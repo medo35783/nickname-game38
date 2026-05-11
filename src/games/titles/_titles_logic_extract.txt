@@ -1,0 +1,551 @@
+  const totalMs=()=>Math.max((Number(attackDur.h)*3600+Number(attackDur.m)*60+Number(attackDur.s))*1000,5*60*1000);
+  const cdInfo=()=>{if(countdown===null)return{label:'—',urgent:false};if(countdown<=0)return{label:'انتهى الوقت!',urgent:true};return{label:fmtMs(countdown),urgent:countdown<5*60*1000};};
+  
+  // دالة تطبيع اللقب (منع التشابه: هاء/تاء مربوطة، همزة/ألف، ياء/ألف مقصورة)
+  const normalizeName = (str) => {
+    return str.trim().toLowerCase()
+      .replace(/ة$/g, 'ه')      // تاء مربوطة → هاء
+      .replace(/أ|إ|آ/g, 'ا')   // همزة → ألف عادي
+      .replace(/ى/g, 'ي');      // ألف مقصورة → ياء
+  };
+
+  /* ══ ADMIN: CREATE ROOM ══ */
+  const createRoom = async () => {
+    // Clear any old session so players aren't stuck in old room
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    const code = genCode();
+    setRoomCode(code);
+    await set(roomRef(code), {
+      game: { phase:'lobby', roundNum:0, createdAt: Date.now() },
+      players: {},
+    });
+    // Save admin session
+    localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: code }));
+    setRole('admin');
+    setGameScreen('admin');
+    notify(`✅ الغرفة جاهزة: ${code}`, 'gold');
+  };
+
+  /* ══ ADMIN: ADD PLAYER ══ */
+  const addPlayer = async () => {
+    const {name, nick, nick2} = form;
+    if(!name.trim()||!nick.trim()){notify('أدخل الاسم واللقب','error');return;}
+    if(nickMode===2&&!nick2.trim()){notify('أدخل اللقب الثاني','error');return;}
+    // استخدام تطبيع اللقب لمنع التشابه
+    const allNicks = playersList.flatMap(p=>[p.nick,p.nick2].filter(Boolean));
+    const normalizedNicks = allNicks.map(normalizeName);
+    if(normalizedNicks.includes(normalizeName(nick))){notify(`⚠️ اللقب "${nick.trim()}" سبقك أحد عليه — اختر لقباً آخر`,'error');return;}
+    if(nickMode===2&&normalizedNicks.includes(normalizeName(nick2))){notify(`⚠️ اللقب "${nick2.trim()}" سبقك أحد عليه — اختر لقباً آخر`,'error');return;}
+    if(nickMode===2&&normalizeName(nick)===normalizeName(nick2)){notify('اللقبان متطابقان — يجب أن يختلفا','error');return;}
+    const newRef = push(playersRef(roomCode));
+    await set(newRef, {
+      name:name.trim(), nick:nick.trim(),
+      nick2: nickMode===2 ? nick2.trim() : null,
+      initials: mkInitials(name.trim()),
+      colorIdx: playersList.length % AV_COLORS.length,
+      status:'active', missedRounds:0,
+    });
+    setForm({name:'',nick:'',nick2:''});
+    notify(`✅ أضيف ${name.trim()}`, 'success');
+  };
+
+  /* ══ PLAYER: JOIN ROOM ══ */
+  const joinRoom = async () => {
+    if(joinLoading) return; // منع الضغط المزدوج
+    setJoinErr('');
+    if(joinInput.length!==4){setJoinErr('الرمز 4 أرقام');return;}
+    if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
+    setJoinLoading(true);
+    try {
+      const snap = await get(roomRef(joinInput));
+      if(!snap.exists()){setJoinErr('الغرفة غير موجودة');return;}
+      const data = snap.val();
+      const existingPlayers = Object.entries(data.players||{});
+      const gamePhase = data.game?.phase || 'lobby';
+
+      // Check if player already exists (rejoin)
+      const existing = existingPlayers.find(([id,p])=>
+        p.name?.trim()===joinName.trim() && p.nick?.trim()===joinNick.trim()
+      );
+
+      if(existing) {
+        // REJOIN — player already registered
+        const [existingId, existingData] = existing;
+        setMyId(existingId);
+        setMyNickLocal(existingData.nick);
+        setRoomCode(joinInput);
+        setRole('player');
+        // Save to localStorage for auto-rejoin
+        localStorage.setItem('ng_session', JSON.stringify({
+          roomCode: joinInput, name: joinName.trim(), nick: joinNick.trim(), playerId: existingId
+        }));
+        if(gamePhase==='lobby') setGameScreen('waiting');
+        else if(gamePhase==='attacking') setGameScreen('attack');
+        else if(gamePhase==='revealing') setGameScreen('results');
+        else if(gamePhase==='ended') setGameScreen('winner');
+        notify('✅ تم الرجوع للعبة!', 'success');
+        return;
+      }
+
+      // NEW JOIN — player not registered yet
+      if(gamePhase!=='lobby'){
+        setJoinErr('اللعبة بدأت — لا يمكن الانضمام لأول مرة');
+        return;
+      }
+      // check nick not taken — استخدام تطبيع اللقب
+      const existingNicks = existingPlayers.flatMap(([,p])=>[p.nick,p.nick2].filter(Boolean));
+      const normalizedExisting = existingNicks.map(normalizeName);
+      if(normalizedExisting.includes(normalizeName(joinNick))){setJoinErr(`⚠️ اللقب "${joinNick.trim()}" سبقك أحد عليه — اختر لقباً مختلفاً`);return;}
+      // Validate nick2 if nickMode=2
+      if(roomNickMode===2){
+        if(!joinNick2.trim()){setJoinErr('أدخل لقبك الثاني');setJoinLoading(false);return;}
+        if(normalizedExisting.includes(normalizeName(joinNick2))){setJoinErr('اللقب الثاني سبقك أحد عليه — اختر لقباً آخر');setJoinLoading(false);return;}
+        if(normalizeName(joinNick)===normalizeName(joinNick2)){setJoinErr('اللقبان يجب أن يختلفا');setJoinLoading(false);return;}
+      }
+      const newRef = push(playersRef(joinInput));
+      await set(newRef, {
+        name:joinName.trim(), nick:joinNick.trim(),
+        nick2: roomNickMode===2 ? joinNick2.trim() : null,
+        initials:mkInitials(joinName.trim()),
+        colorIdx: existingPlayers.length % AV_COLORS.length,
+        status:'active', missedRounds:0,
+      });
+      setMyId(newRef.key);
+      setMyNickLocal(joinNick.trim());
+      setRoomCode(joinInput);
+      setRole('player');
+      // Clear old sessions and save new
+      localStorage.removeItem('ng_admin_session');
+      localStorage.setItem('ng_session', JSON.stringify({
+        roomCode: joinInput, name: joinName.trim(), nick: joinNick.trim(), playerId: newRef.key
+      }));
+      setGameScreen('waiting');
+      notify('✅ انضممت للعبة! انتظر المشرف', 'success');
+    } catch(e) {
+      setJoinErr('خطأ في الاتصال — تحقق من الإنترنت');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  /* ══ AUTO-REJOIN from localStorage ══ */
+  const checkAutoRejoin = async () => {
+    try {
+      // Check admin session first
+      const adminSaved = localStorage.getItem('ng_admin_session');
+      if(adminSaved) {
+        const adminSession = JSON.parse(adminSaved);
+        const snap = await get(roomRef(adminSession.roomCode));
+        if(snap.exists()) {
+          const data = snap.val();
+          const phase = data.game?.phase || 'lobby';
+          // Don't rejoin ended game
+          if(phase==='ended'){ localStorage.removeItem('ng_admin_session'); setIsLoading(false); return; }
+          setRoomCode(adminSession.roomCode);
+          setRole('admin');
+          if(phase==='lobby') setGameScreen('admin');
+          else if(phase==='attacking') setGameScreen('attack');
+          else if(phase==='revealing') setGameScreen('results');
+          setIsLoading(false);
+          return;
+        } else {
+          localStorage.removeItem('ng_admin_session');
+        }
+      }
+      // Check player session
+      const saved = localStorage.getItem('ng_session');
+      if(!saved) { setIsLoading(false); return; }
+      const session = JSON.parse(saved);
+      if(!session.roomCode||!session.name||!session.nick) return;
+      const snap = await get(roomRef(session.roomCode));
+      if(!snap.exists()) { localStorage.removeItem('ng_session'); return; }
+      const data = snap.val();
+      const existing = Object.entries(data.players||{}).find(([id,p])=>
+        p.name?.trim()===session.name && p.nick?.trim()===session.nick
+      );
+      if(!existing) { localStorage.removeItem('ng_session'); return; }
+      const [existingId] = existing;
+      const phase = data.game?.phase || 'lobby';
+      // Don't rejoin ended game
+      if(phase==='ended'){ localStorage.removeItem('ng_session'); setIsLoading(false); return; }
+      setMyId(existingId);
+      setMyNickLocal(session.nick);
+      setJoinName(session.name);
+      setJoinNick(session.nick);
+      setJoinInput(session.roomCode);
+      setRoomCode(session.roomCode);
+      setRole('player');
+      if(phase==='lobby') setGameScreen('waiting');
+      else if(phase==='attacking') setGameScreen('attack');
+      else if(phase==='revealing') setGameScreen('results');
+    } catch(e) { localStorage.removeItem('ng_session'); }
+    finally { setIsLoading(false); }
+  };
+
+  /* ══ ADMIN: START GAME / LAUNCH ROUND ══ */
+  const launchRound = async (rn) => {
+    const dl = Date.now() + totalMs();
+    const allNicks = shuffle(playersList.flatMap(p=>[p.nick,p.nick2].filter(Boolean)));
+    const allNames = shuffle(playersList.map(p=>p.id));
+    // clear previous attacks
+    await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks:{} });
+    // امسح عقوبات اللقب المسموم — الجولة الممنوعة انتهت
+    const banCleanup = {};
+    playersList.forEach(p=>{
+      // اللاعب كان ممنوع في جولة سابقة — امسح العقوبة
+      if(p.isBannedNextRound && p.isBannedNextRound < rn){
+        banCleanup[`rooms/${roomCode}/players/${p.id}/isBannedNextRound`] = null;
+      }
+    });
+    if(Object.keys(banCleanup).length>0) await update(ref(db), banCleanup);
+
+    const updates = {
+      phase:'attacking',
+      roundNum: rn,
+      deadline: dl,
+      roundOrder: { nicks:allNicks, names:allNames },
+      attacksPerRound: activeSpecialRound, // عدد الهجمات الحقيقي
+      specialRound: 1, // إعادة للوضع الافتراضي
+      poisonNick: null
+    };
+    // لا تُعيد silentActive إذا كان مُفعّلاً بالفعل
+    if (!isSilentActive) {
+      updates.silentActive = false;
+    }
+    await update(gameRef(roomCode), updates);
+    setSpecialRound(1); // إعادة local state
+    notify(`🔔 الجولة ${rn} بدأت!`, 'gold');
+  };
+
+  const startGame = async () => {
+    const minPlayers = nickMode===2 ? 4 : 6;
+    if(activePlayers.length<minPlayers){notify(`يلزم ${minPlayers} لاعبين على الأقل`,'error');return;}
+    // احفظ nickMode في Firebase عشان المتسابقين يعرفون
+    await update(gameRef(roomCode), { nickMode });
+    await launchRound(1);
+  };
+
+  /* ══ PLAYER: SUBMIT ATTACK ══ */
+  const submitAttack = async (attackerNickOverride=null) => {
+    if(!myNick||!myGuess){notify('اختر لقباً وحدد صاحبه','error');return;}
+
+    const attackerNick = attackerNickOverride || myNickLocal || '(لاعب)';
+
+    // تحقق من عقوبة اللقب المسموم
+    const attackerData = playersList.find(p=>p.nick===attackerNick||p.nick2===attackerNick);
+    if(attackerData?.isBannedNextRound && attackerData.isBannedNextRound >= roundNum){
+      notify('☠️ أنت ممنوع من الهجوم هذه الجولة — عقوبة اللقب المسموم!','error');
+      return;
+    }
+
+    // Block if attacker is eliminated or inactive
+    const attackerPlayer = playersList.find(p=>p.nick===attackerNick||p.nick2===attackerNick);
+    if(attackerPlayer && attackerPlayer.status!=='active'){
+      notify('❌ لا يمكنك الهجوم — أنت خارج المسابقة','error');
+      return;
+    }
+
+    // Block self-attack — attacker cannot target their own nick
+    const realOwner = playersList.find(p=>p.nick===myNick||p.nick2===myNick);
+    if(!realOwner){notify('لقب غير موجود!','error');return;}
+    if(realOwner.nick===attackerNick||realOwner.nick2===attackerNick){
+      notify('❌ لا يمكنك مهاجمة لقبك أنت!','error');
+      return;
+    }
+    // Block self-attack by name/id
+    if(attackerPlayer && myGuess===attackerPlayer.id){
+      notify('❌ لا يمكنك تخمين نفسك!','error');
+      return;
+    }
+    // منع تخمين نفسك بالاسم أو بالـ ID
+    const guessedP = playersList.find(p=>p.id===myGuess);
+    if(myId && myGuess===myId){
+      notify('❌ لا يمكنك تخمين نفسك!','error');
+      return;
+    }
+    if(guessedP && joinName.trim() && guessedP.name?.trim()===joinName.trim()){
+      notify('❌ لا يمكنك تخمين نفسك!','error');
+      return;
+    }
+
+    // احسب هجمات هذا اللاعب — قراءة مباشرة من Firebase بـ ID اللاعب
+    const freshSnap = await get(attacksRef(roomCode));
+    const freshAttacks = freshSnap.val() || {};
+    const attackerPlayerId = attackerPlayer?.id;
+    const myAttacksCount = Object.values(freshAttacks).filter(a=>{
+      if(a.attackerPlayerId && attackerPlayerId) return a.attackerPlayerId===attackerPlayerId;
+      const nicks = attackerPlayer ? [attackerPlayer.nick, attackerPlayer.nick2].filter(Boolean) : [attackerNick];
+      return nicks.includes(a.attackerNick);
+    }).length;
+    if(myAttacksCount >= attacksPerRound){
+      notify(`❌ وصلت للحد الأقصى — ${attacksPerRound} هجمة لكل لاعب في هذه الجولة`,'error');
+      return;
+    }
+
+    const guessedPlayer = playersList.find(p=>p.id===myGuess);
+    const correct = guessedPlayer?.id === realOwner.id;
+
+    // احفظ attackerPlayerId ليكون الفحص دقيقاً (لاعب واحد = هوية واحدة حتى لو عنده لقبان)
+    const actualAttackerId = attackerPlayer?.id || myId || null;
+    // Firebase Transaction — يمنع Race Conditions والنقر المزدوج
+    const attackData = {
+      attackerNick,
+      attackerId: myId || attackerNickOverride,
+      attackerPlayerId: actualAttackerId,
+      targetNick: myNick,
+      guessedId: myGuess,
+      guessedName: guessedPlayer?.name,
+      realOwnerId: realOwner.id,
+      realOwnerName: realOwner.name,
+      correct,
+      time: Date.now(),
+    };
+    const newAttackRef = push(attacksRef(roomCode));
+    try {
+      await set(newAttackRef, attackData);
+    } catch(err) {
+      notify('⚠️ فشل الإرسال — حاول مرة أخرى','error');
+      return;
+    }
+    const myNewCount = myAttacksCount + 1;
+    // لا نحتاج setMySubmitted — myAttacksDone يحسب من Firebase
+    // دائماً أعد تهيئة الاختيار بعد كل هجمة
+    setMyNick(null);
+    setMyGuess(null);
+    setProxyFor(null);
+    if(attacksPerRound > 1){
+      notify(`✅ هجمة ${myNewCount}/${attacksPerRound}${myNewCount < attacksPerRound ? ' — هاجم مرة أخرى!' : ' — اكتملت هجماتك!'}`, 'gold');
+    } else {
+      notify('✅ تم إرسال الهجوم!', 'gold');
+    }
+  };
+
+  /* ══ ADMIN: REVEAL ══ */
+  const doReveal = async () => {
+    if(phase!=='attacking') return;
+    const currentAttacks = Object.values(attacks||{});
+    const notSent = activePlayers.filter(p=>!currentAttacks.some(a=>a.attackerNick===p.nick));
+    if(notSent.length>0 && !modal){
+      setModal({type:'confirm_reveal', notSent});
+      return;
+    }
+    setModal(null);
+    await processReveal(currentAttacks);
+  };
+
+  const processReveal = async (currentAttacks) => {
+    playSound('suspense');
+
+    // ══ اللقب المسموم — عقوبة في الجولة القادمة ══
+    if(activePoisonNick) {
+      const poisonMisses = currentAttacks.filter(a=>a.targetNick===activePoisonNick && !a.correct);
+      if(poisonMisses.length>0) {
+        setTimeout(()=>{ playSound('poison_hit'); notify(`☠️ ${poisonMisses.length} لاعب وقع في فخ اللقب المسموم — ممنوع من الجولة القادمة!`,'info'); },600);
+        // احفظ العقوبة مباشرة في بيانات كل لاعب معاقب
+        const banUpdates = {};
+        const nextRound = (gameState?.roundNum||0) + 1;
+        poisonMisses.forEach(atk=>{
+          // احصل على ID اللاعب من الهجمة
+          const pid = atk.attackerPlayerId || playersList.find(p=>p.nick===atk.attackerNick||p.nick2===atk.attackerNick)?.id;
+          if(pid) banUpdates[`rooms/${roomCode}/players/${pid}/isBannedNextRound`] = nextRound;
+        });
+        if(Object.keys(banUpdates).length>0) await update(ref(db), banUpdates);
+      }
+    }
+
+    // Deduplicate — two attacks on same player = ONE elimination, merge attacker names
+    const seenElimIds = new Set();
+    const elimAttackers = {}; // playerId -> [attacker nicks]
+    currentAttacks.forEach(a=>{
+      if(a.correct){
+        if(!elimAttackers[a.realOwnerId]) elimAttackers[a.realOwnerId]=[];
+        elimAttackers[a.realOwnerId].push(a.attackerNick);
+        seenElimIds.add(a.realOwnerId);
+      }
+    });
+    const elimIds = seenElimIds;
+
+    // ══ SILENT ROUND: store attacks only, keep everyone active ══
+    if(isSilentActive){
+      const roundKey = `round_${roundNum}`;
+      // Build silent exit data (for later reveal) but DON'T change player status
+      const silentExits = playersList
+        .filter(p=>elimIds.has(p.id))
+        .map(p=>({
+          playerId: p.id, nick:p.nick, nick2:p.nick2, name:p.name,
+          attackers: elimAttackers[p.id]||[], roundNum,
+          initials:p.initials, colorIdx:p.colorIdx
+        }));
+      // Also track missed rounds for silent
+      const silentMissed = playersList
+        .filter(p=>p.status==='active'&&!currentAttacks.some(a=>a.attackerNick===p.nick))
+        .map(p=>({playerId:p.id, missedRounds:(p.missedRounds||0)+1}));
+
+      const updates = {};
+      updates[`rooms/${roomCode}/rounds/${roundKey}`]={
+        round:roundNum, attacks:attacks||{}, endedAt:Date.now(), silent:true
+      };
+      updates[`rooms/${roomCode}/game/phase`]='attacking';
+      updates[`rooms/${roomCode}/game/silentPending`]={ silentExits, silentMissed, roundNum };
+      await update(ref(db), updates);
+      setSilentRound(false); await update(gameRef(roomCode),{silentActive:false});
+      // Launch next round immediately — silent results hidden
+      notify(`🤫 جولة الصمت ${roundNum} — انتقلنا للجولة ${roundNum+1}`,'info');
+      await launchRound(roundNum+1);
+      return;
+    }
+
+    // ══ NORMAL ROUND ══
+    const updates = {};
+    const exitList = [];
+
+    // ── دمج الجولة الصامتة السابقة إن وُجدت ──
+    const pendingSilent = gameState?.silentPending;
+    if(pendingSilent?.silentExits?.length > 0){
+      pendingSilent.silentExits.forEach(ex=>{
+        const p = playersList.find(pl=>pl.id===ex.playerId);
+        if(p && p.status==='active'){
+          const attackersStr = (ex.attackers||[]).join(' + ');
+          updates[`rooms/${roomCode}/players/${p.id}/status`] = 'eliminated';
+          updates[`rooms/${roomCode}/players/${p.id}/eliminatedBy`] = attackersStr;
+          updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`] = ex.roundNum;
+          exitList.push({nick:ex.nick, nick2:ex.nick2, name:ex.name, eliminatedBy:attackersStr, attackers:ex.attackers, initials:ex.initials, colorIdx:ex.colorIdx, fromSilentRound:ex.roundNum});
+        }
+      });
+      // حدّث الخامل من الجولة الصامتة
+      pendingSilent.silentMissed?.forEach(m=>{
+        const p = playersList.find(pl=>pl.id===m.playerId);
+        if(p && p.status==='active'){
+          updates[`rooms/${roomCode}/players/${p.id}/missedRounds`] = m.missedRounds;
+          if(m.missedRounds >= 2){
+            updates[`rooms/${roomCode}/players/${p.id}/status`] = 'inactive';
+            updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`] = pendingSilent.roundNum;
+          }
+        }
+      });
+      // امسح silentPending
+      updates[`rooms/${roomCode}/game/silentPending`] = null;
+    }
+
+    for(const p of playersList){
+      if(elimIds.has(p.id)){
+        const attackers = elimAttackers[p.id]||[];
+        const eliminatedByStr = attackers.join(' + ');
+
+        // لقبان: تحقق إذا تم كشف كلا اللقبين
+        if(p.nick2){
+          const hitNicks = currentAttacks.filter(a=>a.correct&&a.realOwnerId===p.id).map(a=>a.targetNick);
+          const nick1Hit = hitNicks.includes(p.nick);
+          const nick2Hit = hitNicks.includes(p.nick2);
+          if(!nick1Hit||!nick2Hit){
+            // لقب واحد فقط كُشف — اللاعب يبقى لكن نضع علامة
+            const revealedNick = nick1Hit ? p.nick : p.nick2;
+            updates[`rooms/${roomCode}/players/${p.id}/revealedNick`]=revealedNick;
+            exitList.push({nick:revealedNick, name:null, partial:true, eliminatedBy:eliminatedByStr, attackers, initials:p.initials, colorIdx:p.colorIdx});
+            continue; // لا يخرج
+          }
+        }
+
+        updates[`rooms/${roomCode}/players/${p.id}/status`]='eliminated';
+        updates[`rooms/${roomCode}/players/${p.id}/eliminatedBy`]=eliminatedByStr;
+        updates[`rooms/${roomCode}/players/${p.id}/eliminatedByList`]=attackers;
+        updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`]=roundNum;
+        exitList.push({
+          nick:p.nick, nick2:p.nick2, name:p.name,
+          eliminatedBy:eliminatedByStr, attackers,
+          initials:p.initials, colorIdx:p.colorIdx
+        });
+      } else if(p.status==='active'){
+        const submitted = currentAttacks.some(a=>a.attackerNick===p.nick);
+        const nm = submitted ? 0 : (p.missedRounds||0)+1;
+        updates[`rooms/${roomCode}/players/${p.id}/missedRounds`]=nm;
+        // المعاقب بالمسموم لا يُطرد بالخمول
+        if(nm>=2 && !p.isBannedNextRound){
+          updates[`rooms/${roomCode}/players/${p.id}/status`]='inactive';
+          updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`]=roundNum;
+          exitList.push({nick:p.nick, name:p.name, eliminatedBy:'الخمول', attackers:[], initials:p.initials, colorIdx:p.colorIdx, inactive:true});
+        }
+      }
+    }
+
+    const roundKey = `round_${roundNum}`;
+    updates[`rooms/${roomCode}/rounds/${roundKey}`]={ round:roundNum, attacks:attacks||{}, endedAt:Date.now() };
+    // إذا بقي اثنان أو أقل بعد هذه الجولة — أنهِ المسابقة مباشرة
+    const remainingAfter = playersList.filter(p=>p.status==='active'&&!elimIds.has(p.id)).length;
+    updates[`rooms/${roomCode}/game/phase`] = remainingAfter<=2 ? 'ended' : 'revealing';
+    await update(ref(db), updates);
+
+    if(exitList.length>0){
+      exitList.forEach((ex,i)=>{
+        setTimeout(()=>{
+          playSound('explosion');
+          setExitAnnounce(ex);
+          setTimeout(()=>setExitAnnounce(null), 3000);
+        }, i*3200);
+      });
+    }
+
+    // Init flip cards — ONE card per eliminated player (deduplicated)
+    const fc = {};
+    [...elimIds].forEach(id=>{
+      const p = playersList.find(pl=>pl.id===id);
+      if(p) fc[p.nick]=false;
+    });
+    setFlipCards(fc);
+  };
+
+  /* ══ ADMIN: NEXT ROUND ══ */
+  const nextRound = async () => {
+    const still = playersList.filter(p=>p.status==='active');
+    if(still.length<=2){ await update(gameRef(roomCode),{phase:'ended'}); return; } // اثنان أو أقل = فائزان
+    await launchRound(roundNum+1);
+  };
+
+  /* ══ ADMIN CONTROLS ══ */
+  const extendTime = async (ms) => {
+    await update(gameRef(roomCode),{deadline:(deadline||Date.now())+ms});
+    notify(`⏱️ تمديد ${fmtMs(ms)}`,'gold');
+  };
+  const endGame = async () => {
+    await update(gameRef(roomCode),{phase:'ended'});
+    // Clear ALL sessions so no one auto-rejoins a finished game
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+  };
+  const elimCheat = async (pid) => {
+    const p = playersList.find(pl=>pl.id===pid);
+    await update(ref(db,`rooms/${roomCode}/players/${pid}`),{status:'cheater',eliminatedRound:roundNum,eliminatedBy:'المشرف'});
+    notify(`🚫 أُخرج ${p?.name}`, 'error');
+  };
+
+  /* ══ DOWNLOAD PDF REPORT ══ */
+  const downloadPDFReport = () => {
+    const report = {
+      gameType: 'لعبة الألقاب',
+      roomCode,
+      timestamp: new Date().toLocaleString('ar-SA'),
+      players: playersList.map(p => ({
+        name: p.name,
+        nick: p.nick,
+        nick2: p.nick2,
+        status: p.status,
+        eliminatedBy: p.eliminatedBy,
+        eliminatedRound: p.eliminatedRound
+      })),
+      rounds: allRoundsList.map(r => ({
+        round: r.round,
+        attacks: Object.values(r.attacks||{}).length
+      })),
+      winner: activePlayers[0]?.name || 'لا يوجد'
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `تقرير_${roomCode}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('✅ تم تحميل التقرير', 'success');
+  };

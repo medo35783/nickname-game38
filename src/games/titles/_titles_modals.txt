@@ -1,0 +1,175 @@
+      {modal?.type==='confirm_reveal'&&<div className="mbg"><div className="modal">
+        <div className="micn">⚠️</div><div className="mtitle" style={{color:'var(--gold)'}}>كشف مبكر؟</div>
+        <div className="msub">{modal.notSent.length} لاعب لم يرسل:<br/><span style={{color:'var(--red)'}}>{modal.notSent.map(p=>p.name).join('، ')}</span></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn br" style={{flex:1}} onClick={()=>{setModal(null);processReveal(attacksList);}}>كشف الآن</button>
+          <button className="btn bgh" style={{flex:1}} onClick={()=>setModal(null)}>انتظر</button>
+        </div>
+      </div></div>}
+      {/* ══ CINEMATIC EXIT OVERLAY ══ */}
+      {exitAnnounce&&(
+        <div className="exit-screen" onClick={()=>setExitAnnounce(null)}>
+          <div className="exit-icon">💥</div>
+          <div className="exit-title">كُشفت الهوية!</div>
+          <div className="exit-nick">"{exitAnnounce.nick}"</div>
+          <div className="exit-name">{exitAnnounce.inactive?'خرج بسبب الخمول':`الشخص خلف اللقب: ${exitAnnounce.name}`}</div>
+          {!exitAnnounce.inactive&&<div className="exit-killer">
+            ⚔️ كُشف من قِبَل: <span style={{color:'var(--gold)',fontWeight:700}}>{exitAnnounce.eliminatedBy}</span>
+          </div>}
+          <div style={{marginTop:20,fontSize:11,color:'rgba(255,255,255,.3)'}}>اضغط للإغلاق</div>
+        </div>
+      )}
+
+      {/* ══ LEADERBOARD MODAL ══ */}
+
+
+      {/* ══ TUTORIAL MODAL ══ */}
+      {modal?.type==='guide'&&(
+        <div className="mbg" style={{alignItems:'flex-start',paddingTop:16,overflowY:'auto'}}>
+          <div style={{background:'var(--card)',border:'1.5px solid var(--border)',borderRadius:16,padding:20,maxWidth:430,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+
+            {/* Header + close */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+              <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--gold)'}}>📖 دليل لعبة الألقاب</div>
+              <button className="btn bgh bxs" onClick={()=>setModal(null)}>✕</button>
+            </div>
+
+            {/* Role toggle */}
+            <div className="role-toggle" style={{marginBottom:16}}>
+              <button className={`role-btn ${guideRole==='player'?'active':''}`} onClick={()=>setGuideRole('player')}>
+                🎮 أنا متسابق
+              </button>
+              <button className={`role-btn ${guideRole==='admin'?'active':''}`} onClick={()=>setGuideRole('admin')}>
+                👑 أنا المشرف
+              </button>
+            </div>
+
+            {/* ══ متسابق ══ */}
+            {guideRole==='player'&&<>
+              {[
+                {n:1, title:'ادخل رمز الغرفة وسجّل بياناتك', desc:'المشرف يرسل رمزاً من 4 أرقام. أدخله واكتب اسمك ولقبك السري.', tip:'اختر لقباً لا يمت بصلة لاهتماماتك — يجعل كشفك أصعب!'},
+                {n:2, title:'انتظر في غرفة الانتظار', desc:'لقبك مخفي تماماً. انتظر حتى يبدأ المشرف اللعبة — ستنتقل تلقائياً.'},
+                {n:3, title:'شاشة الهجوم', desc:'لوحة الألقاب فوق + قائمة الأسماء تحت. اختر لقباً تعرف صاحبه ثم اختر الاسم واضغط تأكيد.', tip:'الكل يهاجم في نفس الوقت سراً — لا أحد يرى هجومك!'},
+                {n:4, title:'كشف النتائج', desc:'المشرف يقرر متى تُكشف. النتائج تظهر للجميع في نفس اللحظة — اضغط البطاقات لتكشف الهوية!'},
+              ].map(s=>(
+                <div key={s.n} className="step-card" style={{marginBottom:9}}>
+                  <div className="step-num">{s.n}</div>
+                  <div className="step-body">
+                    <div className="step-title">{s.title}</div>
+                    <div className="step-desc">{s.desc}</div>
+                    {s.tip&&<div className="step-tip">💡 {s.tip}</div>}
+                  </div>
+                </div>
+              ))}
+
+              <div style={{marginTop:4,marginBottom:12,fontSize:12,color:'var(--gold)',fontWeight:700}}>⚠️ قوانين مهمة</div>
+              {[
+                ['❌','جولتان بدون هجوم = خروج صامت بدون كشف لقبك'],
+                ['🚫','التعاون ممنوع — المشرف يراقب'],
+                ['🔄','لو خرجت عن طريق الخطأ — أدخل نفس البيانات للرجوع'],
+                ['🏆','الهدف: ابقَ آخر لاعب دون أن يُكشف لقبك'],
+              ].map(([ic,tx],i)=>(
+                <div key={i} className="rule-row">{ic} <span>{tx}</span></div>
+              ))}
+            </>}
+
+            {/* ══ مشرف ══ */}
+            {guideRole==='admin'&&<>
+              {[
+                {n:1, title:'أنشئ الغرفة', desc:'اضغط "إنشاء غرفة كمسؤول". أرسل الرمز الظاهر للمتسابقين أو أضفهم يدوياً.'},
+                {n:2, title:'حدّد الإعدادات', desc:'عدد الألقاب (1 أو 2) ومدة كل جولة. الحد الأدنى 5 دقائق — لا حد أقصى.', tip:'رحلة 3 أيام؟ اجعل كل جولة 2-6 ساعات'},
+                {n:3, title:'ابدأ اللعبة', desc:'بعد 6 لاعبين على الأقل، اضغط "بدء اللعبة". الجميع ينتقلون تلقائياً.'},
+                {n:4, title:'راقب من زر 👑 تحكم', desc:'ترى من أرسل هجومه، السجل السري، وتمديد الوقت والهجوم بالنيابة.'},
+                {n:5, title:'كشف النتائج', desc:'اضغط "كشف نتائج الجولة" متى أردت. النتائج تظهر للجميع معاً.', tip:'⚠️ "إنهاء المسابقة كاملاً" يختلف عن "كشف نتائج الجولة" — الأول لا رجعة فيه!'},
+              ].map(s=>(
+                <div key={s.n} className="step-card" style={{marginBottom:9}}>
+                  <div className="step-num">{s.n}</div>
+                  <div className="step-body">
+                    <div className="step-title">{s.title}</div>
+                    <div className="step-desc">{s.desc}</div>
+                    {s.tip&&<div className="step-tip">💡 {s.tip}</div>}
+                  </div>
+                </div>
+              ))}
+
+              <div style={{marginTop:4,marginBottom:12,fontSize:12,color:'var(--gold)',fontWeight:700}}>🎲 أدوات الإثارة</div>
+              {[
+                ['☠️','اللقب المسموم — من يهاجمه ويخطئ يخسر جولة'],
+                ['🤫','جولة الصمت — النتائج مخفية حتى تقرر أنت'],
+                ['🎮','هجوم بالنيابة — إذا لاعب جواله أُغلق'],
+                ['🚫','إخراج للغش — إذا رأيت تعاوناً مشبوهاً'],
+              ].map(([ic,tx],i)=>(
+                <div key={i} className="rule-row">{ic} <span>{tx}</span></div>
+              ))}
+            </>}
+
+            <button className="btn bg" style={{marginTop:16}} onClick={()=>setModal(null)}>✅ فهمت!</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.type==='exit_game'&&(
+        <div className="mbg"><div className="modal">
+          <div className="micn">🚪</div>
+          <div className="mtitle">الرجوع للصفحة الرئيسية؟</div>
+          <div className="msub">
+            {role==='player'&&<>
+              يمكنك العودة لاحقاً بنفس:<br/>
+              <span style={{color:'var(--gold)',fontWeight:700}}>رمز الغرفة + اسمك + لقبك</span>
+            </>}
+            {role==='admin'&&<>
+              المتسابقون سيبقون في انتظار عودتك.<br/>
+              <span style={{color:'var(--gold)',fontWeight:700}}>يمكنك العودة تلقائياً بفتح الرابط</span>
+            </>}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            <button className="btn bg" onClick={()=>setModal(null)}>
+              ← أكمل اللعبة
+            </button>
+            <button className="btn br" onClick={()=>{
+              setModal(null);
+              localStorage.removeItem('ng_session');
+              localStorage.removeItem('ng_admin_session');
+              setRole(null);
+              setRoomCode('');
+              setGameState(null);
+              setPlayers({});
+              setAttacks({});
+              setAllRoundsData({});
+              setMyId(null);
+              setMyNickLocal('');
+              setJoinName('');
+              setJoinNick('');
+              setJoinInput('');
+              setGameScreen('home');
+              setTab('game');
+              notify('تم الخروج من اللعبة','info');
+            }}>
+              🚪 انسحاب من اللعبة
+            </button>
+          </div>
+        </div></div>
+      )}
+
+      {modal?.type==='confirm_end'&&<div className="mbg"><div className="modal">
+        <div className="micn">⚠️</div>
+        <div className="mtitle" style={{color:'var(--red)'}}>إنهاء المسابقة كاملاً؟</div>
+        <div className="msub">
+          هذا سيُنهي المسابقة نهائياً<br/>
+          وسيُعلن الفائزون الحاليون.<br/>
+          <strong style={{color:'var(--red)'}}>لا يمكن التراجع!</strong>
+        </div>
+        <div style={{background:'rgba(230,57,80,.08)',border:'1px solid rgba(230,57,80,.2)',borderRadius:8,padding:'10px',marginBottom:14,fontSize:12,color:'var(--muted)',textAlign:'center'}}>
+          إذا أردت فقط كشف نتائج الجولة الحالية<br/>
+          اضغط <strong style={{color:'var(--green)'}}>رجوع</strong> واستخدم زر<br/>
+          <strong style={{color:'var(--green)'}}>🔓 كشف نتائج الجولة</strong>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn br" style={{flex:1}} onClick={()=>{setModal(null);endGame();}}>
+            نعم، أنهِ المسابقة
+          </button>
+          <button className="btn bv" style={{flex:1}} onClick={()=>setModal(null)}>
+            ← رجوع
+          </button>
+        </div>
+      </div></div>}

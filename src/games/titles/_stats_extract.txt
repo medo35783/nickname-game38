@@ -1,0 +1,316 @@
+    if(gameScreen==='stats'){
+      // ── هيت ماب الجولة الحالية ──
+      const roundNickMap={};
+      attacksList.forEach(a=>{if(a.targetNick)roundNickMap[a.targetNick]=(roundNickMap[a.targetNick]||0)+1;});
+      const roundNickSorted=Object.entries(roundNickMap).sort((a,b)=>b[1]-a[1]);
+      const roundNameMap={};
+      attacksList.forEach(a=>{if(a.guessedName)roundNameMap[a.guessedName]=(roundNameMap[a.guessedName]||0)+1;});
+      const roundNameSorted=Object.entries(roundNameMap).sort((a,b)=>b[1]-a[1]);
+
+      // ── هيت ماب كامل الجولات ──
+      const allNickSorted=nickHeatmapActive();
+      const allNameSorted=nameHeatmapActive();
+
+      const attackerRank = attackerRankGlobal; // من الحساب العام
+
+      // ── إحصاءات اللاعب الحالي ──
+      const myPlayer = playersList.find(p=>p.nick===myNickLocal);
+      const myAtks = allAttacksFlat.filter(a=>a.attackerNick===myNickLocal);
+      const myHits = myAtks.filter(a=>a.correct);
+      const myTargeted = allAttacksFlat.filter(a=>a.realOwnerId===myPlayer?.id);
+      const myExposed = allAttacksFlat.filter(a=>a.realOwnerId===myPlayer?.id&&a.correct);
+      const myAccuracy = myAtks.length>0?Math.round(myHits.length/myAtks.length*100):0;
+      const myRank = attackerRank.findIndex(p=>p.nick===myNickLocal)+1;
+
+      // تبويبات حسب الدور — «مسار اللعبة» يظهر فقط للمشرف
+      const tabs = effectiveRole === 'admin'
+        ? [['nicks','🎭 الألقاب'],['names','👥 الأسماء'],['fierce','⚔️ الأشرس'],['poison','☠️ المسموم'],['remaining','✅ المتبقون'],['log','📋 مسار اللعبة']]
+        : [['nicks','🎭 الألقاب'],['names','👥 الأسماء'],['fierce','⚔️ الأشرس'],['poison','☠️ المسموم'],['me','👤 أنا']];
+
+      const HeatBar=({items,maxVal,showLabel=true})=>(
+        <>{items.map(([label,count],i)=>(
+          <div key={label} style={{marginBottom:9,maxWidth:'100%'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,gap:8}}>
+              <span style={{fontWeight:700,fontSize:13,color:i===0?'var(--red)':i===1?'var(--gold)':i===2?'var(--blue)':'var(--text)',flex:1,minWidth:0}}>{i+1}. {label}</span>
+              <span style={{fontSize:12,color:'var(--muted)',flexShrink:0}}>{count} هجمة</span>
+            </div>
+            <div style={{height:6,background:'rgba(255,255,255,.06)',borderRadius:3,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${Math.round(count/maxVal*100)}%`,background:i===0?'var(--red)':i===1?'var(--gold)':i===2?'var(--blue)':'var(--muted)',borderRadius:3,transition:'width .4s'}}/>
+            </div>
+          </div>
+        ))}</>
+      );
+
+      return(
+        <div className="scr">
+          <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setGameScreen(phase==='revealing'||phase==='ended'?'results':'attack')}>← رجوع</button>
+
+          {/* جولة الصمت — إخفاء كامل للإحصائيات للمتسابقين */}
+          {gameState?.silentPending && role!=='admin' ? (
+            <div style={{textAlign:'center',padding:'40px 20px'}}>
+              <div style={{fontSize:48,marginBottom:12}}>🤫</div>
+              <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--blue)',marginBottom:8}}>
+                جولة الصمت
+              </div>
+              <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.8}}>
+                النتائج محفوظة — ستظهر الإحصائيات عند إعلان المشرف
+              </div>
+            </div>
+          ) : (
+          <>
+          <div className="tabs" style={{flexWrap:'wrap',gap:4}}>
+            {tabs.map(([k,l])=>(
+              <button key={k} className={`tab${statsTab===k?' on':''}`} style={{flex:'none',padding:'7px 10px',fontSize:11}}
+                onClick={()=>setStatsTab(k)}>{l}</button>
+            ))}
+          </div>
+
+          {/* ══ 🎭 الألقاب ══ */}
+          {statsTab==='nicks'&&<>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center'}}>
+              الألقاب من الأكثر استهدافاً للأقل — اضغط لقباً لترى من هاجمه
+            </div>
+            {/* هيت ماب الجولة الحالية — تظهر فقط بعد الكشف */}
+            {phase==='revealing'&&roundNickSorted.length>0&&<>
+              <div className="ctitle">الجولة الحالية</div>
+              <HeatBar items={roundNickSorted} maxVal={roundNickSorted[0]?.[1]||1}/>
+              <div className="div"/>
+            </>}
+            {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
+              🔒 إحصائيات الجولة الحالية ستظهر بعد الإعلان
+            </div>}
+            <div className="ctitle">كامل الجولات</div>
+            {allNickSorted.length===0
+              ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
+              :<HeatBar items={allNickSorted} maxVal={allNickSorted[0]?.[1]||1}/>
+            }
+          </>}
+
+          {/* ══ 👥 الأسماء ══ */}
+          {statsTab==='names'&&<>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center'}}>
+              الأسماء من الأكثر استهدافاً للأقل
+            </div>
+            {phase==='revealing'&&roundNameSorted.length>0&&<>
+              <div className="ctitle">الجولة الحالية</div>
+              <HeatBar items={roundNameSorted} maxVal={roundNameSorted[0]?.[1]||1}/>
+              <div className="div"/>
+            </>}
+            {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
+              🔒 إحصائيات الجولة الحالية ستظهر بعد الإعلان
+            </div>}
+            <div className="ctitle">كامل الجولات</div>
+            {allNameSorted.length===0
+              ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
+              :<HeatBar items={allNameSorted} maxVal={allNameSorted[0]?.[1]||1}/>
+            }
+          </>}
+
+          {/* ══ 👤 أنا — للمتسابق فقط ══ */}
+          {statsTab==='me'&&role==='player'&&<>
+            {/* بطاقة الهوية */}
+            <div className="card" style={{textAlign:'center',padding:'18px 14px',background:'linear-gradient(135deg,rgba(240,192,64,.1),rgba(255,140,0,.05))'}}>
+              {myPlayer&&<Av p={myPlayer} sz={52} fs={18}/>}
+              <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--gold)',marginTop:8}}>{myPlayer?.name||joinName}</div>
+              <div style={{fontSize:13,color:'var(--text)',marginTop:3}}>"{myNickLocal}"</div>
+              <div style={{marginTop:6}}>
+                {myPlayer?.status==='active'?<span className="badge bvd">✅ نشط</span>:<span className="badge brd">خرج ج{myPlayer?.eliminatedRound}</span>}
+              </div>
+            </div>
+
+            {/* أرقامه الشخصية */}
+            <div className="sg sg4" style={{marginBottom:10}}>
+              {[[myAtks.length,'⚔️ هجماتي','var(--gold)'],[myHits.length,'🎯 إصاباتي','var(--green)'],[myTargeted.length,'👁️ استُهدفت','var(--blue)'],[myExposed.length,'🔓 انكشفت','var(--red)']].map(([n,l,col])=>(
+                <div key={l} className="sbox"><div className="snum" style={{color:col,fontSize:18}}>{n}</div><div className="slbl" style={{fontSize:9}}>{l}</div></div>
+              ))}
+            </div>
+
+            {/* شريط الدقة */}
+            {myAtks.length>0&&<div className="card" style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6,fontSize:13}}>
+                <span style={{fontWeight:700}}>دقة هجماتي</span>
+                <span style={{color:'var(--gold)',fontWeight:900}}>{myAccuracy}%</span>
+              </div>
+              <div style={{height:8,background:'rgba(255,255,255,.06)',borderRadius:4,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${myAccuracy}%`,background:`linear-gradient(90deg,${myAccuracy>=60?'var(--green)':myAccuracy>=30?'var(--gold)':'var(--red)'},${myAccuracy>=60?'#1a8a50':'#b5720c'})`,borderRadius:4,transition:'width .6s'}}/>
+              </div>
+              <div style={{fontSize:11,color:'var(--muted)',marginTop:5}}>أصبت {myHits.length} من {myAtks.length} هجمات</div>
+            </div>}
+
+            {/* ترتيبي */}
+            {myRank>0&&<div className="card" style={{textAlign:'center',marginBottom:10}}>
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:4}}>ترتيبي بالهجمات</div>
+              <div style={{fontFamily:'Cairo',fontSize:28,fontWeight:900,color:'var(--gold)'}}>{myRank}</div>
+              <div style={{fontSize:11,color:'var(--muted)'}}>من {attackerRank.length} لاعب هاجم</div>
+            </div>}
+
+            {/* تاريخ هجماتي */}
+            <div className="ctitle">سجل هجماتي الشخصي</div>
+            {myAtks.length===0
+              ?<div style={{textAlign:'center',color:'var(--muted)',padding:16,fontSize:12}}>لم تهاجم بعد</div>
+              :allRoundsList.map(r=>{
+                const rAtk=Object.values(r.attacks||{}).filter(a=>a.attackerNick===myNickLocal);
+                if(rAtk.length===0) return null;
+                return rAtk.map((a,i)=>(
+                  <div key={i} style={{padding:'8px 12px',marginBottom:5,background:'#09091e',borderRadius:9,borderRight:`3px solid ${a.correct?'var(--green)':'var(--red)'}`,fontSize:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                      <span style={{color:'var(--muted)',fontSize:10}}>الجولة {r.round}</span>
+                      <span style={{color:a.correct?'var(--green)':'var(--red)',fontWeight:700}}>{a.correct?'✅ إصابة':'❌ خطأ'}</span>
+                    </div>
+                    <div>هاجمت <strong style={{color:'var(--gold)'}}>"{a.targetNick}"</strong> وخمّنت <strong>{a.guessedName}</strong></div>
+                  </div>
+                ));
+              })
+            }
+          </>}
+
+          {/* ══ الأشرس هجوماً ══ */}
+          {statsTab==='fierce'&&<>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center'}}>
+              {effectiveRole==='admin'?'الاسم واللقب — للمشرف فقط':'الألقاب فقط — بدون كشف الأسماء'}
+            </div>
+            {attackerRank.length===0
+              ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا هجمات بعد</div>
+              :attackerRank.map((p,i)=>(
+              <div key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:'#09091e',borderRadius:9,marginBottom:5,border:`1px solid ${i===0?'rgba(240,192,64,.3)':i===1?'rgba(200,200,220,.15)':i===2?'rgba(230,57,80,.15)':'rgba(255,255,255,.05)'}`}}>
+                <div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,width:26,textAlign:'center',color:i===0?'var(--gold)':i===1?'rgba(200,200,220,.8)':i===2?'var(--red)':'var(--muted)'}}>
+                  {i===0?'👑':i===1?'🥈':i===2?'🥉':i+1}
+                </div>
+                {/* المشرف يرى الأفاتار والاسم واللقب، المتسابق يرى اللقب فقط بدون أفاتار */}
+                {effectiveRole==='admin' && <Av p={p} sz={32} fs={12}/>}
+                <div style={{flex:1}}>
+                  
+                  {effectiveRole==='admin'
+                    ?<><div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
+                      <div style={{fontSize:11,color:'var(--gold)'}}>"{p.nick}"</div></>
+                    :<div style={{fontWeight:700,fontSize:13,color:'var(--gold)'}}>"{p.nick}"</div>
+                  }
+                </div>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,color:'var(--gold)'}}>{p.count}</div>
+                  <div style={{fontSize:9,color:'var(--muted)'}}>هجمة</div>
+                </div>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,color:'var(--green)'}}>{p.hits}</div>
+                  <div style={{fontSize:9,color:'var(--muted)'}}>إصابة</div>
+                </div>
+              </div>
+            ))}
+          </>}
+
+          {/* ══ ☠️ ضحايا المسموم ══ */}
+          {statsTab==='poison'&&<>
+            {(()=>{
+              const poisoned = playersList.filter(p=>p.isBannedNextRound);
+              if(poisoned.length===0) return(
+                <div style={{textAlign:'center',color:'var(--muted)',padding:20,fontSize:12}}>
+                  <div style={{fontSize:40,marginBottom:8}}>☠️</div>
+                  لا أحد وقع في فخ اللقب المسموم بعد
+                </div>
+              );
+              return(
+                <div>
+                  <div style={{textAlign:'center',marginBottom:12}}>
+                    <div style={{fontFamily:'Cairo',fontSize:28,fontWeight:900,color:'var(--purple)'}}>{poisoned.length}</div>
+                    <div style={{fontSize:11,color:'var(--muted)'}}>لاعب وقع في الفخ</div>
+                  </div>
+                  {poisoned.map(p=>(
+                    <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:'rgba(155,89,182,.08)',border:'1px solid rgba(155,89,182,.2)',borderRadius:9,marginBottom:5}}>
+                      <span style={{fontSize:16}}>☠️</span>
+                      <div style={{flex:1}}>
+                        
+                  {effectiveRole==='admin'
+                          ?<><div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
+                            <div style={{fontSize:11,color:'var(--gold)'}}>"{p.nick}"</div></>
+                          :<div style={{fontWeight:700,fontSize:13,color:'var(--gold)'}}>"{p.nick}"</div>
+                        }
+                      </div>
+                      <div style={{fontSize:11,color:'var(--purple)'}}>ممنوع ج{p.isBannedNextRound}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </>}
+
+          {/* ══ ☠️ ضحايا المسموم ══ */}
+          {statsTab==='poison'&&<>
+            {(()=>{
+              const poisoned = playersList.filter(p=>p.isBannedNextRound);
+              if(poisoned.length===0) return(
+                <div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لم يقع أحد في فخ اللقب المسموم بعد</div>
+              );
+              return(
+                <div>
+                  <div style={{textAlign:'center',marginBottom:12}}>
+                    <div style={{fontSize:36}}>☠️</div>
+                    <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--purple)',marginTop:6}}>{poisoned.length} لاعب ممنوع</div>
+                  </div>
+                  {poisoned.map(p=>(
+                    <div key={p.id} style={{padding:'10px 12px',marginBottom:5,background:'rgba(155,89,182,.08)',border:'1px solid rgba(155,89,182,.2)',borderRadius:9}}>
+                      
+                  {effectiveRole==='admin'
+                        ?<div><span style={{fontWeight:700}}>{p.name}</span> — <span style={{color:'var(--gold)'}}>"{p.nick}"</span><span style={{fontSize:11,color:'var(--muted)',marginRight:8}}> ممنوع الجولة {p.isBannedNextRound}</span></div>
+                        :<div><span style={{color:'var(--gold)',fontWeight:700}}>"{p.nick}"</span><span style={{fontSize:11,color:'var(--muted)',marginRight:8}}> — ممنوع من الهجوم</span></div>
+                      }
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </>}
+
+          {/* ══ المتبقون ══ */}
+          {statsTab==='remaining'&&<>
+            <div className="sg sg3" style={{marginBottom:14}}>
+              <div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{activePlayers.length}</div><div className="slbl">نشطون</div></div>
+              <div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{elimPlayers.length}</div><div className="slbl">خارجون</div></div>
+              <div className="sbox"><div className="snum">{playersList.length}</div><div className="slbl">الكل</div></div>
+            </div>
+            <div className="ctitle" style={{marginBottom:8}}>✅ ما زالوا في اللعبة</div>
+            {activePlayers.map((p,i)=>(
+              <div key={p.id} className="pi" style={{marginBottom:5}}>
+                <div style={{width:26,height:26,borderRadius:'50%',background:'linear-gradient(135deg,var(--green),#1a8a50)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#07070f',flexShrink:0}}>{i+1}</div>
+                <Av p={p} sz={30} fs={11}/>
+                <div className="pi-info">
+                  <div className="pi-name">{effectiveRole==='admin'?p.name:(p.initials||'?')}</div>
+                  <div className="pi-sub" style={{color:effectiveRole==='admin'?'var(--gold)':'var(--muted)'}}>
+                    {effectiveRole==='admin'?`"${p.nick}"${p.nick2?` · "${p.nick2}"`:''}`:' لقبه مخفي 🔒'}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {elimPlayers.length>0&&<>
+              <div className="ctitle" style={{marginBottom:8,marginTop:14}}>⚰️ مقبرة الألقاب</div>
+              {[...elimPlayers].sort((a,b)=>(b.eliminatedRound||0)-(a.eliminatedRound||0)).map(p=>(
+                <div key={p.id} className="grave">
+                  <div className="grave-name">{effectiveRole==='admin'?p.name:(p.initials||p.nick||'?')}</div>
+                  {/* لقب المكشوف فقط — الخارج بالخمول لا يُظهر لقبه */}
+                  {p.status==='eliminated'&&<div className="grave-nick">
+                    {(()=>{
+                      const targetedNick=allAttacksFlat.find(a=>a.correct&&a.realOwnerId===p.id)?.targetNick;
+                      const shownNick=targetedNick||p.nick;
+                      const otherTargeted=p.nick2&&allAttacksFlat.some(a=>a.correct&&a.realOwnerId===p.id&&a.targetNick===p.nick2);
+                      return <>"{shownNick}"{otherTargeted?` / "${p.nick2}"`:''}</>;
+                    })()}
+                  </div>}
+                  {/* الخارج بالخمول — اسم فقط بدون لقب */}
+                  <div className="grave-info">
+                    {p.status==='cheater'?'🚫 خرج من المسابقة':
+                     p.status==='inactive'?`😴 خرج لعدم الهجوم — ج${p.eliminatedRound}`:
+                     `💥 خرج ج${p.eliminatedRound}${p.eliminatedBy?` — كشفه: ${p.eliminatedBy}`:''}`}
+                  </div>
+                </div>
+              ))}
+            </>}
+          </>}
+
+          {/* ══ 🕵️ التقرير الكامل — للمشرف فقط ══ */}
+          {statsTab==='log'&&effectiveRole==='admin'&&<>
+            <div style={{fontSize:11,color:'var(--gold)',fontWeight:700,marginBottom:12}}>🕵️ السجل الكامل — للمشرف فقط</div>
+            {renderFullLog(false)}
+          </>}
+          </>
+          )}
+        </div>
+      );

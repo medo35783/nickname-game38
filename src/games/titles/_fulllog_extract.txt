@@ -1,0 +1,155 @@
+  const renderFullLog = (forEveryone=false) => {
+    if(allRoundsList.length===0) return(
+      <div style={{textAlign:'center',color:'var(--muted)',padding:24,fontSize:12}}>لا جولات منتهية بعد</div>
+    );
+    return(
+      <div id="full-log">
+        {/* ملخص سريع */}
+        <div className="sg sg4" style={{marginBottom:14}}>
+          <div className="sbox"><div className="snum">{allRoundsList.length}</div><div className="slbl">جولات</div></div>
+          <div className="sbox"><div className="snum">{allAttacksFlat.length}</div><div className="slbl">هجمات</div></div>
+          <div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{allAttacksFlat.filter(a=>a.correct).length}</div><div className="slbl">إصابات</div></div>
+          <div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{allAttacksFlat.filter(a=>!a.correct).length}</div><div className="slbl">فشل</div></div>
+        </div>
+
+        {/* جولة جولة */}
+        {allRoundsList.map((r,ri)=>{
+          const ratks = Object.values(r.attacks||{}).sort((a,b)=>a.time-b.time);
+          const hits  = ratks.filter(a=>a.correct);
+          const misses= ratks.filter(a=>!a.correct);
+          const inactivePlayers = playersList.filter(p=>p.status==='inactive'&&p.eliminatedRound===r.round);
+          const cheaters = playersList.filter(p=>p.status==='cheater'&&p.eliminatedRound===r.round);
+
+          return(
+            <div key={ri} className="round-block">
+              {/* رأس الجولة */}
+              <div className="round-header">
+                <div style={{fontFamily:'Cairo',fontSize:15,fontWeight:900,color:'var(--gold)'}}>
+                  الجولة {r.round} {r.silent&&<span className="tag tb" style={{fontSize:10,marginRight:4}}>🤫 صمت</span>}
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  <span className="tag tb">{ratks.length} هجمة</span>
+                  <span className="tag tv">{hits.length} ✅</span>
+                  <span className="tag tr">{misses.length} ❌</span>
+                </div>
+              </div>
+
+              {/* ✅ الإصابات — مفصلة */}
+              {hits.length>0&&<>
+                <div style={{fontSize:11,color:'var(--green)',fontWeight:700,marginBottom:6}}>✅ الإصابات</div>
+                {hits.map((a,i)=>{
+                  const victim = playersList.find(p=>p.id===a.realOwnerId);
+                  return(
+                    <div key={i} className="attack-row attack-hit" style={{flexDirection:'column',alignItems:'flex-start',gap:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,width:'100%'}}>
+                        <span style={{fontSize:14}}>💥</span>
+                        <span style={{fontWeight:700,color:'var(--gold)'}}>"{a.attackerNick}"</span>
+                        <span style={{color:'var(--muted)',fontSize:11}}>هاجم</span>
+                        <span style={{fontWeight:700,color:'var(--text)'}}>"{a.targetNick}"</span>
+                        <span className="tag tv" style={{marginRight:'auto',fontSize:9}}>✅ صح</span>
+                      </div>
+                      <div style={{fontSize:11,color:'var(--muted)',paddingRight:20}}>
+                        خمّن: <strong style={{color:'var(--text)'}}>{a.guessedName}</strong>
+                        {!forEveryone&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{victim?.name} ({victim?.nick})</strong></>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>}
+
+              {/* ❌ الهجمات الخاطئة — مفصلة */}
+              {misses.length>0&&<>
+                <div style={{fontSize:11,color:'var(--red)',fontWeight:700,marginBottom:6,marginTop:10}}>❌ الهجمات الخاطئة</div>
+                {misses.map((a,i)=>{
+                  const realOwner = playersList.find(p=>p.id===a.realOwnerId);
+                  return(
+                    <div key={i} className="attack-row attack-miss" style={{flexDirection:'column',alignItems:'flex-start',gap:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,width:'100%'}}>
+                        <span style={{fontSize:14}}>🎯</span>
+                        <span style={{fontWeight:700,color:'var(--gold)'}}>"{a.attackerNick}"</span>
+                        <span style={{color:'var(--muted)',fontSize:11}}>هاجم</span>
+                        <span style={{fontWeight:700,color:'var(--text)'}}>"{a.targetNick}"</span>
+                        <span className="tag tr" style={{marginRight:'auto',fontSize:9}}>❌ خطأ</span>
+                      </div>
+                      <div style={{fontSize:11,color:'var(--muted)',paddingRight:20}}>
+                        خمّن: <strong style={{color:'var(--red)'}}>{a.guessedName}</strong>
+                        {!forEveryone&&realOwner&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{realOwner.name} ({realOwner.nick})</strong></>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>}
+
+              {/* ⚠️ خمول وغش */}
+              {(inactivePlayers.length>0||cheaters.length>0)&&<>
+                <div style={{fontSize:11,color:'var(--muted)',fontWeight:700,marginBottom:5,marginTop:10}}>⚠️ أخرى</div>
+                {inactivePlayers.map(p=>(
+                  <div key={p.id} className="attack-row attack-inactive">
+                    <span>😴</span>
+                    <span style={{flex:1,fontWeight:700}}>{p.name}</span>
+                    <span style={{color:'var(--muted)',fontSize:11}}>خرج لعدم الهجوم جولتين</span>
+                  </div>
+                ))}
+                {cheaters.map(p=>(
+                  <div key={p.id} className="attack-row" style={{background:'rgba(230,57,80,.07)',borderRight:'3px solid var(--red)'}}>
+                    <span>🚫</span>
+                    <span style={{flex:1,fontWeight:700}}>{p.name}</span>
+                    <span style={{color:'var(--red)',fontSize:11}}>أُخرج بسبب الغش</span>
+                  </div>
+                ))}
+              </>}
+
+              {ratks.length===0&&inactivePlayers.length===0&&cheaters.length===0&&(
+                <div style={{fontSize:11,color:'var(--muted)',textAlign:'center',padding:'8px 0'}}>لا أحداث في هذه الجولة</div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* زر الطباعة */}
+        <button className="btn bo no-print" style={{marginTop:8}} onClick={()=>{
+          const el=document.getElementById('full-log');
+          if(!el) return;
+          const w=window.open('','_blank');
+          w.document.write(`<html dir="rtl"><head><title>تقرير لعبة الألقاب</title>
+          <style>body{font-family:Arial,sans-serif;direction:rtl;padding:20px;color:#111}
+          .round-block{border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:14px;page-break-inside:avoid}
+          .round-header{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:10px}
+          .attack-row{display:flex;gap:8px;padding:6px 10px;border-radius:6px;margin-bottom:4px;font-size:13px;border-right:3px solid #ccc}
+          .hit{background:#f0fff4;border-color:#2ecc71}.miss{background:#fff5f5;border-color:#e63950}
+          .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin:0 2px}
+          .gold{color:#b8860b;font-weight:700}.green{color:#1a7a40;font-weight:700}.red{color:#a82020;font-weight:700}
+          h2{color:#b8860b;margin:0 0 4px}</style></head><body>`);
+          allRoundsList.forEach(r=>{
+            const ratks=Object.values(r.attacks||{});
+            const hits=ratks.filter(a=>a.correct);
+            const misses=ratks.filter(a=>!a.correct);
+            const missMap={};misses.forEach(a=>{missMap[a.targetNick]=(missMap[a.targetNick]||0)+1;});
+            w.document.write(`<div class="round-block">
+              <div class="round-header"><h2>الجولة ${r.round}${r.silent?' 🤫':''}</h2>
+              <span>${ratks.length} هجمة | ${hits.length} ✅ | ${misses.length} ❌</span></div>`);
+            if(hits.length>0){
+              w.document.write('<div style="font-weight:700;color:#1a7a40;margin-bottom:6px">✅ الإصابات</div>');
+              hits.forEach(a=>{
+                const v=playersList.find(p=>p.id===a.realOwnerId);
+                w.document.write(`<div class="attack-row hit">💥 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <strong>${a.guessedName}</strong> — الحقيقي: <strong class="green">${v?.name} (${v?.nick})</strong></div>`);
+              });
+            }
+            if(misses.length>0){
+              w.document.write('<div style="font-weight:700;color:#a82020;margin:8px 0 6px">❌ الهجمات الخاطئة</div>');
+              misses.forEach(a=>{
+                const ro=playersList.find(p=>p.id===a.realOwnerId);
+                w.document.write(`<div class="attack-row miss">🎯 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <span class="red">${a.guessedName}</span> — الحقيقي: <strong>${ro?.name} (${ro?.nick})</strong></div>`);
+              });
+            }
+            w.document.write('</div>');
+          });
+          w.document.write('</body></html>');
+          w.document.close();
+          w.print();
+        }}>
+          🖨️ طباعة / حفظ كـ PDF
+        </button>
+      </div>
+    );
+  };
