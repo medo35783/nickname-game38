@@ -38,7 +38,7 @@ export default function TitlesLobby(props) {
   const canStart = activePlayers.length >= minPlayers;
 
   return (
-    <div className="scr">
+    <>
       <div className="card">
         <div className="ctitle">
           📡 رمز الغرفة <span className="online-dot" />
@@ -251,6 +251,6 @@ export default function TitlesLobby(props) {
           🚀 بدء الجولة ({activePlayers.length}/{minPlayers}+)
         </button>
       )}
-    </div>
+    </>
   );
 }

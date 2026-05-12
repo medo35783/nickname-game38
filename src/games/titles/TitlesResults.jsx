@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Av from '../../shared/Av';
 
 /* ── بطاقة "إحصائياتي" للمتسابق ── */
-function MyStatsCard({ myNickLocal, allAttacksFlat }) {
+export function MyStatsCard({ myNickLocal, allAttacksFlat }) {
   const myAttacks = (allAttacksFlat || []).filter((a) => a.attackerNick === myNickLocal);
   const hits = myAttacks.filter((a) => a.correct).length;
   const misses = myAttacks.filter((a) => !a.correct).length;

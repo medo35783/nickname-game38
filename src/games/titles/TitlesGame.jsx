@@ -47,12 +47,11 @@ function OnboardingScreen({ role, onDismiss }) {
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
   { notify, setTab, setSelectedGame, onHeaderMeta },
-  ref
+  fwdRef
 ) {
   const [gameScreen, setGameScreen] = useState('home');
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
-  const [titlesBoot, setTitlesBoot] = useState(true);
 
   const [role, setRole] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -313,60 +312,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     } finally {
       setJoinLoading(false);
     }
-  };
-
-  /* ══ AUTO-REJOIN from localStorage ══ */
-  const checkAutoRejoin = async () => {
-    try {
-      // Check admin session first
-      const adminSaved = localStorage.getItem('ng_admin_session');
-      if(adminSaved) {
-        const adminSession = JSON.parse(adminSaved);
-        const snap = await get(roomRef(adminSession.roomCode));
-        if(snap.exists()) {
-          const data = snap.val();
-          const phase = data.game?.phase || 'lobby';
-          // Don't rejoin ended game
-          if(phase==='ended'){ localStorage.removeItem('ng_admin_session'); setTitlesBoot(false); return; }
-          setRoomCode(adminSession.roomCode);
-          setRole('admin');
-          if(phase==='lobby') setGameScreen('lobby');
-          else if(phase==='attacking') setGameScreen('attack');
-          else if(phase==='revealing') setGameScreen('results');
-          setTitlesBoot(false);
-          return;
-        } else {
-          localStorage.removeItem('ng_admin_session');
-        }
-      }
-      // Check player session
-      const saved = localStorage.getItem('ng_session');
-      if(!saved) { setTitlesBoot(false); return; }
-      const session = JSON.parse(saved);
-      if(!session.roomCode||!session.name||!session.nick) return;
-      const snap = await get(roomRef(session.roomCode));
-      if(!snap.exists()) { localStorage.removeItem('ng_session'); return; }
-      const data = snap.val();
-      const existing = Object.entries(data.players||{}).find(([id,p])=>
-        p.name?.trim()===session.name && p.nick?.trim()===session.nick
-      );
-      if(!existing) { localStorage.removeItem('ng_session'); return; }
-      const [existingId] = existing;
-      const phase = data.game?.phase || 'lobby';
-      // Don't rejoin ended game
-      if(phase==='ended'){ localStorage.removeItem('ng_session'); setTitlesBoot(false); return; }
-      setMyId(existingId);
-      setMyNickLocal(session.nick);
-      setJoinName(session.name);
-      setJoinNick(session.nick);
-      setJoinInput(session.roomCode);
-      setRoomCode(session.roomCode);
-      setRole('player');
-      if(phase==='lobby') setGameScreen('lobby');
-      else if(phase==='attacking') setGameScreen('attack');
-      else if(phase==='revealing') setGameScreen('results');
-    } catch(e) { localStorage.removeItem('ng_session'); }
-    finally { setTitlesBoot(false); }
   };
 
   /* ══ ADMIN: START GAME / LAUNCH ROUND ══ */
@@ -928,7 +873,32 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   };
 
   /* ══ AUTO-REJOIN on mount ══ */
-  useEffect(()=>{ checkAutoRejoin(); },[]);
+  useEffect(() => {
+    try {
+      const admin = localStorage.getItem('ng_admin_session');
+      const player = localStorage.getItem('ng_session');
+      if (admin) {
+        const s = JSON.parse(admin);
+        if (s.roomCode) {
+          setRoomCode(s.roomCode);
+          setRole('admin');
+          setGameScreen('lobby');
+        }
+      } else if (player) {
+        const s = JSON.parse(player);
+        if (s.roomCode) {
+          setRoomCode(s.roomCode);
+          setRole('player');
+          // Fix: keys are 'playerId' and 'nick', not 'myId' and 'myNick'
+          setMyId(s.playerId || s.myId || null);
+          setMyNickLocal(s.nick || s.myNick || '');
+          // Don't force 'attack' — let the phase useEffect decide the screen
+          // after Firebase data arrives. Set lobby as safe default.
+          setGameScreen('lobby');
+        }
+      }
+    } catch(e) {}
+  }, []);
   useEffect(()=>{
     if(!roomCode) return;
     // game state
@@ -968,6 +938,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   },[deadline, phase]);
   useEffect(()=>{
     if(!gameState) return;
+    if(phase==='lobby')       setGameScreen('lobby');
     if(phase==='attacking')   {
       window._resultsPlayed=false; // reset results sound
       if(role==='admin' && !proxyFor) setGameScreen('admin_live');
@@ -977,7 +948,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
     if(phase==='revealing')   setGameScreen('results');
     if(phase==='ended')       { setGameScreen('winner'); setTimeout(()=>playSound('applause'),500); setTimeout(()=>playSound('applause'),1400); }
-  },[phase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[phase, gameState]);
 
   useEffect(() => {
     if (!onHeaderMeta) return;
@@ -987,7 +959,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     });
   }, [roomCode, role, phase, onHeaderMeta]);
 
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(fwdRef, () => ({
     tryTitlesExit: () => {
       if (roomCode) setModal({ type: 'exit_game' });
     },
@@ -1493,25 +1465,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       );
   };
 
-  if (titlesBoot) {
-    return (
-      <div
-        style={{
-          minHeight: '45vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          color: 'var(--muted)',
-        }}
-      >
-        <div style={{ fontSize: 48 }}>🎭</div>
-        <div style={{ fontSize: 14 }}>جارٍ استعادة الجلسة…</div>
-      </div>
-    );
-  }
-
   const startGameForLobby = startGame;
 
   const sharedProps = {
@@ -1653,6 +1606,24 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           >
             ← رجوع
           </button>
+          <TitlesLobby
+            roomCode={roomCode}
+            role={role}
+            players={players}
+            gameState={gameState}
+            nickMode={nickMode}
+            setNickMode={setNickMode}
+            attackDur={attackDur}
+            setAttackDur={setAttackDur}
+            specialRound={specialRound}
+            setSpecialRound={setSpecialRound}
+            poisonNick={poisonNick}
+            setPoisonNick={setPoisonNick}
+            silentRound={silentRound}
+            setSilentRound={setSilentRound}
+            startRound={startGameForLobby}
+            notify={notify}
+          />
           {role === 'admin' && phase === 'lobby' && (
             <div className="card">
               <div className="ctitle">➕ إضافة لاعب</div>
@@ -1690,24 +1661,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
               </button>
             </div>
           )}
-          <TitlesLobby
-            roomCode={roomCode}
-            role={role}
-            players={players}
-            gameState={gameState}
-            nickMode={nickMode}
-            setNickMode={setNickMode}
-            attackDur={attackDur}
-            setAttackDur={setAttackDur}
-            specialRound={specialRound}
-            setSpecialRound={setSpecialRound}
-            poisonNick={poisonNick}
-            setPoisonNick={setPoisonNick}
-            silentRound={silentRound}
-            setSilentRound={setSilentRound}
-            startRound={startGameForLobby}
-            notify={notify}
-          />
           {role === 'admin' && phase !== 'lobby' && (
             <button type="button" className="btn bb" onClick={() => setGameScreen('attack')} style={{ marginBottom: 8 }}>
               🎮 العودة للعبة
