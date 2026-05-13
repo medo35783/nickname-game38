@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Av from '../../shared/Av';
 import { fmtMs } from '../../core/helpers';
 import { db, ref, set, update, gameRef } from '../../core/firebaseHelpers';
@@ -20,11 +21,101 @@ export default function TitlesLobby(props) {
     setSilentRound,
     startRound,
     notify,
+    myId,
   } = props;
+
+  const [decoyInput, setDecoyInput] = useState('');
+  const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+
+  const addDecoy = async () => {
+    const v = decoyInput.trim();
+    if (!v) return;
+    if (decoyNicks.some((d) => d.toLowerCase() === v.toLowerCase())) {
+      notify('هذا اللقب موجود بالفعل في قائمة التمويه', 'error');
+      return;
+    }
+    const allRealNicks = Object.values(players || {}).flatMap((p) => [p?.nick, p?.nick2].filter(Boolean));
+    if (allRealNicks.some((n) => n?.toLowerCase() === v.toLowerCase())) {
+      notify('⚠️ هذا اللقب مستخدم من قِبَل أحد المتسابقين — اختر لقبًا مختلفًا', 'error');
+      return;
+    }
+    await update(gameRef(roomCode), { decoyNicks: [...decoyNicks, v] });
+    setDecoyInput('');
+    notify(`🎭 أُضيف لقب تمويه: "${v}"`, 'gold');
+  };
+
+  const removeDecoy = async (nick) => {
+    await update(gameRef(roomCode), { decoyNicks: decoyNicks.filter((n) => n !== nick) });
+  };
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
-  const phase = gameState?.phase || 'lobby';
+
+  const isAdmin = role === 'admin';
+
+  /* ── شاشة انتظار المتسابق (لا تكشف ألقاب اللاعبين الآخرين) ── */
+  if (!isAdmin) {
+    const me = playersList.find((p) => p.id === myId);
+    return (
+      <>
+        <div style={{ textAlign: 'center', padding: '24px 16px 12px' }}>
+          <div style={{ fontSize: 56, marginBottom: 10 }}>⏳</div>
+          <div className="ptitle">في انتظار المشرف</div>
+          <div className="psub">
+            انضممت للغرفة بنجاح!
+            <br />
+            انتظر حتى يبدأ المشرف اللعبة
+          </div>
+        </div>
+
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div className="ctitle">
+            📡 رمز الغرفة <span className="online-dot" />
+          </div>
+          <div className="room-code-big">{roomCode}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+            <span className="online-dot" /> {activePlayers.length} لاعب في الغرفة الآن
+          </div>
+        </div>
+
+        {me && (
+          <div className="card">
+            <div className="ctitle">👤 معلوماتك</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+              <Av p={me} sz={44} fs={14} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{me.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  لقبك:{' '}
+                  <span style={{ color: 'var(--gold)', fontWeight: 700 }}>
+                    "{me.nick}"
+                    {me.nick2 ? <span style={{ color: 'rgba(240,192,64,.6)' }}> · "{me.nick2}"</span> : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--muted)',
+                marginTop: 8,
+                padding: '8px 10px',
+                background: 'rgba(240,192,64,.06)',
+                borderRadius: 8,
+                border: '1px solid rgba(240,192,64,.15)',
+              }}
+            >
+              💡 لقبك لن يظهر لأحد حتى تبدأ اللعبة — ألقاب بقية اللاعبين مخفية عنك أيضاً
+            </div>
+          </div>
+        )}
+
+        <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+          الصفحة تتحدث تلقائياً عند بدء اللعبة 🚀
+        </div>
+      </>
+    );
+  }
 
   const activePoisonNick = gameState?.poisonNick ?? poisonNick;
   const activeSpecialRound = gameState?.specialRound ?? specialRound;
@@ -33,7 +124,6 @@ export default function TitlesLobby(props) {
   const totalMs = () =>
     Math.max((Number(attackDur.h) * 3600 + Number(attackDur.m) * 60 + Number(attackDur.s)) * 1000, 5 * 60 * 1000);
 
-  const isAdmin = role === 'admin';
   const minPlayers = nickMode === 2 ? 4 : 6;
   const canStart = activePlayers.length >= minPlayers;
 
@@ -177,6 +267,77 @@ export default function TitlesLobby(props) {
         </div>
       )}
 
+      {/* ── ألقاب التمويه (اختياري — للمشرف فقط) ── */}
+      <div
+        className="card"
+        style={{
+          background: 'linear-gradient(135deg,rgba(155,89,182,.06),rgba(79,163,224,.03))',
+          border: '1px solid rgba(155,89,182,.18)',
+        }}
+      >
+        <div className="ctitle" style={{ fontSize: 12 }}>
+          🎭 ألقاب التمويه <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 10 }}>(اختياري — لإضافة إثارة)</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.6 }}>
+          ألقاب وهمية تظهر في لوحة الألقاب — ليس لها صاحب حقيقي، والهجوم عليها يفشل دائماً. تُكشف في نهاية المسابقة.
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input
+            className="inp"
+            style={{ flex: 1, fontSize: 12, padding: '6px 10px' }}
+            placeholder="مثلاً: الشبح، النمر..."
+            value={decoyInput}
+            onChange={(e) => setDecoyInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void addDecoy();
+              }
+            }}
+          />
+          <button type="button" className="btn bg bxs" style={{ width: 'auto', padding: '6px 14px' }} onClick={() => void addDecoy()}>
+            ➕ إضافة
+          </button>
+        </div>
+        {decoyNicks.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {decoyNicks.map((n) => (
+              <span
+                key={n}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 9px',
+                  background: 'rgba(155,89,182,.12)',
+                  border: '1px solid rgba(155,89,182,.3)',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  color: 'var(--purple)',
+                }}
+              >
+                🎭 &quot;{n}&quot;
+                <button
+                  type="button"
+                  onClick={() => void removeDecoy(n)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--red)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    padding: '0 2px',
+                  }}
+                  aria-label={`حذف ${n}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {playersList.length > 0 && (
         <div className="card">
           <div className="ctitle">👥 المسجلون ({playersList.length})</div>
@@ -228,29 +389,21 @@ export default function TitlesLobby(props) {
         </div>
       </div>
 
-      {isAdmin && activePlayers.length < minPlayers && playersList.length > 0 && (
+      {activePlayers.length < minPlayers && playersList.length > 0 && (
         <div style={{ fontSize: 12, color: 'var(--red)', textAlign: 'center', marginBottom: 9 }}>
           يلزم {minPlayers - activePlayers.length} لاعب إضافي
         </div>
       )}
 
-      {!isAdmin && phase === 'lobby' && (
-        <div className="card" style={{ textAlign: 'center', padding: 16, fontSize: 13, color: 'var(--muted)' }}>
-          ⏳ انتظر حتى يبدأ المشرف الجولة
-        </div>
-      )}
-
-      {isAdmin && (
-        <button
-          type="button"
-          className="btn bg"
-          disabled={!canStart}
-          style={{ marginBottom: 8 }}
-          onClick={() => void startRound()}
-        >
-          🚀 بدء الجولة ({activePlayers.length}/{minPlayers}+)
-        </button>
-      )}
+      <button
+        type="button"
+        className="btn bg"
+        disabled={!canStart}
+        style={{ marginBottom: 8 }}
+        onClick={() => void startRound()}
+      >
+        🚀 بدء الجولة ({activePlayers.length}/{minPlayers}+)
+      </button>
     </>
   );
 }

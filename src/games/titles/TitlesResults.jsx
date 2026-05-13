@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import Av from '../../shared/Av';
 
-/* ── بطاقة "إحصائياتي" للمتسابق ── */
-export function MyStatsCard({ myNickLocal, allAttacksFlat }) {
-  const myAttacks = (allAttacksFlat || []).filter((a) => a.attackerNick === myNickLocal);
+/* ── بطاقة "إحصائياتي" للمتسابق (أو نيابةً عن لاعب في وضع إعارة الجوال) ── */
+export function MyStatsCard({ myNickLocal, attackerNicks, allAttacksFlat }) {
+  const nicks =
+    attackerNicks && attackerNicks.length > 0
+      ? attackerNicks
+      : [myNickLocal].filter(Boolean);
+  const myAttacks = (allAttacksFlat || []).filter((a) => nicks.includes(a.attackerNick));
   const hits = myAttacks.filter((a) => a.correct).length;
   const misses = myAttacks.filter((a) => !a.correct).length;
   const accuracy = myAttacks.length > 0 ? Math.round((hits / myAttacks.length) * 100) : 0;
@@ -57,6 +61,7 @@ export default function TitlesResults(props) {
     endGame,
     notify,
     setModal,
+    proxyFor,
   } = props;
 
   void roomCode;
@@ -87,6 +92,12 @@ export default function TitlesResults(props) {
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
+
+  const proxyKioskPlayer =
+    role === 'admin' && proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
+  const kioskStatsNicks = proxyKioskPlayer
+    ? [proxyKioskPlayer.nick, proxyKioskPlayer.nick2].filter(Boolean)
+    : null;
 
   const allRoundsList = Object.values(allRoundsData || {}).sort((a, b) => a.round - b.round);
   const allAttacksFlat = allRoundsList.flatMap((r) => Object.values(r.attacks || {}));
@@ -227,36 +238,21 @@ export default function TitlesResults(props) {
           </div>
         )}
 
-        {/* إحصائيات "أنا" للمتسابق */}
-        {role === 'player' && myNickLocal && (
-          <MyStatsCard myNickLocal={myNickLocal} allAttacksFlat={allAttacksFlat} />
+        {/* إحصائيات "أنا" — متسابق أو مشرف في وضع النيابة */}
+        {((role === 'player' && myNickLocal) || (role === 'admin' && kioskStatsNicks?.length > 0)) && (
+          <MyStatsCard
+            myNickLocal={myNickLocal}
+            attackerNicks={kioskStatsNicks}
+            allAttacksFlat={allAttacksFlat}
+          />
         )}
-
-        {/* ضحايا اللقب المسموم */}
-        {(() => {
-          const poisoned = playersList.filter((p) => p.isBannedNextRound && p.isBannedNextRound > roundNum - 1);
-          if (!activePoisonNick || poisoned.length === 0) return null;
-          return (
-            <div
-              style={{
-                padding: '10px 14px',
-                background: 'rgba(155,89,182,.1)',
-                border: '1px solid rgba(155,89,182,.3)',
-                borderRadius: 10,
-                marginBottom: 10,
-              }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--purple)' }}>
-                ☠️ {poisoned.length} لاعب وقع في فخ اللقب المسموم — ممنوعون الجولة القادمة
-              </div>
-            </div>
-          );
-        })()}
 
         {/* ☠️ ضحايا المسموم */}
         {(() => {
-          const poisoned = playersList.filter((p) => p.isBannedNextRound && p.isBannedNextRound >= roundNum);
-          if (poisoned.length === 0 || !activePoisonNick) return null;
+          const poisoned = playersList.filter(
+            (p) => p.isBannedNextRound && p.isBannedNextRound >= roundNum
+          );
+          if (!activePoisonNick || poisoned.length === 0) return null;
           return (
             <div
               style={{
@@ -394,6 +390,63 @@ export default function TitlesResults(props) {
           </div>
         )}
 
+        {/* 🎭 كشف ألقاب التمويه — في نهاية المسابقة */}
+        {(() => {
+          const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+          if (decoyNicks.length === 0) return null;
+          const decoyAttacks = allAttacksFlat.filter((a) => a.isDecoy);
+          return (
+            <div
+              className="card"
+              style={{
+                background: 'linear-gradient(135deg,rgba(155,89,182,.1),rgba(79,163,224,.05))',
+                border: '1.5px solid rgba(155,89,182,.4)',
+              }}
+            >
+              <div className="ctitle" style={{ color: 'var(--purple)' }}>
+                🎭 كُشف السر — ألقاب التمويه ({decoyNicks.length})
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.6 }}>
+                هذه الألقاب لم يكن لها صاحب حقيقي — كانت لخداع المهاجمين فقط!
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {decoyNicks.map((n) => {
+                  const hits = decoyAttacks.filter((a) => a.targetNick === n).length;
+                  return (
+                    <div
+                      key={n}
+                      style={{
+                        display: 'inline-flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '8px 14px',
+                        background: 'linear-gradient(145deg,rgba(155,89,182,.22),rgba(79,163,224,.1))',
+                        border: '1px solid rgba(155,89,182,.55)',
+                        borderRadius: 14,
+                        minWidth: 72,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: 'var(--purple)', fontWeight: 800 }}>
+                        🎭 &quot;{n}&quot;
+                      </span>
+                      <span style={{ fontSize: 10, color: 'rgba(200,160,255,.95)', fontWeight: 700 }}>تمويه 🎭</span>
+                      {hits > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 700 }}>سقط فيه {hits}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {decoyAttacks.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--gold)', textAlign: 'center', marginTop: 4 }}>
+                  وقع المهاجمون في فخّ التمويه {decoyAttacks.length} مرة — أحسنتم 👏
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* التقرير الكامل */}
         <div className="card">
           <div className="ctitle">📜 تسلسل المسابقة</div>
@@ -405,7 +458,7 @@ export default function TitlesResults(props) {
         </button>
         {role === 'admin' && (
           <button className="btn bg mt2" onClick={downloadPDFReport}>
-            📄 تحميل التقرير
+            📄 تقرير كامل + طباعة PDF
           </button>
         )}
       </div>

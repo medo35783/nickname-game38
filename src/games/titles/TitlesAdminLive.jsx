@@ -88,7 +88,11 @@ export default function TitlesAdminLive(props) {
 
   const launchRound = async (rn) => {
     const dl = Date.now() + totalMs();
-    const allNicks = shuffle(playersList.flatMap((p) => [p.nick, p.nick2].filter(Boolean)));
+    const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+    const allNicks = shuffle([
+      ...playersList.flatMap((p) => [p.nick, p.nick2].filter(Boolean)),
+      ...decoyNicks,
+    ]);
     const allNames = shuffle(playersList.map((p) => p.id));
     await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks: {} });
     const banCleanup = {};

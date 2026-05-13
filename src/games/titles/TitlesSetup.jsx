@@ -16,10 +16,7 @@ export default function TitlesSetup(props) {
     joinNick2,
     setJoinNick2,
     joinLoading,
-    form,
-    setForm,
     nickMode,
-    createRoom,
     joinRoom,
     notify,
   } = props;
@@ -29,65 +26,6 @@ export default function TitlesSetup(props) {
   useEffect(() => {
     if (gameScreen !== 'join') setJoinRoomNickMode(1);
   }, [gameScreen]);
-
-  if (gameScreen === 'create') {
-    return (
-      <div className="scr">
-        <button
-          type="button"
-          className="btn bgh bsm"
-          style={{ width: 'auto', marginBottom: 12 }}
-          onClick={() => setGameScreen('home')}
-        >
-          ← رجوع
-        </button>
-        <div className="ptitle">إنشاء غرفة جديدة</div>
-        <div className="psub">أنشئ رمز الغرفة ثم أضف المتسابقين يدوياً أو دعهم ينضمون بالرمز</div>
-        <button type="button" className="btn bg" style={{ marginBottom: 12 }} onClick={() => void createRoom()}>
-          🏟️ إنشاء الغرفة
-        </button>
-        <div className="card">
-          <div className="ctitle">➕ إضافة متسابق</div>
-          <div className="ig">
-            <label className="lbl">اسم المتسابق</label>
-            <input
-              className="inp"
-              placeholder="محمد عبدالله"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-          <div className="ig">
-            <label className="lbl">اللقب {nickMode === 2 ? 'الأول' : ''}</label>
-            <input
-              className="inp"
-              placeholder="القناص"
-              value={form.nick}
-              onChange={(e) => setForm((f) => ({ ...f, nick: e.target.value }))}
-            />
-          </div>
-          {nickMode === 2 && (
-            <div className="ig">
-              <label className="lbl">اللقب الثاني</label>
-              <input
-                className="inp"
-                placeholder="الصقر"
-                value={form.nick2}
-                onChange={(e) => setForm((f) => ({ ...f, nick2: e.target.value }))}
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            className="btn bg"
-            onClick={() => notify('بعد إنشاء الغرفة أضِف المتسابقين من لوحة المشرف (أو اربط addPlayer لاحقاً).', 'info')}
-          >
-            ➕ إضافة
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (gameScreen === 'join') {
     return (

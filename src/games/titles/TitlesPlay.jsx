@@ -56,6 +56,9 @@ export default function TitlesPlay(props) {
   const activePoisonNick = gameState?.poisonNick || '';
   const isSilentActive = gameState?.silentActive || false;
 
+  /* ── وضع إعارة الجوال (المشرف أعطى جواله لمتسابق ليلعب) ── */
+  const isKioskMode = role === 'admin' && !!proxyFor;
+
   const playerAttackCounts = {};
   attacksList.forEach((a) => {
     if (a.attackerNick) playerAttackCounts[a.attackerNick] = (playerAttackCounts[a.attackerNick] || 0) + 1;
@@ -68,8 +71,14 @@ export default function TitlesPlay(props) {
       return done >= attacksPerRound;
     });
 
-  const myDoneCount = attacksList.filter((a) => a.attackerNick === myNickLocal).length;
-  const myAttacksDone = myNickLocal ? myDoneCount >= attacksPerRound : false;
+  const _proxyPlayerEarly = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
+  const effectiveAttackerNicks = _proxyPlayerEarly
+    ? [_proxyPlayerEarly.nick, _proxyPlayerEarly.nick2].filter(Boolean)
+    : myNickLocal
+    ? [myNickLocal]
+    : [];
+  const myDoneCount = attacksList.filter((a) => effectiveAttackerNicks.includes(a.attackerNick)).length;
+  const myAttacksDone = effectiveAttackerNicks.length > 0 ? myDoneCount >= attacksPerRound : false;
 
   const allRoundsList = Object.values(allRoundsData || {}).sort((a, b) => a.round - b.round);
   const allAttacksFlat = allRoundsList.flatMap((r) => Object.values(r.attacks || {}));
@@ -120,7 +129,7 @@ export default function TitlesPlay(props) {
             </button>
           </div>
         </div>
-        {/* Player's own info - مخفي عند الهجوم بالإنابة */}
+        {/* Player's own info — يظهر للمتسابق العادي ولوضع إعارة الجوال */}
         {role === 'player' && myNickLocal && !proxyFor && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.05)', marginTop: 4 }}>
             <span style={{ fontSize: 10, color: 'var(--muted)' }}>أنت:</span>
@@ -129,11 +138,13 @@ export default function TitlesPlay(props) {
             <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700 }}>"{myNickLocal}"</span>
           </div>
         )}
-        {/* رسالة للمشرف أثناء الهجوم بالإنابة */}
-        {role === 'admin' && proxyFor && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.05)', marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: 'var(--purple)' }}>⚡ تهاجم بالإنابة عن:</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>{proxyPlayer?.name}</span>
+        {/* وضع إعارة الجوال — اللاعب يلعب من جوال المشرف */}
+        {isKioskMode && _proxyPlayerEarly && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.05)', marginTop: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: 'var(--purple)' }}>📱 جوال المشرف:</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{_proxyPlayerEarly.name}</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
+            <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700 }}>"{_proxyPlayerEarly.nick}"</span>
           </div>
         )}
       </div>
@@ -183,7 +194,7 @@ export default function TitlesPlay(props) {
       )}
       {/* بانر الحرمان من اللقب المسموم */}
       {(() => {
-        const myP = playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
+        const myP = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
         if (myP?.isBannedNextRound && myP.isBannedNextRound >= roundNum)
           return (
             <div
@@ -259,16 +270,23 @@ export default function TitlesPlay(props) {
         </div>
         {role === 'admin' && (
           <div style={{ display: 'flex', gap: 4 }}>
-            <button className="btn bgh bxs" onClick={() => extendTime(30 * 60 * 1000)}>
-              +30د
-            </button>
-            <button className="btn br bxs" onClick={doReveal}>
-              كشف
-            </button>
+            {!isKioskMode && (
+              <>
+                <button className="btn bgh bxs" onClick={() => extendTime(30 * 60 * 1000)}>
+                  +30د
+                </button>
+                <button className="btn br bxs" onClick={doReveal}>
+                  كشف
+                </button>
+              </>
+            )}
             <button
               className="btn bgh bxs"
               onClick={() => {
+                setProxyFor(null);
                 setIsProxyMode(false);
+                setMyNick(null);
+                setMyGuess(null);
                 setGameScreen('admin_live');
               }}
             >
@@ -293,17 +311,17 @@ export default function TitlesPlay(props) {
             <div className="counter-fill" style={{ width: `${(submittedCount / Math.max(activePlayers.length * attacksPerRound, 1)) * 100}%` }} />
           </div>
         </div>
-        {allSubmitted && role === 'admin' && (
+        {allSubmitted && role === 'admin' && !isKioskMode && (
           <button className="btn bv bxs" onClick={doReveal}>
             كشف ▶
           </button>
         )}
       </div>
 
-      {/* Proxy banner */}
+      {/* بانر وضع إعارة الجوال — اللاعب يلعب من جوال المشرف */}
       {proxyPlayer && (
         <div className="ann ag" style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>🎮 المشرف يهاجم نيابةً عن</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>📱 وضع إعارة الجوال — يلعب من جوال المشرف</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)' }}>
             {proxyPlayer.name} — {proxyPlayer.nick}
           </div>
@@ -317,13 +335,13 @@ export default function TitlesPlay(props) {
               setMyGuess(null);
             }}
           >
-            إلغاء
+            إنهاء الإعارة
           </button>
         </div>
       )}
 
-      {/* SUBMITTED */}
-      {(myAttacksDone || myDoneCount >= attacksPerRound) && !proxyFor ? (
+      {/* SUBMITTED — يشمل وضع إعارة الجوال */}
+      {(myAttacksDone || myDoneCount >= attacksPerRound) ? (
         <div className="card">
           <div className="waiting-box">
             <div className="waiting-icon">⏳</div>
@@ -344,7 +362,7 @@ export default function TitlesPlay(props) {
           <div className="bwrap">
             <div className="blbl">🎭 لوحة الألقاب — اضغط لقباً للهجوم عليه</div>
             <div className="bgrid">
-              {(role === 'admin' ? displayNicks : visibleNicks).map((nick, i) => {
+              {(role === 'admin' && !isKioskMode ? displayNicks : visibleNicks).map((nick, i) => {
                 const owner = playersList.find((p) => p.nick === nick || p.nick2 === nick);
                 const isEliminated = owner && (owner.status === 'eliminated' || owner.status === 'cheater');
                 const isElim = isEliminated;

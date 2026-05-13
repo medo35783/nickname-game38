@@ -50,6 +50,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   fwdRef
 ) {
   const [gameScreen, setGameScreen] = useState('home');
+  /** يمنع عرض أزرار «الرئيسية» قبل انتهاء التحقق من جلسة localStorage + Firebase */
+  const [sessionGate, setSessionGate] = useState('checking');
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
 
@@ -82,7 +84,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [isProxyMode, setIsProxyMode] = useState(false);
 
   const [modal, setModal] = useState(null);
-  const [statsTab, setStatsTab] = useState('round');
+  const [statsTab, setStatsTab] = useState('nicks');
   const [heatmapView, setHeatmapView] = useState('nicks');
 
   const [guideRole, setGuideRole] = useState('player');
@@ -94,8 +96,23 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [pendingSilent, setPendingSilent] = useState(null);
   const [exitAnnounce, setExitAnnounce] = useState(null);
   const [flipCards, setFlipCards] = useState({});
+  const titlesPhaseRef = useRef(null);
 
-  const effectiveRole = role;
+  useEffect(() => {
+    titlesPhaseRef.current = null;
+  }, [roomCode]);
+
+  /* ── أثناء "إعارة جوال المشرف للمتسابق" تُعامَل الواجهة كأنها للمتسابق نفسه ── */
+  const proxiedPlayer = (() => {
+    if (role !== 'admin' || !proxyFor) return null;
+    return Object.entries(players || {})
+      .map(([id, p]) => ({ ...p, id }))
+      .find((p) => p.id === proxyFor) || null;
+  })();
+  const isKioskMode = role === 'admin' && !!proxiedPlayer;
+  const effectiveRole = isKioskMode ? 'player' : role;
+  const effectiveMyNick = isKioskMode ? proxiedPlayer?.nick || '' : myNickLocal;
+  const effectiveMyId = isKioskMode ? proxiedPlayer?.id || null : myId;
   const effectiveNickMode = role === 'admin' ? nickMode : gameState?.nickMode || 1;
   const activePoisonNick = gameState?.poisonNick || poisonNick;
   const activeSpecialRound = gameState?.specialRound || specialRound;
@@ -192,6 +209,29 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       .replace(/ة$/g, 'ه')      // تاء مربوطة → هاء
       .replace(/أ|إ|آ/g, 'ا')   // همزة → ألف عادي
       .replace(/ى/g, 'ي');      // ألف مقصورة → ياء
+  };
+
+  /** مسح جلسة الألقاب من الجهاز والعودة للشاشة الرئيسية (مفيد بعد auto-rejoin أو جلسة قديمة) */
+  const clearTitlesSessionAndGoHome = () => {
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    setModal(null);
+    setShowOnboarding(null);
+    setRole(null);
+    setRoomCode('');
+    setGameState(null);
+    setPlayers({});
+    setAttacks({});
+    setAllRoundsData({});
+    setMyId(null);
+    setMyNickLocal('');
+    setJoinName('');
+    setJoinNick('');
+    setJoinNick2('');
+    setJoinInput('');
+    setJoinErr('');
+    setJoinLoading(false);
+    setGameScreen('home');
   };
 
   /* ══ ADMIN: CREATE ROOM ══ */
@@ -317,7 +357,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   /* ══ ADMIN: START GAME / LAUNCH ROUND ══ */
   const launchRound = async (rn) => {
     const dl = Date.now() + totalMs();
-    const allNicks = shuffle(playersList.flatMap(p=>[p.nick,p.nick2].filter(Boolean)));
+    const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+    const allNicks = shuffle([
+      ...playersList.flatMap(p=>[p.nick,p.nick2].filter(Boolean)),
+      ...decoyNicks,
+    ]);
     const allNames = shuffle(playersList.map(p=>p.id));
     // clear previous attacks
     await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks:{} });
@@ -379,8 +423,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
     // Block self-attack — attacker cannot target their own nick
     const realOwner = playersList.find(p=>p.nick===myNick||p.nick2===myNick);
-    if(!realOwner){notify('لقب غير موجود!','error');return;}
-    if(realOwner.nick===attackerNick||realOwner.nick2===attackerNick){
+    const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+    const isDecoyAttack = !realOwner && decoyNicks.includes(myNick);
+    if(!realOwner && !isDecoyAttack){notify('لقب غير موجود!','error');return;}
+    if(realOwner && (realOwner.nick===attackerNick||realOwner.nick2===attackerNick)){
       notify('❌ لا يمكنك مهاجمة لقبك أنت!','error');
       return;
     }
@@ -415,7 +461,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
 
     const guessedPlayer = playersList.find(p=>p.id===myGuess);
-    const correct = guessedPlayer?.id === realOwner.id;
+    /* لو الهدف لقب تمويه فالهجمة دائماً فاشلة (لا يوجد صاحب حقيقي) */
+    const correct = isDecoyAttack ? false : guessedPlayer?.id === realOwner.id;
 
     // احفظ attackerPlayerId ليكون الفحص دقيقاً (لاعب واحد = هوية واحدة حتى لو عنده لقبان)
     const actualAttackerId = attackerPlayer?.id || myId || null;
@@ -427,8 +474,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       targetNick: myNick,
       guessedId: myGuess,
       guessedName: guessedPlayer?.name,
-      realOwnerId: realOwner.id,
-      realOwnerName: realOwner.name,
+      realOwnerId: isDecoyAttack ? null : realOwner.id,
+      realOwnerName: isDecoyAttack ? null : realOwner.name,
+      isDecoy: isDecoyAttack || false,
       correct,
       time: Date.now(),
     };
@@ -444,7 +492,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     // دائماً أعد تهيئة الاختيار بعد كل هجمة
     setMyNick(null);
     setMyGuess(null);
-    setProxyFor(null);
+    /* أثناء الهجوم بالنيابة لا تُلغى الجلسة بعد كل هجمة — يبقى المشرف بمنظور المتسابق حتى 👑 */
+    if (!(role === 'admin' && proxyFor)) {
+      setProxyFor(null);
+    }
     if(attacksPerRound > 1){
       notify(`✅ هجمة ${myNewCount}/${attacksPerRound}${myNewCount < attacksPerRound ? ' — هاجم مرة أخرى!' : ' — اكتملت هجماتك!'}`, 'gold');
     } else {
@@ -650,35 +701,169 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     notify(`🚫 أُخرج ${p?.name}`, 'error');
   };
 
-  /* ══ DOWNLOAD PDF REPORT ══ */
+  /* ══ تقرير كامل — طباعة / حفظ PDF من المتصفح + نسخة HTML ══ */
   const downloadPDFReport = () => {
-    const report = {
-      gameType: 'لعبة الألقاب',
-      roomCode,
-      timestamp: new Date().toLocaleString('ar-SA'),
-      players: playersList.map(p => ({
-        name: p.name,
-        nick: p.nick,
-        nick2: p.nick2,
-        status: p.status,
-        eliminatedBy: p.eliminatedBy,
-        eliminatedRound: p.eliminatedRound
-      })),
-      rounds: allRoundsList.map(r => ({
-        round: r.round,
-        attacks: Object.values(r.attacks||{}).length
-      })),
-      winner: activePlayers[0]?.name || 'لا يوجد'
-    };
+    const esc = (v) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    const decoyNicksList = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+    const decoyAtks = allAttacksFlat.filter((a) => a.isDecoy || decoyNicksList.includes(a.targetNick));
+    const nickH = nickHeatmap();
+    const nameH = nameHeatmap();
+
+    const playersRows = playersList
+      .map(
+        (p) =>
+          `<tr><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${esc(p.nick2 || '—')}</td><td>${esc(
+            p.status
+          )}</td><td>${esc(p.eliminatedBy || '—')}</td><td>${esc(p.eliminatedRound ?? '—')}</td></tr>`
+      )
+      .join('');
+
+    const nickHeatRows = nickH
+      .map(
+        ([label, count], i) =>
+          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td></tr>`
+      )
+      .join('');
+    const nameHeatRows = nameH
+      .map(
+        ([label, count], i) =>
+          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td></tr>`
+      )
+      .join('');
+
+    const fierceRows = attackerRankGlobal
+      .map(
+        (p, i) =>
+          `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${p.count}</td><td>${p.hits}</td></tr>`
+      )
+      .join('');
+
+    const poisoned = playersList.filter((p) => p.isBannedNextRound);
+    const poisonRows = poisoned
+      .map(
+        (p) =>
+          `<tr><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${esc(p.isBannedNextRound)}</td></tr>`
+      )
+      .join('');
+
+    const decoyListRows = decoyNicksList
+      .map((n) => {
+        const hits = decoyAtks.filter((a) => a.targetNick === n).length;
+        return `<tr><td>${esc(n)}</td><td>${hits}</td></tr>`;
+      })
+      .join('');
+    const decoyAtkRows = decoyAtks
+      .map(
+        (a) =>
+          `<tr><td>${esc(a.attackerNick)}</td><td>${esc(a.targetNick)}</td><td>${esc(
+            a.guessedName
+          )}</td><td>فشل (تمويه)</td></tr>`
+      )
+      .join('');
+
+    const roundsHtml = allRoundsList
+      .map((r) => {
+        const ratks = Object.values(r.attacks || {}).sort((a, b) => (a.time || 0) - (b.time || 0));
+        const rows = ratks
+          .map((a) => {
+            const victim = playersList.find((pl) => pl.id === a.realOwnerId);
+            let note = '';
+            if (a.isDecoy || decoyNicksList.includes(a.targetNick)) {
+              note = 'تمويه (لا صاحب حقيقي)';
+            } else if (victim) {
+              note = `صاحب اللقب: ${esc(victim.name)} (${esc(victim.nick)})`;
+            }
+            return `<tr><td>${esc(a.attackerNick)}</td><td>${esc(a.targetNick)}</td><td>${esc(
+              a.guessedName
+            )}</td><td>${a.correct ? '✅' : '❌'}</td><td style="font-size:11px">${note}</td></tr>`;
+          })
+          .join('');
+        return `<section class="sec"><h2>الجولة ${r.round}${r.silent ? ' (صمت)' : ''}</h2><p>عدد الهجمات: ${ratks.length}</p><table><thead><tr><th>المهاجم</th><th>الهدف</th><th>التخمين</th><th>النتيجة</th><th>ملاحظات</th></tr></thead><tbody>${rows || '<tr><td colspan="5">لا هجمات</td></tr>'}</tbody></table></section>`;
+      })
+      .join('');
+
+    const summary = `<div class="sec"><h2>ملخص</h2><p>الجولات: ${allRoundsList.length} — إجمالي الهجمات: ${allAttacksFlat.length} — إصابات: ${allAttacksFlat.filter((a) => a.correct).length} — فشل: ${allAttacksFlat.filter((a) => !a.correct).length}</p><p>الفائز (النشطون عند الإنهاء): ${esc(activePlayers.map((p) => p.name).join('، ') || '—')}</p></div>`;
+
+    const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8" />
+<title>${esc(`تقرير الألقاب ${roomCode}`)}</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background:#0f0f18; color:#eaeaf0; padding:20px; line-height:1.5; }
+  h1 { color:#e6c84d; font-size:22px; }
+  h2 { color:#c9a227; font-size:16px; margin-top:0; }
+  .sec { margin-bottom:20px; padding:14px 16px; border:1px solid #2a2a3a; border-radius:12px; background:#161622; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  th, td { border:1px solid #333; padding:8px; text-align:right; }
+  th { background:#252536; color:#e6c84d; }
+  .hint { font-size:12px; color:#9a9aaf; margin-top:16px; }
+  @media print {
+    body { background:white; color:#111; }
+    .sec { border-color:#ccc; background:#fafafa; page-break-inside: avoid; }
+    th { background:#eee; color:#111; }
+    .no-print { display:none; }
+  }
+</style>
+</head>
+<body>
+<h1>لعبة الألقاب — تقرير كامل</h1>
+<p><strong>رمز الغرفة:</strong> ${esc(roomCode)} &nbsp;|&nbsp; <strong>التاريخ:</strong> ${esc(new Date().toLocaleString('ar-SA'))}</p>
+<p class="no-print hint">لحفظ PDF: اضغط Ctrl+P (أو قائمة الطباعة) واختر «Save as PDF» / «Microsoft Print to PDF».</p>
+${summary}
+<div class="sec"><h2>المتسابقون</h2>
+<table><thead><tr><th>الاسم</th><th>اللقب</th><th>الثاني</th><th>الحالة</th><th>خرج بـ</th><th>جولة</th></tr></thead><tbody>${playersRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table></div>
+<div class="sec"><h2>الألقاب الأكثر استهدافاً</h2>
+<table><thead><tr><th>#</th><th>اللقب</th><th>هجمات</th></tr></thead><tbody>${nickHeatRows || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+<div class="sec"><h2>الأسماء الأكثر تخميناً</h2>
+<table><thead><tr><th>#</th><th>الاسم</th><th>مرات</th></tr></thead><tbody>${nameHeatRows || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+<div class="sec"><h2>الأشرس هجوماً</h2>
+<table><thead><tr><th>#</th><th>الاسم</th><th>اللقب</th><th>هجمات</th><th>إصابات</th></tr></thead><tbody>${fierceRows || '<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
+<div class="sec"><h2>ضحايا المسموم (إن وجد)</h2>
+<table><thead><tr><th>الاسم</th><th>اللقب</th><th>ممنوع جولة</th></tr></thead><tbody>${poisonRows || '<tr><td colspan="3">لا يوجد</td></tr>'}</tbody></table></div>
+<div class="sec"><h2>ألقاب التمويه</h2>
+<table><thead><tr><th>اللقب</th><th>عدد الهجمات</th></tr></thead><tbody>${decoyListRows || '<tr><td colspan="2">لا تمويه</td></tr>'}</tbody></table>
+${decoyAtks.length ? `<h2 style="margin-top:14px;font-size:15px">هجمات على التمويه</h2><table><thead><tr><th>المهاجم</th><th>الهدف</th><th>التخمين</th><th>النتيجة</th></tr></thead><tbody>${decoyAtkRows}</tbody></table>` : ''}
+</div>
+<h1 style="margin-top:28px;font-size:18px">مسار الجولات — تفصيلي</h1>
+${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `تقرير_${roomCode}_${Date.now()}.json`;
+    a.href = blobUrl;
+    a.download = `تقرير_الألقاب_${roomCode}.html`;
     a.click();
-    URL.revokeObjectURL(url);
-    notify('✅ تم تحميل التقرير', 'success');
+    URL.revokeObjectURL(blobUrl);
+
+    try {
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => {
+          try {
+            w.focus();
+            w.print();
+          } catch (e) {
+            /* ignore */
+          }
+        }, 400);
+        notify('تم فتح نافذة الطباعة — للـ PDF اختر «حفظ كـ PDF». وتم تنزيل نسخة HTML أيضاً.', 'success');
+      } else {
+        notify('تم تنزيل التقرير كملف HTML — افتحه ثم اطبعه واحفظ كـ PDF.', 'gold');
+      }
+    } catch (e) {
+      notify('تم تنزيل التقرير كملف HTML — افتحه ثم اطبعه واحفظ كـ PDF.', 'gold');
+    }
   };
 
 
@@ -874,30 +1059,44 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   /* ══ AUTO-REJOIN on mount ══ */
   useEffect(() => {
-    try {
-      const admin = localStorage.getItem('ng_admin_session');
-      const player = localStorage.getItem('ng_session');
-      if (admin) {
-        const s = JSON.parse(admin);
-        if (s.roomCode) {
-          setRoomCode(s.roomCode);
+    const restoreSession = async () => {
+      try {
+        const admin = localStorage.getItem('ng_admin_session');
+        const player = localStorage.getItem('ng_session');
+        const session = admin ? JSON.parse(admin) : (player ? JSON.parse(player) : null);
+        if (!session?.roomCode) return;
+
+        const snap = await get(roomRef(session.roomCode));
+        if (!snap.exists()) {
+          localStorage.removeItem('ng_session');
+          localStorage.removeItem('ng_admin_session');
+          return;
+        }
+
+        const phase = snap.val()?.game?.phase;
+        if (phase === 'ended') {
+          localStorage.removeItem('ng_session');
+          localStorage.removeItem('ng_admin_session');
+          return;
+        }
+
+        if (admin) {
+          setRoomCode(session.roomCode);
           setRole('admin');
           setGameScreen('lobby');
-        }
-      } else if (player) {
-        const s = JSON.parse(player);
-        if (s.roomCode) {
-          setRoomCode(s.roomCode);
+        } else if (player) {
+          setRoomCode(session.roomCode);
           setRole('player');
-          // Fix: keys are 'playerId' and 'nick', not 'myId' and 'myNick'
-          setMyId(s.playerId || s.myId || null);
-          setMyNickLocal(s.nick || s.myNick || '');
-          // Don't force 'attack' — let the phase useEffect decide the screen
-          // after Firebase data arrives. Set lobby as safe default.
+          setMyId(session.playerId || session.myId || null);
+          setMyNickLocal(session.nick || session.myNick || '');
           setGameScreen('lobby');
         }
+      } catch(e) {}
+      finally {
+        setSessionGate('ready');
       }
-    } catch(e) {}
+    };
+    restoreSession();
   }, []);
   useEffect(()=>{
     if(!roomCode) return;
@@ -936,34 +1135,97 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     const t = setInterval(tick, 500);
     return()=>clearInterval(t);
   },[deadline, phase]);
-  useEffect(()=>{
-    if(!gameState) return;
-    if(phase==='lobby')       setGameScreen('lobby');
-    if(phase==='attacking')   {
-      window._resultsPlayed=false; // reset results sound
-      if(role==='admin' && !proxyFor) setGameScreen('admin_live');
-      else setGameScreen('attack');
-      setMyNick(null); setMyGuess(null); setMySubmitted(false);
-      if(!proxyFor) setProxyFor(null);
+  useEffect(() => {
+    if (!gameState) return;
+    const prev = titlesPhaseRef.current;
+    if (phase === prev) return;
+    titlesPhaseRef.current = phase;
+
+    if (phase === 'lobby') {
+      setGameScreen('lobby');
+      return;
     }
-    if(phase==='revealing')   setGameScreen('results');
-    if(phase==='ended')       { setGameScreen('winner'); setTimeout(()=>playSound('applause'),500); setTimeout(()=>playSound('applause'),1400); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[phase, gameState]);
+    if (phase === 'attacking') {
+      window._resultsPlayed = false;
+      if (role === 'admin' && !proxyFor) setGameScreen('admin_live');
+      else setGameScreen('attack');
+      setMyNick(null);
+      setMyGuess(null);
+      setMySubmitted(false);
+      if (!proxyFor) setProxyFor(null);
+      return;
+    }
+    if (phase === 'revealing') {
+      setGameScreen('results');
+      return;
+    }
+    if (phase === 'ended') {
+      setGameScreen('winner');
+      setTimeout(() => playSound('applause'), 500);
+      setTimeout(() => playSound('applause'), 1400);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, gameState, role, proxyFor]);
+
+  useEffect(() => {
+    if (gameScreen !== 'stats') return;
+    const playerTabs = ['nicks', 'names', 'fierce', 'poison', 'remaining', 'me'];
+    const adminTabs = [
+      'nicks',
+      'names',
+      'fierce',
+      'poison',
+      'remaining',
+      ...(phase === 'ended' && role === 'admin' ? ['decoys'] : []),
+      'log',
+    ];
+    const allowed = effectiveRole === 'admin' ? adminTabs : playerTabs;
+    if (!allowed.includes(statsTab)) setStatsTab('nicks');
+  }, [gameScreen, statsTab, effectiveRole, phase, role]);
 
   useEffect(() => {
     if (!onHeaderMeta) return;
     onHeaderMeta({
       inRoom: !!roomCode,
-      showAdminBtn: !!(roomCode && role === 'admin' && phase !== 'lobby'),
+      gameScreen,
+      showAdminBtn: !!(
+        roomCode &&
+        role === 'admin' &&
+        phase !== 'lobby' &&
+        gameScreen !== 'admin_live'
+      ),
     });
-  }, [roomCode, role, phase, onHeaderMeta]);
+  }, [roomCode, role, phase, gameScreen, onHeaderMeta]);
 
-  useImperativeHandle(fwdRef, () => ({
-    tryTitlesExit: () => {
-      if (roomCode) setModal({ type: 'exit_game' });
-    },
-  }));
+  useImperativeHandle(
+    fwdRef,
+    () => ({
+      handleHeaderBack() {
+        if (sessionGate === 'checking') return true;
+        if (modal?.type) {
+          setModal(null);
+          return true;
+        }
+        if (roomCode) {
+          setModal({ type: 'exit_game' });
+          return true;
+        }
+        if (gameScreen === 'join') {
+          setGameScreen('home');
+          return true;
+        }
+        return false;
+      },
+      openAdminPanel() {
+        if (role !== 'admin' || !roomCode) return false;
+        setIsProxyMode(false);
+        setProxyFor(null);
+        setGameScreen('admin_live');
+        return true;
+      },
+    }),
+    [sessionGate, roomCode, gameScreen, modal, role]
+  );
 
   const renderOverlays = () => (
     <>
@@ -1080,41 +1342,29 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     {modal?.type==='exit_game'&&(
       <div className="mbg"><div className="modal">
         <div className="micn">🚪</div>
-        <div className="mtitle">الرجوع للصفحة الرئيسية؟</div>
+        <div className="mtitle">ماذا تريد؟</div>
         <div className="msub">
+          يمكنك متابعة الغرفة الحالية، أو الانسحاب منها والبدء من جديد من شاشة إنشاء غرفة / انضمام (دون الخروج من لعبة الألقاب).
           {role==='player'&&<>
-            يمكنك العودة لاحقاً بنفس:<br/>
+            <br/><br/>
+            للعودة لاحقاً لنفس الغرفة احفظ:<br/>
             <span style={{color:'var(--gold)',fontWeight:700}}>رمز الغرفة + اسمك + لقبك</span>
           </>}
           {role==='admin'&&<>
-            المتسابقون سيبقون في انتظار عودتك.<br/>
-            <span style={{color:'var(--gold)',fontWeight:700}}>يمكنك العودة تلقائياً بفتح الرابط</span>
+            <br/><br/>
+            المتسابقون يبقون في الغرفة حتى تعود أو تُنهي المسابقة.
           </>}
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           <button className="btn bg" onClick={()=>setModal(null)}>
-            ← أكمل اللعبة
+            ← أكمل اللعبة الحالية
           </button>
           <button className="btn br" onClick={()=>{
             setModal(null);
-            localStorage.removeItem('ng_session');
-            localStorage.removeItem('ng_admin_session');
-            setRole(null);
-            setRoomCode('');
-            setGameState(null);
-            setPlayers({});
-            setAttacks({});
-            setAllRoundsData({});
-            setMyId(null);
-            setMyNickLocal('');
-            setJoinName('');
-            setJoinNick('');
-            setJoinInput('');
-            setGameScreen('home');
-            setTab('game');
-            notify('تم الخروج من اللعبة','info');
+            clearTitlesSessionAndGoHome();
+            notify('تم الانسحاب — يمكنك البدء بلعبة جديدة من هنا','info');
           }}>
-            🚪 انسحاب من اللعبة
+            🚪 انسحاب وبدء لعبة جديدة
           </button>
         </div>
       </div></div>
@@ -1162,19 +1412,37 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
       const attackerRank = attackerRankGlobal; // من الحساب العام
 
-      // ── إحصاءات اللاعب الحالي ──
-      const myPlayer = playersList.find(p=>p.nick===myNickLocal);
-      const myAtks = allAttacksFlat.filter(a=>a.attackerNick===myNickLocal);
+      // ── إحصاءات اللاعب الحالي (مع دعم وضع إعارة الجوال) ──
+      const myPlayer =
+        playersList.find(p=>p.id===effectiveMyId) ||
+        playersList.find(p=>p.nick===effectiveMyNick||p.nick2===effectiveMyNick);
+      const myNicksForStats = myPlayer ? [myPlayer.nick, myPlayer.nick2].filter(Boolean) : [effectiveMyNick].filter(Boolean);
+      const myAtks = allAttacksFlat.filter(a=>myNicksForStats.includes(a.attackerNick));
       const myHits = myAtks.filter(a=>a.correct);
       const myTargeted = allAttacksFlat.filter(a=>a.realOwnerId===myPlayer?.id);
       const myExposed = allAttacksFlat.filter(a=>a.realOwnerId===myPlayer?.id&&a.correct);
       const myAccuracy = myAtks.length>0?Math.round(myHits.length/myAtks.length*100):0;
-      const myRank = attackerRank.findIndex(p=>p.nick===myNickLocal)+1;
+      const myRank = myPlayer ? attackerRank.findIndex(p=>p.id===myPlayer.id)+1 : 0;
 
-      // تبويبات حسب الدور — «مسار اللعبة» يظهر فقط للمشرف
+      // تبويبات — «التمويه» للمشرف فقط بعد انتهاء المسابقة (مثل إبقاء التفاصيل الحساسة للختام)
       const tabs = effectiveRole === 'admin'
-        ? [['nicks','🎭 الألقاب'],['names','👥 الأسماء'],['fierce','⚔️ الأشرس'],['poison','☠️ المسموم'],['remaining','✅ المتبقون'],['log','📋 مسار اللعبة']]
-        : [['nicks','🎭 الألقاب'],['names','👥 الأسماء'],['fierce','⚔️ الأشرس'],['poison','☠️ المسموم'],['me','👤 أنا']];
+        ? [
+            ['nicks', '🎭 الألقاب'],
+            ['names', '👥 الأسماء'],
+            ['fierce', '⚔️ الأشرس'],
+            ['poison', '☠️ المسموم'],
+            ['remaining', '✅ المتبقون'],
+            ...(phase === 'ended' && role === 'admin' ? [['decoys', '🎭 التمويه']] : []),
+            ['log', '📋 مسار اللعبة'],
+          ]
+        : [
+            ['nicks', '🎭 الألقاب'],
+            ['names', '👥 الأسماء'],
+            ['fierce', '⚔️ الأشرس'],
+            ['poison', '☠️ المسموم'],
+            ['remaining', '✅ المتبقون'],
+            ['me', '👤 أنا'],
+          ];
 
       const HeatBar=({items,maxVal,showLabel=true})=>(
         <>{items.map(([label,count],i)=>(
@@ -1195,7 +1463,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setGameScreen(phase==='revealing'||phase==='ended'?'results':'attack')}>← رجوع</button>
 
           {/* جولة الصمت — إخفاء كامل للإحصائيات للمتسابقين */}
-          {gameState?.silentPending && role!=='admin' ? (
+          {gameState?.silentPending && effectiveRole === 'player' ? (
             <div style={{textAlign:'center',padding:'40px 20px'}}>
               <div style={{fontSize:48,marginBottom:12}}>🤫</div>
               <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--blue)',marginBottom:8}}>
@@ -1255,13 +1523,13 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             }
           </>}
 
-          {/* ══ 👤 أنا — للمتسابق فقط ══ */}
-          {statsTab==='me'&&role==='player'&&<>
+          {/* ══ 👤 أنا — للمتسابق فقط (يشمل وضع إعارة الجوال) ══ */}
+          {statsTab==='me'&&effectiveRole==='player'&&<>
             {/* بطاقة الهوية */}
             <div className="card" style={{textAlign:'center',padding:'18px 14px',background:'linear-gradient(135deg,rgba(240,192,64,.1),rgba(255,140,0,.05))'}}>
               {myPlayer&&<Av p={myPlayer} sz={52} fs={18}/>}
               <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--gold)',marginTop:8}}>{myPlayer?.name||joinName}</div>
-              <div style={{fontSize:13,color:'var(--text)',marginTop:3}}>"{myNickLocal}"</div>
+              <div style={{fontSize:13,color:'var(--text)',marginTop:3}}>"{effectiveMyNick}"</div>
               <div style={{marginTop:6}}>
                 {myPlayer?.status==='active'?<span className="badge bvd">✅ نشط</span>:<span className="badge brd">خرج ج{myPlayer?.eliminatedRound}</span>}
               </div>
@@ -1298,7 +1566,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             {myAtks.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:16,fontSize:12}}>لم تهاجم بعد</div>
               :allRoundsList.map(r=>{
-                const rAtk=Object.values(r.attacks||{}).filter(a=>a.attackerNick===myNickLocal);
+                const rAtk=Object.values(r.attacks||{}).filter(a=>myNicksForStats.includes(a.attackerNick));
                 if(rAtk.length===0) return null;
                 return rAtk.map((a,i)=>(
                   <div key={i} style={{padding:'8px 12px',marginBottom:5,background:'#09091e',borderRadius:9,borderRight:`3px solid ${a.correct?'var(--green)':'var(--red)'}`,fontSize:12}}>
@@ -1352,52 +1620,19 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             {(()=>{
               const poisoned = playersList.filter(p=>p.isBannedNextRound);
               if(poisoned.length===0) return(
-                <div style={{textAlign:'center',color:'var(--muted)',padding:20,fontSize:12}}>
-                  <div style={{fontSize:40,marginBottom:8}}>☠️</div>
-                  لا أحد وقع في فخ اللقب المسموم بعد
+                <div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>
+                  <div style={{fontSize:36,marginBottom:8}}>☠️</div>
+                  لم يقع أحد في فخ اللقب المسموم بعد
                 </div>
               );
               return(
                 <div>
                   <div style={{textAlign:'center',marginBottom:12}}>
-                    <div style={{fontFamily:'Cairo',fontSize:28,fontWeight:900,color:'var(--purple)'}}>{poisoned.length}</div>
-                    <div style={{fontSize:11,color:'var(--muted)'}}>لاعب وقع في الفخ</div>
-                  </div>
-                  {poisoned.map(p=>(
-                    <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:'rgba(155,89,182,.08)',border:'1px solid rgba(155,89,182,.2)',borderRadius:9,marginBottom:5}}>
-                      <span style={{fontSize:16}}>☠️</span>
-                      <div style={{flex:1}}>
-                        
-                  {effectiveRole==='admin'
-                          ?<><div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
-                            <div style={{fontSize:11,color:'var(--gold)'}}>"{p.nick}"</div></>
-                          :<div style={{fontWeight:700,fontSize:13,color:'var(--gold)'}}>"{p.nick}"</div>
-                        }
-                      </div>
-                      <div style={{fontSize:11,color:'var(--purple)'}}>ممنوع ج{p.isBannedNextRound}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </>}
-
-          {/* ══ ☠️ ضحايا المسموم ══ */}
-          {statsTab==='poison'&&<>
-            {(()=>{
-              const poisoned = playersList.filter(p=>p.isBannedNextRound);
-              if(poisoned.length===0) return(
-                <div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لم يقع أحد في فخ اللقب المسموم بعد</div>
-              );
-              return(
-                <div>
-                  <div style={{textAlign:'center',marginBottom:12}}>
-                    <div style={{fontSize:36}}>☠️</div>
                     <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--purple)',marginTop:6}}>{poisoned.length} لاعب ممنوع</div>
+                    <div style={{fontSize:11,color:'var(--muted)'}}>من الجولات السابقة</div>
                   </div>
                   {poisoned.map(p=>(
                     <div key={p.id} style={{padding:'10px 12px',marginBottom:5,background:'rgba(155,89,182,.08)',border:'1px solid rgba(155,89,182,.2)',borderRadius:9}}>
-                      
                   {effectiveRole==='admin'
                         ?<div><span style={{fontWeight:700}}>{p.name}</span> — <span style={{color:'var(--gold)'}}>"{p.nick}"</span><span style={{fontSize:11,color:'var(--muted)',marginRight:8}}> ممنوع الجولة {p.isBannedNextRound}</span></div>
                         :<div><span style={{color:'var(--gold)',fontWeight:700}}>"{p.nick}"</span><span style={{fontSize:11,color:'var(--muted)',marginRight:8}}> — ممنوع من الهجوم</span></div>
@@ -1409,6 +1644,101 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             })()}
           </>}
 
+          {/* ══ التمويه — للمشرف فقط بعد انتهاء المسابقة ══ */}
+          {statsTab === 'decoys' && role === 'admin' && phase === 'ended' && (
+            <>
+              {(() => {
+                const decoyNicksList = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+                const decoyAtks = allAttacksFlat.filter(
+                  (a) => a.isDecoy || decoyNicksList.includes(a.targetNick)
+                );
+                if (decoyNicksList.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 24, fontSize: 13 }}>
+                      لم تُضف ألقاب تمويه في هذه المسابقة.
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--muted)',
+                        marginBottom: 14,
+                        textAlign: 'center',
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      ألقاب وهمية — لا صاحب حقيقي. الهجمات عليها تُسجّل كفشل دائماً.
+                    </div>
+                    <div className="ctitle" style={{ color: 'var(--purple)', marginBottom: 10 }}>
+                      قائمة التمويه
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                      {decoyNicksList.map((n) => {
+                        const hits = decoyAtks.filter((a) => a.targetNick === n).length;
+                        return (
+                          <div
+                            key={n}
+                            style={{
+                              padding: '8px 12px',
+                              background: 'linear-gradient(135deg,rgba(155,89,182,.12),rgba(79,163,224,.06))',
+                              border: '1px solid rgba(155,89,182,.35)',
+                              borderRadius: 12,
+                              fontSize: 12,
+                              color: 'var(--purple)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            🎭 &quot;{n}&quot;
+                            {hits > 0 && (
+                              <span style={{ fontSize: 10, color: 'var(--muted)', marginRight: 6 }}>
+                                {' '}
+                                — {hits} هجمة
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {decoyAtks.length > 0 ? (
+                      <>
+                        <div className="ctitle" style={{ marginBottom: 8 }}>
+                          سجل الهجمات على التمويه
+                        </div>
+                        <div className="sc" style={{ maxHeight: 280 }}>
+                          {decoyAtks.map((a, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                padding: '8px 10px',
+                                marginBottom: 4,
+                                background: '#09091e',
+                                borderRadius: 8,
+                                borderRight: '3px solid var(--purple)',
+                                fontSize: 11,
+                              }}
+                            >
+                              <span style={{ fontWeight: 700 }}>&quot;{a.attackerNick}&quot;</span> → &quot;
+                              {a.targetNick}&quot;
+                              <span style={{ marginRight: 6 }}> خمّن: {a.guessedName}</span>
+                              <span style={{ color: 'var(--red)' }}>❌ تمويه</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, padding: 12 }}>
+                        لم يُهاجَم أي تمويه في المسابقة.
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
+
           {/* ══ المتبقون ══ */}
           {statsTab==='remaining'&&<>
             <div className="sg sg3" style={{marginBottom:14}}>
@@ -1417,15 +1747,26 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
               <div className="sbox"><div className="snum">{playersList.length}</div><div className="slbl">الكل</div></div>
             </div>
             <div className="ctitle" style={{marginBottom:8}}>✅ ما زالوا في اللعبة</div>
-            {activePlayers.map((p,i)=>(
-              <div key={p.id} className="pi" style={{marginBottom:5}}>
-                <div style={{width:26,height:26,borderRadius:'50%',background:'linear-gradient(135deg,var(--green),#1a8a50)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#07070f',flexShrink:0}}>{i+1}</div>
-                <Av p={p} sz={30} fs={11}/>
-                <div className="pi-info">
-                  <div className="pi-name">{effectiveRole==='admin'?p.name:(p.initials||'?')}</div>
-                  <div className="pi-sub" style={{color:effectiveRole==='admin'?'var(--gold)':'var(--muted)'}}>
-                    {effectiveRole==='admin'?`"${p.nick}"${p.nick2?` · "${p.nick2}"`:''}`:' لقبه مخفي 🔒'}
+            {activePlayers.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  marginBottom: 6,
+                  padding: '8px 10px',
+                  background: 'rgba(255,255,255,.03)',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,.06)',
+                }}
+              >
+                <div className="pi-info" style={{ flex: 1 }}>
+                  <div className="pi-name" style={{ fontWeight: 700 }}>
+                    {p.name}
                   </div>
+                  {effectiveRole === 'admin' && (
+                    <div className="pi-sub" style={{ color: 'var(--gold)', marginTop: 4 }}>
+                      &quot;{p.nick}&quot;{p.nick2 ? ` · "${p.nick2}"` : ''}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1433,17 +1774,15 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
               <div className="ctitle" style={{marginBottom:8,marginTop:14}}>⚰️ مقبرة الألقاب</div>
               {[...elimPlayers].sort((a,b)=>(b.eliminatedRound||0)-(a.eliminatedRound||0)).map(p=>(
                 <div key={p.id} className="grave">
-                  <div className="grave-name">{effectiveRole==='admin'?p.name:(p.initials||p.nick||'?')}</div>
-                  {/* لقب المكشوف فقط — الخارج بالخمول لا يُظهر لقبه */}
+                  <div className="grave-name">{p.name}</div>
                   {p.status==='eliminated'&&<div className="grave-nick">
                     {(()=>{
                       const targetedNick=allAttacksFlat.find(a=>a.correct&&a.realOwnerId===p.id)?.targetNick;
                       const shownNick=targetedNick||p.nick;
                       const otherTargeted=p.nick2&&allAttacksFlat.some(a=>a.correct&&a.realOwnerId===p.id&&a.targetNick===p.nick2);
-                      return <>"{shownNick}"{otherTargeted?` / "${p.nick2}"`:''}</>;
+                      return <>&quot;{shownNick}&quot;{otherTargeted?` / "${p.nick2}"`:''}</>;
                     })()}
                   </div>}
-                  {/* الخارج بالخمول — اسم فقط بدون لقب */}
                   <div className="grave-info">
                     {p.status==='cheater'?'🚫 خرج من المسابقة':
                      p.status==='inactive'?`😴 خرج لعدم الهجوم — ج${p.eliminatedRound}`:
@@ -1494,6 +1833,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     playSound,
     renderFullLog,
     downloadPDFReport,
+    proxyFor,
   };
 
   const mainEl = (() => {
@@ -1508,6 +1848,17 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             else setGameScreen('join');
           }}
         />
+      );
+    }
+
+    if (sessionGate === 'checking') {
+      return (
+        <div className="scr" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, padding: 24 }}>
+          <div style={{ fontSize: 44, marginBottom: 14 }}>🎭</div>
+          <div style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.6 }}>
+            جاري التحقق من جلستك…
+          </div>
+        </div>
       );
     }
 
@@ -1530,11 +1881,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             <div className="psub">أخفِ هويتك • الكل يهاجم معاً • اكشف الهويات</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button type="button" className="btn bg" onClick={() => setShowOnboarding('admin')}>
+            <button type="button" className="btn bg" onClick={() => void createRoom()}>
               👑 إنشاء غرفة كمسؤول
             </button>
-            <button type="button" className="btn bo" onClick={() => setShowOnboarding('player')}>
-              🎮 انضمام كلاعب برمز الغرفة
+            <button type="button" className="btn bo" onClick={() => setGameScreen('join')}>
+              🎮 انضمام برمز الغرفة
             </button>
           </div>
           <button type="button" className="btn bgh" style={{ marginTop: 4 }} onClick={() => setModal({ type: 'guide' })}>
@@ -1569,7 +1920,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       );
     }
 
-    if (gameScreen === 'create' || gameScreen === 'join') {
+    if (gameScreen === 'join') {
       return (
         <TitlesSetup
           gameScreen={gameScreen}
@@ -1585,10 +1936,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           joinNick2={joinNick2}
           setJoinNick2={setJoinNick2}
           joinLoading={joinLoading}
-          form={form}
-          setForm={setForm}
           nickMode={nickMode}
-          createRoom={createRoom}
           joinRoom={joinRoom}
           notify={notify}
         />
@@ -1623,6 +1971,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             setSilentRound={setSilentRound}
             startRound={startGameForLobby}
             notify={notify}
+            myId={myId}
           />
           {role === 'admin' && phase === 'lobby' && (
             <div className="card">
@@ -1752,14 +2101,18 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     </>
   );});
 
-export default function TitlesGame({ notify, setTab, setSelectedGame, titlesRef, onTitlesHeaderMeta }) {
+const TitlesGame = forwardRef(function TitlesGame(
+  { notify, setTab, setSelectedGame, onHeaderMeta },
+  ref
+) {
   return (
     <TitlesGameInner
-      ref={titlesRef}
+      ref={ref}
       notify={notify}
       setTab={setTab}
       setSelectedGame={setSelectedGame}
-      onHeaderMeta={onTitlesHeaderMeta}
+      onHeaderMeta={onHeaderMeta}
     />
   );
-}
+});
+export default TitlesGame;
