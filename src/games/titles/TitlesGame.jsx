@@ -724,16 +724,30 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       )
       .join('');
 
+    const maxNickHeat = nickH[0]?.[1] || 1;
+    const maxNameHeat = nameH[0]?.[1] || 1;
+    const pdfHeatBar = (count, maxVal) => {
+      const r = maxVal > 0 ? count / maxVal : 0;
+      const pct = Math.round(r * 100);
+      const h = Math.round(215 - r * 168);
+      return `<div class="heat-track"><div class="heat-fill" style="width:${pct}%;--hue:${h}"></div></div>`;
+    };
     const nickHeatRows = nickH
       .map(
         ([label, count], i) =>
-          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td></tr>`
+          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td><td>${pdfHeatBar(
+            count,
+            maxNickHeat
+          )}</td></tr>`
       )
       .join('');
     const nameHeatRows = nameH
       .map(
         ([label, count], i) =>
-          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td></tr>`
+          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td><td>${pdfHeatBar(
+            count,
+            maxNameHeat
+          )}</td></tr>`
       )
       .join('');
 
@@ -803,6 +817,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
   th, td { border:1px solid #333; padding:8px; text-align:right; }
   th { background:#252536; color:#e6c84d; }
+  .heat-track { height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.12); min-width:100px; }
+  .heat-fill { height:100%; border-radius:999px; background:linear-gradient(90deg, hsl(calc(var(--hue) + 18),72%,38%), hsl(var(--hue),84%,52%), hsl(calc(var(--hue) - 22),90%,62%)); box-shadow:0 0 12px hsla(var(--hue),90%,55%,.35); }
   .hint { font-size:12px; color:#9a9aaf; margin-top:16px; }
   @media print {
     body { background:white; color:#111; }
@@ -820,9 +836,9 @@ ${summary}
 <div class="sec"><h2>المتسابقون</h2>
 <table><thead><tr><th>الاسم</th><th>اللقب</th><th>الثاني</th><th>الحالة</th><th>خرج بـ</th><th>جولة</th></tr></thead><tbody>${playersRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table></div>
 <div class="sec"><h2>الألقاب الأكثر استهدافاً</h2>
-<table><thead><tr><th>#</th><th>اللقب</th><th>هجمات</th></tr></thead><tbody>${nickHeatRows || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+<table><thead><tr><th>#</th><th>اللقب</th><th>هجمات</th><th>الشدة</th></tr></thead><tbody>${nickHeatRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
 <div class="sec"><h2>الأسماء الأكثر تخميناً</h2>
-<table><thead><tr><th>#</th><th>الاسم</th><th>مرات</th></tr></thead><tbody>${nameHeatRows || '<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+<table><thead><tr><th>#</th><th>الاسم</th><th>مرات</th><th>الشدة</th></tr></thead><tbody>${nameHeatRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
 <div class="sec"><h2>الأشرس هجوماً</h2>
 <table><thead><tr><th>#</th><th>الاسم</th><th>اللقب</th><th>هجمات</th><th>إصابات</th></tr></thead><tbody>${fierceRows || '<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
 <div class="sec"><h2>ضحايا المسموم (إن وجد)</h2>
@@ -1412,6 +1428,54 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
 
       const attackerRank = attackerRankGlobal; // من الحساب العام
 
+      /** تدرج لوني يشبه الخريطة الحرارية — من أزرق بارد إلى ذهبي/أحمر ساخن */
+      const heatBarFillStyle = (count, maxVal) => {
+        const r = maxVal > 0 ? Math.min(1, count / maxVal) : 0;
+        const hue = 215 - r * 168;
+        const light = 38 + r * 22;
+        const sat = 72 + r * 22;
+        const c0 = `hsl(${hue + 18}deg, ${sat}%, ${light - 6}%)`;
+        const c1 = `hsl(${hue}deg, ${sat + 8}%, ${light}%)`;
+        const c2 = `hsl(${Math.max(8, hue - 28)}deg, ${Math.min(98, sat + 12)}%, ${Math.min(72, light + 16)}%)`;
+        return {
+          width: `${Math.max(count > 0 ? 6 : 0, Math.round(r * 100))}%`,
+          background: `linear-gradient(90deg, ${c0}, ${c1}, ${c2})`,
+          borderRadius: 999,
+          minHeight: 10,
+          boxShadow:
+            r > 0.62
+              ? `0 0 16px hsla(${Math.max(0, hue - 20)}deg, 95%, 55%, 0.42), inset 0 1px 0 rgba(255,255,255,.22)`
+              : 'inset 0 1px 0 rgba(255,255,255,.12)',
+          transition: 'width .45s ease, box-shadow .35s ease',
+        };
+      };
+
+      /** صفوف هجوم → خرائط مرتبة لكل جولة (من الأرشيف) */
+      const nickHeatFromAttacks = (atkList) => {
+        const m = {};
+        atkList.forEach((a) => {
+          if (a.targetNick) m[a.targetNick] = (m[a.targetNick] || 0) + 1;
+        });
+        return Object.entries(m).sort((a, b) => b[1] - a[1]);
+      };
+      const nameHeatFromAttacks = (atkList) => {
+        const m = {};
+        atkList.forEach((a) => {
+          if (a.guessedName) m[a.guessedName] = (m[a.guessedName] || 0) + 1;
+        });
+        return Object.entries(m).sort((a, b) => b[1] - a[1]);
+      };
+
+      const lastArchivedRound = allRoundsList.length ? allRoundsList[allRoundsList.length - 1].round : 0;
+      const showLiveRoundNickHeat =
+        phase === 'revealing' &&
+        roundNickSorted.length > 0 &&
+        lastArchivedRound < roundNum;
+      const showLiveRoundNameHeat =
+        phase === 'revealing' &&
+        roundNameSorted.length > 0 &&
+        lastArchivedRound < roundNum;
+
       // ── إحصاءات اللاعب الحالي (مع دعم وضع إعارة الجوال) ──
       const myPlayer =
         playersList.find(p=>p.id===effectiveMyId) ||
@@ -1444,18 +1508,96 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             ['me', '👤 أنا'],
           ];
 
-      const HeatBar=({items,maxVal,showLabel=true})=>(
-        <>{items.map(([label,count],i)=>(
-          <div key={label} style={{marginBottom:9,maxWidth:'100%'}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,gap:8}}>
-              <span style={{fontWeight:700,fontSize:13,color:i===0?'var(--red)':i===1?'var(--gold)':i===2?'var(--blue)':'var(--text)',flex:1,minWidth:0}}>{i+1}. {label}</span>
-              <span style={{fontSize:12,color:'var(--muted)',flexShrink:0}}>{count} هجمة</span>
+      const LuxHeatBar = ({ items, maxVal }) => (
+        <>
+          {items.map(([label, count], i) => (
+            <div
+              key={`${label}-${i}`}
+              style={{
+                marginBottom: 11,
+                maxWidth: '100%',
+                padding: '10px 12px',
+                borderRadius: 14,
+                background:
+                  i === 0
+                    ? 'linear-gradient(135deg, rgba(255,107,90,.09), rgba(240,192,64,.06), rgba(79,163,224,.04))'
+                    : 'linear-gradient(135deg, rgba(255,255,255,.035), rgba(79,163,224,.025))',
+                border:
+                  i === 0
+                    ? '1px solid rgba(255,180,100,.28)'
+                    : '1px solid rgba(255,255,255,.07)',
+                boxShadow: i === 0 ? '0 6px 24px rgba(0,0,0,.22)' : '0 2px 12px rgba(0,0,0,.12)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 10, alignItems: 'baseline' }}>
+                <span
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 13,
+                    fontFamily: 'Cairo, sans-serif',
+                    color: i === 0 ? 'var(--gold)' : i === 1 ? 'rgba(230,200,120,.95)' : i === 2 ? 'var(--blue)' : 'var(--text)',
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <span style={{ opacity: 0.65, marginLeft: 4 }}>{i + 1}</span> {label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: 'var(--muted)',
+                    flexShrink: 0,
+                    padding: '2px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(255,255,255,.06)',
+                  }}
+                >
+                  {count} هجمة
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 12,
+                  background: 'linear-gradient(180deg, rgba(0,0,0,.25), rgba(255,255,255,.04))',
+                  borderRadius: 999,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,.08)',
+                }}
+              >
+                <div style={{ height: '100%', ...heatBarFillStyle(count, maxVal) }} />
+              </div>
             </div>
-            <div style={{height:6,background:'rgba(255,255,255,.06)',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${Math.round(count/maxVal*100)}%`,background:i===0?'var(--red)':i===1?'var(--gold)':i===2?'var(--blue)':'var(--muted)',borderRadius:3,transition:'width .4s'}}/>
-            </div>
+          ))}
+        </>
+      );
+
+      const roundHeatCardShell = (roundLabel, subRight, inner) => (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '12px 12px 6px',
+            borderRadius: 16,
+            background: 'linear-gradient(145deg, rgba(20,22,48,.92), rgba(40,32,72,.35))',
+            border: '1px solid rgba(155,89,182,.22)',
+            boxShadow: '0 8px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+              paddingBottom: 8,
+              borderBottom: '1px solid rgba(255,255,255,.07)',
+            }}
+          >
+            <span style={{ fontFamily: 'Cairo, sans-serif', fontWeight: 900, fontSize: 14, color: 'var(--gold)' }}>{roundLabel}</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{subRight}</span>
           </div>
-        ))}</>
+          {inner}
+        </div>
       );
 
       return(
@@ -1484,42 +1626,87 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
 
           {/* ══ 🎭 الألقاب ══ */}
           {statsTab==='nicks'&&<>
-            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center'}}>
-              الألقاب من الأكثر استهدافاً للأقل — اضغط لقباً لترى من هاجمه
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center',lineHeight:1.7}}>
+              خريطة حرارية: الألقاب الأكثر استهدافاً — <strong style={{color:'var(--gold)'}}>كل جولة</strong> ثم المجموع الكلي
             </div>
-            {/* هيت ماب الجولة الحالية — تظهر فقط بعد الكشف */}
-            {phase==='revealing'&&roundNickSorted.length>0&&<>
-              <div className="ctitle">الجولة الحالية</div>
-              <HeatBar items={roundNickSorted} maxVal={roundNickSorted[0]?.[1]||1}/>
-              <div className="div"/>
-            </>}
             {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
-              🔒 إحصائيات الجولة الحالية ستظهر بعد الإعلان
+              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — الجولات المنتهية أدناه
             </div>}
-            <div className="ctitle">كامل الجولات</div>
+            {/* خريطة حرارية لكل جولة مؤرشفة */}
+            {allRoundsList.length>0&&<>
+              <div className="ctitle" style={{marginBottom:10}}>🔥 حسب الجولة</div>
+              <div style={{display:'flex',flexDirection:'column',gap:2,marginBottom:14}}>
+                {allRoundsList.map((r)=>{
+                  const ratks=Object.values(r.attacks||{});
+                  const sorted=nickHeatFromAttacks(ratks);
+                  if(sorted.length===0) return null;
+                  const mx=sorted[0][1]||1;
+                  const hits=ratks.filter(a=>a.correct).length;
+                  const misses=ratks.length-hits;
+                  return(
+                    <div key={`hn-${r.round}`}>
+                      {roundHeatCardShell(
+                        `الجولة ${r.round}${r.silent?' 🤫':''}`,
+                        `${ratks.length} هجمة · ✅${hits} · ❌${misses}`,
+                        <LuxHeatBar items={sorted} maxVal={mx}/>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>}
+            {/* جولة مكشوفة لم تُؤرشف بعد (تأخير الشبكة) */}
+            {showLiveRoundNickHeat&&roundHeatCardShell(
+              `الجولة ${roundNum} — مباشر`,
+              `${attacksList.length} هجمة`,
+              <LuxHeatBar items={roundNickSorted} maxVal={roundNickSorted[0]?.[1]||1}/>
+            )}
+            <div className="ctitle" style={{marginTop:4}}>🏅 المجموع الكلي (كل الجولات)</div>
             {allNickSorted.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
-              :<HeatBar items={allNickSorted} maxVal={allNickSorted[0]?.[1]||1}/>
+              :<LuxHeatBar items={allNickSorted} maxVal={allNickSorted[0]?.[1]||1}/>
             }
           </>}
 
           {/* ══ 👥 الأسماء ══ */}
           {statsTab==='names'&&<>
-            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center'}}>
-              الأسماء من الأكثر استهدافاً للأقل
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center',lineHeight:1.7}}>
+              أكثر الأسماء التي خُيّمت عليها — <strong style={{color:'var(--gold)'}}>كل جولة</strong> ثم المجموع الكلي
             </div>
-            {phase==='revealing'&&roundNameSorted.length>0&&<>
-              <div className="ctitle">الجولة الحالية</div>
-              <HeatBar items={roundNameSorted} maxVal={roundNameSorted[0]?.[1]||1}/>
-              <div className="div"/>
-            </>}
             {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
-              🔒 إحصائيات الجولة الحالية ستظهر بعد الإعلان
+              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — الجولات المنتهية أدناه
             </div>}
-            <div className="ctitle">كامل الجولات</div>
+            {allRoundsList.length>0&&<>
+              <div className="ctitle" style={{marginBottom:10}}>🔥 حسب الجولة</div>
+              <div style={{display:'flex',flexDirection:'column',gap:2,marginBottom:14}}>
+                {allRoundsList.map((r)=>{
+                  const ratks=Object.values(r.attacks||{});
+                  const sorted=nameHeatFromAttacks(ratks);
+                  if(sorted.length===0) return null;
+                  const mx=sorted[0][1]||1;
+                  const hits=ratks.filter(a=>a.correct).length;
+                  const misses=ratks.length-hits;
+                  return(
+                    <div key={`hna-${r.round}`}>
+                      {roundHeatCardShell(
+                        `الجولة ${r.round}${r.silent?' 🤫':''}`,
+                        `${ratks.length} هجمة · ✅${hits} · ❌${misses}`,
+                        <LuxHeatBar items={sorted} maxVal={mx}/>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>}
+            {showLiveRoundNameHeat&&roundHeatCardShell(
+              `الجولة ${roundNum} — مباشر`,
+              `${attacksList.length} هجمة`,
+              <LuxHeatBar items={roundNameSorted} maxVal={roundNameSorted[0]?.[1]||1}/>
+            )}
+            <div className="ctitle" style={{marginTop:4}}>🏅 المجموع الكلي (كل الجولات)</div>
             {allNameSorted.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
-              :<HeatBar items={allNameSorted} maxVal={allNameSorted[0]?.[1]||1}/>
+              :<LuxHeatBar items={allNameSorted} maxVal={allNameSorted[0]?.[1]||1}/>
             }
           </>}
 
