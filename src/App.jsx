@@ -1,13 +1,18 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import News from './pages/News';
 import Suggestions from './pages/Suggestions';
 import Packages from './pages/Packages';
 import Home from './pages/Home';
+import AdminCodesPanel from './components/admin/AdminCodesPanel';
 import TitlesGame from './games/titles/TitlesGame';
 import FameeriGame from './games/fameeri/FameeriGame';
 import './styles/base.css';
 import Stars from './shared/Stars';
 import Notif from './shared/Notif';
+import CodeActivation from './components/codes/CodeActivation';
+import SubscriptionTimer from './components/codes/SubscriptionTimer';
+import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
+import { getActiveUserCode, isCodeValid } from './firebaseHelpers';
 
 /* ══════════════════════════════════════════════════
    MAIN APP
@@ -26,12 +31,65 @@ export default function App() {
 
   /* ── معلومات تأتي من TitlesGame لرسم زر 👑 في الهيدر ── */
   const [titlesMeta, setTitlesMeta] = useState({ inRoom: false, showAdminBtn: false, gameScreen: 'home' });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeCode, setActiveCode] = useState(null);
+  const [showCodeActivation, setShowCodeActivation] = useState(false);
+  const [showEndGamePrompt, setShowEndGamePrompt] = useState(false);
+  const [endGameData, setEndGameData] = useState(null);
+
+  useEffect(() => {
+    const checkCode = async () => {
+      const storedAdmin = localStorage.getItem('pfcc_is_admin');
+      if (storedAdmin === 'true') {
+        setIsAdmin(true);
+        return;
+      }
+
+      const userId = localStorage.getItem('pfcc_subscriber_uid');
+      if (userId) {
+        const code = await getActiveUserCode(userId);
+        if (code && isCodeValid(code)) {
+          setActiveCode(code);
+          return;
+        }
+      }
+    };
+
+    checkCode();
+  }, []);
+
+  useEffect(() => {
+    const handleOpenPackages = () => setTab('pricing');
+    window.addEventListener('pfcc-open-packages', handleOpenPackages);
+    return () => window.removeEventListener('pfcc-open-packages', handleOpenPackages);
+  }, []);
+
+  const onGameEnd = useCallback((data) => {
+    if (isAdmin || (activeCode && isCodeValid(activeCode))) return;
+    setEndGameData(data ?? null);
+    setTimeout(() => {
+      setShowEndGamePrompt(true);
+    }, 2000);
+  }, [isAdmin, activeCode]);
 
   /* ── DERIVED ── */
   const hasNews      = true;
 
   const notify=(text,type='info')=>{const id=Date.now()+Math.random();setNotifs(p=>[...p,{id,text,type}]);setTimeout(()=>setNotifs(p=>p.filter(n=>n.id!==id)),3200);};
   const renderGame = () => {
+    if (showCodeActivation) {
+      return (
+        <CodeActivation
+          notify={notify}
+          onActivationSuccess={(codeData) => {
+            setActiveCode(codeData);
+            setShowCodeActivation(false);
+          }}
+          onBack={() => setShowCodeActivation(false)}
+        />
+      );
+    }
+
     if(selectedGame === 'nicknames') return (
       <TitlesGame
         ref={titlesRef}
@@ -39,6 +97,9 @@ export default function App() {
         setTab={setTab}
         setSelectedGame={setSelectedGame}
         onHeaderMeta={setTitlesMeta}
+        canCreateRoom={isAdmin || (activeCode && isCodeValid(activeCode))}
+        onRequestActivation={() => setShowCodeActivation(true)}
+        onGameEnd={onGameEnd}
       />
     );
 
@@ -49,6 +110,9 @@ export default function App() {
           notify={notify}
           setTab={setTab}
           setSelectedGame={setSelectedGame}
+          canCreateRoom={isAdmin || (activeCode && isCodeValid(activeCode))}
+          onRequestActivation={() => setShowCodeActivation(true)}
+          onGameEnd={onGameEnd}
         />
       );
     }
@@ -60,7 +124,13 @@ export default function App() {
     return null;
   };
 
-  const navItems=[{id:'news',icon:'🔔',label:'أخبار',dot:hasNews},{id:'game',icon:'🎭',label:'اللعبة'},{id:'suggest',icon:'💡',label:'اقتراح'},{id:'pricing',icon:'💎',label:'الباقات'}];
+  const navItems = [
+    {id:'news',icon:'🔔',label:'أخبار',dot:hasNews},
+    {id:'game',icon:'🎭',label:'اللعبة'},
+    ...(isAdmin ? [{id:'codes',icon:'🎫',label:'الأكواد'}] : []),
+    {id:'suggest',icon:'💡',label:'اقتراح'},
+    {id:'pricing',icon:'💎',label:'الباقات'}
+  ];
 
   return(
     <div className="app">
@@ -95,6 +165,16 @@ export default function App() {
         </div>
 
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          {!isAdmin && activeCode?.expiresAt && isCodeValid(activeCode) && (
+            <SubscriptionTimer
+              activeCode={activeCode}
+              onExpired={() => {
+                setActiveCode(null);
+                setShowCodeActivation(true);
+                notify('⏰ انتهى اشتراكك! جدّد الآن', 'error');
+              }}
+            />
+          )}
           {tab==='game' && selectedGame==='nicknames' && titlesMeta.showAdminBtn ? (
             <button
               className="btn bg bsm"
@@ -112,6 +192,9 @@ export default function App() {
       <div className="main">
         {tab==='news'&&<News />}
         {tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
+        {tab === 'codes' && isAdmin && (
+          <AdminCodesPanel notify={notify} />
+        )}
         {tab==='suggest'&&<Suggestions notify={notify} />}
         {tab==='pricing'&&<Packages />}
       </div>
@@ -125,6 +208,33 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {showEndGamePrompt && (
+        <EndGameJoinPrompt
+          winner={endGameData?.winner}
+          playerStats={endGameData?.playerStats}
+          onClose={() => {
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+          }}
+          onSubscribe={(pkg) => {
+            console.log('Selected package:', pkg);
+            notify('قريباً: ربط بوابة الدفع', 'info');
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+          }}
+          onTryFree={() => {
+            notify('🎁 التجربة المجانية مُفعّلة!', 'success');
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+          }}
+          onNewGame={() => {
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+            setSelectedGame(null);
+          }}
+        />
+      )}
     </div>
   );
 }

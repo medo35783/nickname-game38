@@ -46,7 +46,7 @@ function OnboardingScreen({ role, onDismiss }) {
 }
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
-  { notify, setTab, setSelectedGame, onHeaderMeta },
+  { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
   fwdRef
 ) {
   const [gameScreen, setGameScreen] = useState('home');
@@ -97,9 +97,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [exitAnnounce, setExitAnnounce] = useState(null);
   const [flipCards, setFlipCards] = useState({});
   const titlesPhaseRef = useRef(null);
+  const titlesEndGamePromptSentRef = useRef(false);
 
   useEffect(() => {
     titlesPhaseRef.current = null;
+    titlesEndGamePromptSentRef.current = false;
   }, [roomCode]);
 
   /* ── أثناء "إعارة جوال المشرف للمتسابق" تُعامَل الواجهة كأنها للمتسابق نفسه ── */
@@ -236,6 +238,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   /* ══ ADMIN: CREATE ROOM ══ */
   const createRoom = async () => {
+    if (!canCreateRoom) {
+      notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً', 'error');
+      onRequestActivation();
+      return;
+    }
     // Clear any old session so players aren't stuck in old room
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
@@ -1179,6 +1186,41 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       setGameScreen('winner');
       setTimeout(() => playSound('applause'), 500);
       setTimeout(() => playSound('applause'), 1400);
+
+      if (role === 'player' && onGameEnd && !titlesEndGamePromptSentRef.current) {
+        titlesEndGamePromptSentRef.current = true;
+        const winnerName = activePlayers.map((p) => p.name).join(' ، ') || '—';
+        const myPlayer = myId ? playersList.find((p) => p.id === myId) : null;
+        const statNicks = myPlayer ? [myPlayer.nick, myPlayer.nick2].filter(Boolean) : [myNickLocal].filter(Boolean);
+        const myAtks = allAttacksFlat.filter((a) => statNicks.includes(a.attackerNick));
+        const hits = myAtks.filter((a) => a.correct).length;
+        const accuracy = myAtks.length > 0 ? Math.round((hits / myAtks.length) * 100) : 0;
+        const rankRows = playersList
+          .map((p) => {
+            const nk = [p.nick, p.nick2].filter(Boolean);
+            const atks = allAttacksFlat.filter((a) => nk.includes(a.attackerNick));
+            return {
+              id: p.id,
+              hits: atks.filter((a) => a.correct).length,
+              count: atks.length,
+            };
+          })
+          .sort((a, b) => b.hits - a.hits || b.count - a.count);
+        const rankIdx = myId ? rankRows.findIndex((r) => r.id === myId) : -1;
+        const rank = rankIdx >= 0 ? rankIdx + 1 : playersList.length ? playersList.length : null;
+        const started = gameState?.createdAt;
+        const timeSec = started ? Math.round((Date.now() - started) / 1000) : undefined;
+        onGameEnd({
+          winner: winnerName,
+          playerStats: {
+            rank,
+            hits,
+            accuracy,
+            time: timeSec,
+          },
+        });
+      }
+      return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, gameState, role, proxyFor]);
@@ -2289,7 +2331,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
   );});
 
 const TitlesGame = forwardRef(function TitlesGame(
-  { notify, setTab, setSelectedGame, onHeaderMeta },
+  { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
   ref
 ) {
   return (
@@ -2299,6 +2341,9 @@ const TitlesGame = forwardRef(function TitlesGame(
       setTab={setTab}
       setSelectedGame={setSelectedGame}
       onHeaderMeta={onHeaderMeta}
+      canCreateRoom={canCreateRoom}
+      onRequestActivation={onRequestActivation}
+      onGameEnd={onGameEnd}
     />
   );
 });

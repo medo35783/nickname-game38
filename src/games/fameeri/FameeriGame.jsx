@@ -18,7 +18,10 @@ function readSavedFameeri() {
   }
 }
 
-const FameeriGame = forwardRef(function FameeriGame({ notify, setTab, setSelectedGame }, ref) {
+const FameeriGame = forwardRef(function FameeriGame(
+  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd },
+  ref
+) {
   void setTab;
   const [qSaved] = useState(readSavedFameeri);
   const [gameScreen, setGameScreen] = useState('home');
@@ -55,6 +58,11 @@ const FameeriGame = forwardRef(function FameeriGame({ notify, setTab, setSelecte
   const [speedRoundSecs, setSpeedRoundSecs] = useState(35); // مؤقت حسم السرعة (ثانية، حد أقصى 35)
 
   const lastResultRef = useRef(null);
+  const fameeriEndGamePromptSentRef = useRef(false);
+
+  useEffect(() => {
+    fameeriEndGamePromptSentRef.current = false;
+  }, [qRoom]);
 
   /* ══ QUMAIRI FIREBASE LISTENERS ══ */
   useEffect(()=>{
@@ -230,6 +238,33 @@ const FameeriGame = forwardRef(function FameeriGame({ notify, setTab, setSelecte
     setSpeedWinSelect((prev) => (ids.includes(prev) ? prev : ''));
   }, [qGameState?.speedClaims]);
 
+  useEffect(() => {
+    const ph = qGameState?.phase || 'lobby';
+    if (ph !== 'ended' || !qRoom || !onGameEnd) return;
+    if (qRole === 'admin') return;
+    if (fameeriEndGamePromptSentRef.current) return;
+    fameeriEndGamePromptSentRef.current = true;
+
+    const gList = Object.entries(qGroups).map(([id, g]) => ({ ...g, id }));
+    const sorted = [...gList].sort((a, b) => (b.totalRemaining || 0) - (a.totalRemaining || 0));
+    const winnerName = sorted[0]?.name || '—';
+
+    let playerStats = null;
+    if (qGroupId && sorted.length) {
+      const rank = sorted.findIndex((g) => g.id === qGroupId) + 1;
+      const attacks = Object.values(qAttacks || {});
+      const myOff = attacks.filter((a) => a.attackerId === qGroupId);
+      const hits = myOff.filter((a) => a.result === 'success').reduce((s, a) => s + (a.hunted || 0), 0);
+      const good = myOff.filter((a) => a.result === 'success').length;
+      const accuracy = myOff.length ? Math.round((good / myOff.length) * 100) : 0;
+      const t0 = qGameState?.createdAt;
+      const timeSec = t0 ? Math.round((Date.now() - t0) / 1000) : undefined;
+      playerStats = { rank, hits, accuracy, time: timeSec };
+    }
+
+    onGameEnd({ winner: winnerName, playerStats });
+  }, [qGameState, qRoom, qRole, qGroupId, qGroups, qAttacks, onGameEnd]);
+
   const renderMain = () => {
     if (gameScreen === 'home') {
       return (
@@ -241,7 +276,14 @@ const FameeriGame = forwardRef(function FameeriGame({ notify, setTab, setSelecte
             <div className="psub">وزّع قمائرك • هاجم الأشجار • احمِ مجموعتك</div>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button className="btn bg" onClick={()=>setGameScreen('qumairi_admin')}>👑 إنشاء غرفة كمسؤول</button>
+            <button className="btn bg" onClick={()=>{
+              if (!canCreateRoom) {
+                notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً', 'error');
+                onRequestActivation();
+                return;
+              }
+              setGameScreen('qumairi_admin');
+            }}>👑 إنشاء غرفة كمسؤول</button>
             <button className="btn bo" onClick={()=>setGameScreen('qumairi_join')}>🎮 انضمام كمجموعة برمز الغرفة</button>
           </div>
           <div className="div">نظرة سريعة</div>
@@ -253,7 +295,7 @@ const FameeriGame = forwardRef(function FameeriGame({ notify, setTab, setSelecte
     }
 
     /* ══ QUMAIRI SCREENS ══ */
-    if(gameScreen==='qumairi_admin') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">إنشاء غرفة — صيد القميري</div><div className="psub">أنت المشرف</div><button className="btn bg" onClick={async()=>{const code=genCode();setQRoom(code);setQRole('admin');await set(dbRef(db,`qrooms/${code}`),{game:{phase:'lobby',createdAt:Date.now()},groups:{},members:{},attacks:{}});localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:code,qRole:'admin'}));setGameScreen('qumairi_lobby');notify(`✅ الغرفة: ${code}`,'gold');}}>🏟️ إنشاء الغرفة</button></div>);
+    if(gameScreen==='qumairi_admin') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">إنشاء غرفة — صيد القميري</div><div className="psub">أنت المشرف</div><button className="btn bg" onClick={async()=>{if(!canCreateRoom){notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً','error');onRequestActivation();return;}const code=genCode();setQRoom(code);setQRole('admin');await set(dbRef(db,`qrooms/${code}`),{game:{phase:'lobby',createdAt:Date.now()},groups:{},members:{},attacks:{}});localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:code,qRole:'admin'}));setGameScreen('qumairi_lobby');notify(`✅ الغرفة: ${code}`,'gold');}}>🏟️ إنشاء الغرفة</button></div>);
 
     if(gameScreen==='qumairi_join') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">انضمام — صيد القميري</div><div className="card"><div className="ig"><label className="lbl">🔢 رمز الغرفة</label><input className="inp big" placeholder="× × × × × ×" maxLength={4} value={qJoinInput} onChange={e=>{setQJoinInput(e.target.value.replace(/\D/g,''));setQJoinErr('');}}/></div><div className="ig"><label className="lbl">👤 اسمك</label><input className="inp" placeholder="محمد" value={qMyName} onChange={e=>setQMyName(e.target.value)}/></div>{qJoinErr&&<div className="err-msg">⚠️ {qJoinErr}</div>}<button className="btn bg mt2" disabled={qJoinLoading} onClick={async()=>{if(qJoinLoading)return;if(qJoinInput.length!==4){setQJoinErr('الرمز 4 أرقام');return;}if(!qMyName.trim()){setQJoinErr('أدخل اسمك');return;}setQJoinLoading(true);try{const snap=await get(dbRef(db,`qrooms/${qJoinInput}`));if(!snap.exists()){setQJoinErr('الغرفة غير موجودة');return;}const data=snap.val();if(data.game?.phase!=='lobby'){setQJoinErr('اللعبة بدأت');return;}const mRef=push(dbRef(db,`qrooms/${qJoinInput}/members`));await set(mRef,{name:qMyName.trim(),groupId:null,role:'member',joinedAt:Date.now()});setQMyId(mRef.key);setQRoom(qJoinInput);setQRole('member');localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'member',qMyName:qMyName.trim(),qMyId:mRef.key}));setGameScreen('qumairi_lobby');notify('✅ انضممت','success');}catch(e){setQJoinErr('خطأ');}finally{setQJoinLoading(false);}}}>{qJoinLoading?'⏳':'🚀 انضمام'}</button></div></div>);
 
