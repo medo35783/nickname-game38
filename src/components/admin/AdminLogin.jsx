@@ -4,10 +4,10 @@ import { auth } from '../../firebase';
 import { adminProfileExistsForUid } from '../../firebaseHelpers';
 
 /**
- * شاشة تسجيل دخول المشرف (Email/Password + التحقق من وجود UID تحت admins/ أو admin/)
- * @param {{ onLoginSuccess: () => void; notify: (text: string, type?: string) => void }} props
+ * شاشة تسجيل دخول Admin (Email/Password + التحقق من وجود UID تحت admins/ أو admin/)
+ * @param {{ onLoginSuccess: () => void; onCancel?: () => void; notify: (text: string, type?: string) => void }} props
  */
-export default function AdminLogin({ onLoginSuccess, notify }) {
+export default function AdminLogin({ onLoginSuccess, onCancel, notify }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminLogin({ onLoginSuccess, notify }) {
 
         const isAdmin = await adminProfileExistsForUid(uid);
         if (!isAdmin) {
-          throw new Error('ليس لديك صلاحيات مشرف');
+          throw new Error('ليس لديك صلاحية Admin');
         }
 
         localStorage.setItem('pfcc_is_admin', 'true');
@@ -38,7 +38,7 @@ export default function AdminLogin({ onLoginSuccess, notify }) {
           setError('البريد الإلكتروني غير موجود');
         } else if (err?.code === 'auth/wrong-password') {
           setError('كلمة المرور غير صحيحة');
-        } else if (err?.message?.includes('صلاحيات')) {
+        } else if (err?.message?.includes('صلاحية')) {
           setError(err.message);
         } else {
           setError('حدث خطأ، يرجى المحاولة مرة أخرى');
@@ -55,10 +55,10 @@ export default function AdminLogin({ onLoginSuccess, notify }) {
       <div style={{ textAlign: 'center', padding: '12px 0 18px' }}>
         <div style={{ fontSize: 48, lineHeight: 1.2, marginBottom: 8 }}>🔐</div>
         <div className="ptitle" style={{ fontSize: 22 }}>
-          تسجيل دخول المشرف
+          تسجيل دخول Admin
         </div>
         <p className="psub" style={{ marginBottom: 0 }}>
-          أدخل بيانات الحساب المصرّح به في لوحة التحكم
+          أدخل بيانات الحساب المصرّح به
         </p>
       </div>
 
@@ -114,6 +114,11 @@ export default function AdminLogin({ onLoginSuccess, notify }) {
         <button type="submit" className="btn bg mt2" disabled={loading}>
           {loading ? '⏳ جاري التحقق…' : 'تسجيل الدخول'}
         </button>
+        {onCancel ? (
+          <button type="button" className="btn bgh mt1" disabled={loading} onClick={onCancel}>
+            إلغاء
+          </button>
+        ) : null}
       </form>
     </div>
   );

@@ -17,6 +17,10 @@ import SubscriptionTimer from './components/codes/SubscriptionTimer';
 import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid } from './firebaseHelpers';
 
+/** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
+const ADMIN_LOGO_TAPS = 7;
+const ADMIN_LOGO_TAP_MS = 2000;
+
 /* ══════════════════════════════════════════════════
    MAIN APP
 ══════════════════════════════════════════════════ */
@@ -37,6 +41,8 @@ export default function App() {
   /* ── معلومات تأتي من TitlesGame لرسم زر 👑 في الهيدر ── */
   const [titlesMeta, setTitlesMeta] = useState({ inRoom: false, showAdminBtn: false, gameScreen: 'home' });
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminGateOpen, setAdminGateOpen] = useState(false);
+  const adminLogoTapRef = useRef({ count: 0, last: 0 });
   const [activeCode, setActiveCode] = useState(null);
   const [showCodeActivation, setShowCodeActivation] = useState(false);
   const [showEndGamePrompt, setShowEndGamePrompt] = useState(false);
@@ -118,6 +124,36 @@ export default function App() {
     return () => window.removeEventListener('pfcc-open-packages', handleOpenPackages);
   }, []);
 
+  const openAdminGate = useCallback(() => {
+    setAdminGateOpen(true);
+    setTab('admin-login');
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash.toLowerCase() === '#admin') {
+      openAdminGate();
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [openAdminGate]);
+
+  const goToTab = useCallback((id) => {
+    if (id !== 'admin-login') setAdminGateOpen(false);
+    setTab(id);
+  }, []);
+
+  const handleLogoSecretTap = useCallback(() => {
+    const now = Date.now();
+    if (now - adminLogoTapRef.current.last > ADMIN_LOGO_TAP_MS) {
+      adminLogoTapRef.current.count = 0;
+    }
+    adminLogoTapRef.current.last = now;
+    adminLogoTapRef.current.count += 1;
+    if (adminLogoTapRef.current.count >= ADMIN_LOGO_TAPS) {
+      adminLogoTapRef.current.count = 0;
+      openAdminGate();
+    }
+  }, [openAdminGate]);
+
   const onGameEnd = useCallback((data) => {
     if (isAdmin || (activeCode && isCodeValid(activeCode))) return;
     setEndGameData(data ?? null);
@@ -184,7 +220,6 @@ export default function App() {
     ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
     { id: 'pricing', icon: '💎', label: 'الباقات' },
     { id: 'suggest', icon: '💡', label: 'اقتراح' },
-    ...(!isAdmin ? [{ id: 'admin-login', icon: '🔐', label: 'مشرف' }] : [])
   ];
 
   if (!authReady) {
@@ -205,7 +240,19 @@ export default function App() {
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
       <div className="hdr">
-        {tab==='game'&&(selectedGame||gameScreen!=='home')?(
+        {tab === 'admin-login' && adminGateOpen && !isAdmin ? (
+          <button
+            type="button"
+            className="btn bgh bsm"
+            style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid rgba(255,255,255,.1)' }}
+            onClick={() => {
+              setAdminGateOpen(false);
+              goToTab('game');
+            }}
+          >
+            ← رجوع
+          </button>
+        ) : tab==='game'&&(selectedGame||gameScreen!=='home')?(
           <button className="btn bgh bsm" style={{width:'auto',padding:'6px 12px',fontSize:12,color:'var(--muted)',border:'1px solid rgba(255,255,255,.1)'}}
             onClick={()=>{
               if (selectedGame === 'qumairi') {
@@ -227,7 +274,12 @@ export default function App() {
           <div style={{width:60}}/>
         )}
 
-        <div className="logo" style={{position:'absolute',left:'50%',transform:'translateX(-50%)'}}>
+        <div
+          className="logo"
+          role="presentation"
+          style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', userSelect: 'none' }}
+          onClick={handleLogoSecretTap}
+        >
           {tab === 'news'
             ? '🔔 أخبار'
             : tab === 'game'
@@ -241,7 +293,7 @@ export default function App() {
                   : tab === 'codes'
                     ? '🎫 الأكواد'
                     : tab === 'admin-login'
-                      ? '🔐 مشرف'
+                      ? '🔐 Admin'
                       : '🏟️ ساحة الألعاب'}
         </div>
 
@@ -254,7 +306,8 @@ export default function App() {
                 localStorage.removeItem('pfcc_is_admin');
                 localStorage.removeItem('pfcc_admin_uid');
                 setIsAdmin(false);
-                setTab('game');
+                setAdminGateOpen(false);
+                goToTab('game');
                 try {
                   await signOut(auth);
                 } catch (e) {
@@ -293,12 +346,17 @@ export default function App() {
 
       <div className="main">
         {tab==='news'&&<News />}
-        {tab === 'admin-login' && !isAdmin && (
+        {tab === 'admin-login' && adminGateOpen && !isAdmin && (
           <AdminLogin
             notify={notify}
+            onCancel={() => {
+              setAdminGateOpen(false);
+              goToTab('game');
+            }}
             onLoginSuccess={() => {
               setIsAdmin(true);
-              setTab('codes');
+              setAdminGateOpen(false);
+              goToTab('codes');
             }}
           />
         )}
@@ -312,7 +370,7 @@ export default function App() {
 
       <nav className="bnav">
         {navItems.map(item=>(
-          <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} onClick={()=>setTab(item.id)}>
+          <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} onClick={()=>goToTab(item.id)}>
             <div className="bnav-icon">{item.icon}</div>
             <div className="bnav-label">{item.label}</div>
             {item.dot&&<div className="bnav-dot"/>}
