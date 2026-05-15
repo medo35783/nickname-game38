@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
+import { auth } from "./firebase";
 import News from './pages/News';
 import Suggestions from './pages/Suggestions';
 import Packages from './pages/Packages';
 import Home from './pages/Home';
 import AdminCodesPanel from './components/admin/AdminCodesPanel';
+import AdminLogin from './components/admin/AdminLogin';
 import TitlesGame from './games/titles/TitlesGame';
 import FameeriGame from './games/fameeri/FameeriGame';
 import './styles/base.css';
@@ -12,12 +15,14 @@ import Notif from './shared/Notif';
 import CodeActivation from './components/codes/CodeActivation';
 import SubscriptionTimer from './components/codes/SubscriptionTimer';
 import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
-import { getActiveUserCode, isCodeValid } from './firebaseHelpers';
+import { getActiveUserCode, isCodeValid, adminProfileExistsForUid } from './firebaseHelpers';
 
 /* ══════════════════════════════════════════════════
    MAIN APP
 ══════════════════════════════════════════════════ */
 export default function App() {
+  const [authReady, setAuthReady] = useState(false);
+
   /* ── NAV ── */
   const [tab, setTab]           = useState('game');
   const [selectedGame, setSelectedGame] = useState(null);
@@ -38,11 +43,61 @@ export default function App() {
   const [endGameData, setEndGameData] = useState(null);
 
   useEffect(() => {
-    const checkCode = async () => {
-      const storedAdmin = localStorage.getItem('pfcc_is_admin');
-      if (storedAdmin === 'true') {
-        setIsAdmin(true);
+    let done = false;
+    const finishAuthInit = () => {
+      if (!done) {
+        done = true;
+        setAuthReady(true);
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log("User authenticated:", user.uid);
+        finishAuthInit();
         return;
+      }
+
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        // auth/admin-restricted-operation = Anonymous غير مفعّل في Firebase Console
+        console.warn("Anonymous sign-in skipped:", error?.code || error);
+        finishAuthInit();
+      }
+    });
+
+    const safety = setTimeout(finishAuthInit, 6000);
+
+    return () => {
+      clearTimeout(safety);
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+
+    const checkAdmin = async () => {
+      const storedAdmin = localStorage.getItem('pfcc_is_admin');
+      const adminUid = localStorage.getItem('pfcc_admin_uid');
+
+      if (storedAdmin === 'true' && adminUid) {
+        try {
+          const ok = await adminProfileExistsForUid(adminUid);
+          if (ok) {
+            setIsAdmin(true);
+          } else {
+            localStorage.removeItem('pfcc_is_admin');
+            localStorage.removeItem('pfcc_admin_uid');
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.error('Admin check error:', error);
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
       }
 
       const userId = localStorage.getItem('pfcc_subscriber_uid');
@@ -50,13 +105,12 @@ export default function App() {
         const code = await getActiveUserCode(userId);
         if (code && isCodeValid(code)) {
           setActiveCode(code);
-          return;
         }
       }
     };
 
-    checkCode();
-  }, []);
+    checkAdmin();
+  }, [authReady]);
 
   useEffect(() => {
     const handleOpenPackages = () => setTab('pricing');
@@ -125,12 +179,25 @@ export default function App() {
   };
 
   const navItems = [
-    {id:'news',icon:'🔔',label:'أخبار',dot:hasNews},
-    {id:'game',icon:'🎭',label:'اللعبة'},
-    ...(isAdmin ? [{id:'codes',icon:'🎫',label:'الأكواد'}] : []),
-    {id:'suggest',icon:'💡',label:'اقتراح'},
-    {id:'pricing',icon:'💎',label:'الباقات'}
+    { id: 'game', icon: '🏟️', label: 'الألعاب' },
+    { id: 'news', icon: '🔔', label: 'أخبار', dot: hasNews },
+    ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
+    { id: 'pricing', icon: '💎', label: 'الباقات' },
+    { id: 'suggest', icon: '💡', label: 'اقتراح' },
+    ...(!isAdmin ? [{ id: 'admin-login', icon: '🔐', label: 'مشرف' }] : [])
   ];
+
+  if (!authReady) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#07071a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Stars />
+        <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 64, animation: "bnc 1s infinite" }}>🎮</div>
+          <div style={{ color: "var(--muted)", marginTop: 16 }}>جاري التحميل...</div>
+        </div>
+      </div>
+    );
+  }
 
   return(
     <div className="app">
@@ -161,10 +228,45 @@ export default function App() {
         )}
 
         <div className="logo" style={{position:'absolute',left:'50%',transform:'translateX(-50%)'}}>
-          {tab==='news'?'🔔 أخبار':tab==='game'?(selectedGame==='qumairi'?'🦅 صيد القميري':'🏟️ ساحة الألعاب'):tab==='suggest'?'💡 اقتراح':'💎 الباقات'}
+          {tab === 'news'
+            ? '🔔 أخبار'
+            : tab === 'game'
+              ? selectedGame === 'qumairi'
+                ? '🦅 صيد القميري'
+                : '🏟️ ساحة الألعاب'
+              : tab === 'suggest'
+                ? '💡 اقتراح'
+                : tab === 'pricing'
+                  ? '💎 الباقات'
+                  : tab === 'codes'
+                    ? '🎫 الأكواد'
+                    : tab === 'admin-login'
+                      ? '🔐 مشرف'
+                      : '🏟️ ساحة الألعاب'}
         </div>
 
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn bgh bsm"
+              onClick={async () => {
+                localStorage.removeItem('pfcc_is_admin');
+                localStorage.removeItem('pfcc_admin_uid');
+                setIsAdmin(false);
+                setTab('game');
+                try {
+                  await signOut(auth);
+                } catch (e) {
+                  console.error(e);
+                }
+                notify('تم تسجيل الخروج', 'info');
+              }}
+              style={{ fontSize: 11 }}
+            >
+              🚪 خروج
+            </button>
+          )}
           {!isAdmin && activeCode?.expiresAt && isCodeValid(activeCode) && (
             <SubscriptionTimer
               activeCode={activeCode}
@@ -191,6 +293,15 @@ export default function App() {
 
       <div className="main">
         {tab==='news'&&<News />}
+        {tab === 'admin-login' && !isAdmin && (
+          <AdminLogin
+            notify={notify}
+            onLoginSuccess={() => {
+              setIsAdmin(true);
+              setTab('codes');
+            }}
+          />
+        )}
         {tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
         {tab === 'codes' && isAdmin && (
           <AdminCodesPanel notify={notify} />

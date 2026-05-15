@@ -192,8 +192,20 @@ export async function saveUserActiveCode(userId, codeData) {
 }
 
 // ═══════════════════════════════════════════
-// Refs للأكواد
+// Refs للأكواد + مسارات المشرفين في RTDB (`admins` الاسم الصحيح، `admin` لتوافق البيانات الموجودة)
 // ═══════════════════════════════════════════
+const RTDB_ADMIN_ROOT_KEYS = ['admins', 'admin'];
+
+/** يتحقق من وجود سجل مشرف للمستخدم تحت `admins/{uid}` أو `admin/{uid}` */
+export async function adminProfileExistsForUid(uid) {
+  if (!uid) return false;
+  for (const key of RTDB_ADMIN_ROOT_KEYS) {
+    const snap = await get(ref(db, `${key}/${uid}`));
+    if (snap.exists()) return true;
+  }
+  return false;
+}
+
 export const codesRef = () => ref(db, 'codes');
 export const codeRef = (codeId) => ref(db, `codes/${codeId}`);
 export const userCodeRef = (userId) => ref(db, `users/${userId}/activeCode`);

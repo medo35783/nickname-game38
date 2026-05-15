@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { onValue } from 'firebase/database';
-import { createCode, codesRef } from '../../firebaseHelpers';
-import { db } from '../../firebase';
+import { auth } from '../../firebase';
+import { adminProfileExistsForUid, createCode, codesRef } from '../../firebaseHelpers';
 
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
 const PACKAGES = [
@@ -59,25 +60,49 @@ export default function AdminCodesPanel({ notify }) {
   /** رسالة نجاح بعد التوليد */
   const [successMsg, setSuccessMsg] = useState('');
 
-  // الاشتراك في شجرة codes (تنظيف عند unmount)
+  // الاشتراك في codes بعد تأكيد جلسة مشرف (تجنّب قراءة أثناء auth مجهول)
   useEffect(() => {
-    const r = codesRef();
-    const unsub = onValue(
-      r,
-      (snap) => {
-        const list = [];
-        snap.forEach((child) => {
-          list.push({ id: child.key, ...child.val() });
-        });
-        list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setRows(list);
-      },
-      (err) => {
-        console.error(err);
-        notify(err?.message || 'فشل تحميل الأكواد', 'error');
-      }
-    );
-    return () => unsub();
+    let dbUnsub = null;
+
+    const authUnsub = onAuthStateChanged(auth, async (user) => {
+      if (dbUnsub) dbUnsub();
+      dbUnsub = null;
+      setRows([]);
+
+      if (!user) return;
+
+      const isAdmin = await adminProfileExistsForUid(user.uid);
+      if (!isAdmin) return;
+
+      dbUnsub = onValue(
+        codesRef(),
+        (snap) => {
+          const list = [];
+          snap.forEach((child) => {
+            list.push({ id: child.key, ...child.val() });
+          });
+          list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          setRows(list);
+        },
+        (err) => {
+          console.error(err);
+          const denied =
+            err?.code === 'PERMISSION_DENIED' ||
+            String(err?.message || '').includes('permission_denied');
+          notify(
+            denied
+              ? 'صلاحية /codes مرفوضة: انشر قواعد firebase-database-rules.json من Firebase → Realtime Database → Rules → Publish'
+              : err?.message || 'فشل تحميل الأكواد',
+            'error'
+          );
+        }
+      );
+    });
+
+    return () => {
+      authUnsub();
+      if (dbUnsub) dbUnsub();
+    };
   }, [notify]);
 
   /** إحصائيات مجمّعة حسب الحالة الفعلية */
