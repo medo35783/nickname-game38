@@ -22,6 +22,10 @@ export default function TitlesLobby(props) {
     startRound,
     notify,
     myId,
+    /** نموذج إضافة لاعب يدوياً (المشرف فقط) */
+    form,
+    setForm,
+    onAddManualPlayer,
   } = props;
 
   const [decoyInput, setDecoyInput] = useState('');
@@ -50,6 +54,7 @@ export default function TitlesLobby(props) {
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
+  const sidelinedPlayers = playersList.filter((p) => p.status && p.status !== 'active');
 
   const isAdmin = role === 'admin';
 
@@ -129,13 +134,28 @@ export default function TitlesLobby(props) {
 
   return (
     <>
+      <div
+        className="card"
+        style={{
+          marginBottom: 12,
+          textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(240,192,64,.12), rgba(155,89,182,.05))',
+          border: '1px solid rgba(240,192,64,.32)',
+        }}
+      >
+        <div style={{ fontWeight: 900, color: 'var(--gold)', fontSize: 15 }}>👑 أنت مشرف هذه الغرفة</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.55 }}>
+          اضبط الإعدادات والمدة، أضف لاعبين يدوياً أو دعهم ينضمون بالرمز، ثم ابدأ الجولة. المتسابقون يرون شاشة انتظار مختلفة عنك.
+        </div>
+      </div>
+
       <div className="card">
         <div className="ctitle">
           📡 رمز الغرفة <span className="online-dot" />
         </div>
         <div className="room-code-big">{roomCode}</div>
         <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
-          أرسل هذا الرمز للمتسابقين — {activePlayers.length} منضم الآن
+          أرسل هذا الرمز للمشاركين — {playersList.length} مسجّل · {activePlayers.length} نشط
         </div>
         <button
           type="button"
@@ -211,7 +231,7 @@ export default function TitlesLobby(props) {
             {[
               [1, '🗡️ عادية'],
               [2, '⚔️ مزدوجة'],
-              [3, '⚡ اندفاع'],
+              [3, '⚡ مفاجئ'],
             ].map(([n, label]) => (
               <button
                 key={n}
@@ -338,6 +358,24 @@ export default function TitlesLobby(props) {
         )}
       </div>
 
+      {playersList.length === 0 && (
+        <div
+          className="card"
+          style={{
+            textAlign: 'center',
+            padding: '18px 14px',
+            background: 'rgba(79,163,224,.06)',
+            border: '1px dashed rgba(79,163,224,.35)',
+          }}
+        >
+          <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
+          <div style={{ fontWeight: 800, color: 'var(--gold)', fontSize: 14, marginBottom: 6 }}>لا يوجد مسجّلون بعد</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+            انسخ الرمز أعلاه وأرسله للمشاركين، أو أضف لاعبين يدوياً من الأسفل. يظهر هنا كل من انضم برمز الغرفة.
+          </div>
+        </div>
+      )}
+
       {playersList.length > 0 && (
         <div className="card">
           <div className="ctitle">👥 المسجلون ({playersList.length})</div>
@@ -376,10 +414,10 @@ export default function TitlesLobby(props) {
         </div>
       )}
 
-      <div className="sg">
+      <div className="sg sg3">
         <div className="sbox">
           <div className="snum">{playersList.length}</div>
-          <div className="slbl">مسجلون</div>
+          <div className="slbl">مسجّلون</div>
         </div>
         <div className="sbox">
           <div className="snum" style={{ color: 'var(--green)' }}>
@@ -387,13 +425,13 @@ export default function TitlesLobby(props) {
           </div>
           <div className="slbl">نشطون</div>
         </div>
-      </div>
-
-      {activePlayers.length < minPlayers && playersList.length > 0 && (
-        <div style={{ fontSize: 12, color: 'var(--red)', textAlign: 'center', marginBottom: 9 }}>
-          يلزم {minPlayers - activePlayers.length} لاعب إضافي
+        <div className="sbox">
+          <div className="snum" style={{ color: sidelinedPlayers.length ? 'var(--red)' : 'var(--muted)' }}>
+            {sidelinedPlayers.length}
+          </div>
+          <div className="slbl">مستبعدون</div>
         </div>
-      )}
+      </div>
 
       <button
         type="button"
@@ -404,6 +442,51 @@ export default function TitlesLobby(props) {
       >
         🚀 بدء الجولة ({activePlayers.length}/{minPlayers}+)
       </button>
+      <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginBottom: 12, lineHeight: 1.55 }}>
+        الحد الأدنى للبدء: <strong style={{ color: 'var(--gold)' }}>{minPlayers} لاعبين نشطين</strong>
+        {nickMode === 2 ? ' (وضع لقبان)' : ' (وضع لقب واحد)'}
+        {activePlayers.length < minPlayers && playersList.length > 0
+          ? ` — يتبقى ${minPlayers - activePlayers.length}`
+          : ''}
+      </div>
+
+      {isAdmin && form && setForm && onAddManualPlayer && (
+        <div className="card">
+          <div className="ctitle">➕ إضافة لاعب يدوياً</div>
+          <div className="ig">
+            <label className="lbl">الاسم الكامل</label>
+            <input
+              className="inp"
+              placeholder="محمد عبدالله"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+          <div className="ig">
+            <label className="lbl">اللقب {nickMode === 2 ? 'الأول' : ''}</label>
+            <input
+              className="inp"
+              placeholder="القناص"
+              value={form.nick}
+              onChange={(e) => setForm((f) => ({ ...f, nick: e.target.value }))}
+            />
+          </div>
+          {nickMode === 2 && (
+            <div className="ig">
+              <label className="lbl">اللقب الثاني</label>
+              <input
+                className="inp"
+                placeholder="الصقر"
+                value={form.nick2}
+                onChange={(e) => setForm((f) => ({ ...f, nick2: e.target.value }))}
+              />
+            </div>
+          )}
+          <button type="button" className="btn bg" onClick={() => void onAddManualPlayer()}>
+            ➕ إضافة
+          </button>
+        </div>
+      )}
     </>
   );
 }

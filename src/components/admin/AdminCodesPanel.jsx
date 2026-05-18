@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { onValue } from 'firebase/database';
-import { auth } from '../../firebase';
-import { adminProfileExistsForUid, createCode, codesRef } from '../../firebaseHelpers';
+import { auth, db } from '../../firebase';
+import { ref, onValue as onDbValue } from 'firebase/database';
+import { adminProfileExistsForUid, createCode, codesRef, ensureCodeIndexesFromRows, formatCodeForDisplay } from '../../firebaseHelpers';
 
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
 const PACKAGES = [
@@ -49,6 +50,8 @@ function formatDate(ts) {
 export default function AdminCodesPanel({ notify }) {
   /** سجل الأكواد من Realtime DB */
   const [rows, setRows] = useState([]);
+  /** حالة التفعيل الفعلية من codeIndex */
+  const [indexByCode, setIndexByCode] = useState({});
   /** الباقة المختارة للتوليد */
   const [selectedPkg, setSelectedPkg] = useState(PACKAGES[0]);
   /** عدد الأكواد المراد توليدها */
@@ -105,6 +108,32 @@ export default function AdminCodesPanel({ notify }) {
     };
   }, [notify]);
 
+  useEffect(() => {
+    if (!rows.length) return;
+    ensureCodeIndexesFromRows(rows).catch((err) => {
+      console.warn('ensureCodeIndexesFromRows:', err);
+    });
+  }, [rows]);
+
+  useEffect(() => {
+    let unsub = null;
+    const authUnsub = onAuthStateChanged(auth, async (user) => {
+      if (unsub) unsub();
+      unsub = null;
+      setIndexByCode({});
+      if (!user) return;
+      const isAdmin = await adminProfileExistsForUid(user.uid);
+      if (!isAdmin) return;
+      unsub = onDbValue(ref(db, 'codeIndex'), (snap) => {
+        setIndexByCode(snap.val() || {});
+      });
+    });
+    return () => {
+      authUnsub();
+      if (unsub) unsub();
+    };
+  }, []);
+
   /** إحصائيات مجمّعة حسب الحالة الفعلية */
   const stats = useMemo(() => {
     let total = 0;
@@ -113,13 +142,14 @@ export default function AdminCodesPanel({ notify }) {
     let expired = 0;
     for (const row of rows) {
       total += 1;
-      const eff = getEffectiveStatus(row);
+      const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+      const eff = getEffectiveStatus(merged);
       if (eff === 'unused') unused += 1;
       else if (eff === 'active') active += 1;
       else if (eff === 'expired') expired += 1;
     }
     return { total, unused, active, expired };
-  }, [rows]);
+  }, [rows, indexByCode]);
 
   const clampCount = useCallback((n) => {
     const x = Number.isFinite(n) ? Math.floor(n) : 1;
@@ -137,7 +167,7 @@ export default function AdminCodesPanel({ notify }) {
     try {
       for (let i = 0; i < n; i += 1) {
         const rec = await createCode(selectedPkg.duration, selectedPkg.price);
-        created.push(rec.code);
+        created.push(formatCodeForDisplay(rec.code));
       }
       setGeneratedLines(created);
       const msg = `تم توليد ${created.length} كود بنجاح (${selectedPkg.labelShort} / ${selectedPkg.labelPrice})`;
@@ -174,8 +204,9 @@ export default function AdminCodesPanel({ notify }) {
     }
     const header = ['code', 'status', 'duration_days', 'price_sar', 'created_at'];
     const lines = rows.map((row) => {
-      const eff = getEffectiveStatus(row);
-      const code = String(row.code || '').replace(/"/g, '""');
+      const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+      const eff = getEffectiveStatus(merged);
+      const code = String(formatCodeForDisplay(row.code) || '').replace(/"/g, '""');
       const created = row.createdAt ? new Date(row.createdAt).toISOString() : '';
       return `"${code}","${eff}",${Number(row.duration) || 0},${Number(row.price) || 0},"${created}"`;
     });
@@ -342,7 +373,8 @@ export default function AdminCodesPanel({ notify }) {
                 </tr>
               ) : (
                 rows.map((row) => {
-                  const eff = getEffectiveStatus(row);
+                  const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+                  const eff = getEffectiveStatus(merged);
                   const rowColor =
                     eff === 'unused' ? 'var(--blue)' : eff === 'active' ? 'var(--green)' : eff === 'expired' ? 'var(--red)' : 'var(--muted)';
                   const bg =
@@ -355,7 +387,7 @@ export default function AdminCodesPanel({ notify }) {
                           : 'rgba(255,255,255,.03)';
                   return (
                     <tr key={row.id} style={{ background: bg, borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                      <td style={{ padding: '10px 6px', fontWeight: 800, fontFamily: 'monospace', color: 'var(--gold)' }}>{row.code}</td>
+                      <td style={{ padding: '10px 6px', fontWeight: 800, fontFamily: 'monospace', color: 'var(--gold)' }}>{formatCodeForDisplay(row.code)}</td>
                       <td style={{ padding: '10px 6px', fontWeight: 800, color: rowColor }}>{statusLabel(eff)}</td>
                       <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.duration ?? '—'} يوم</td>
                       <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.price ?? '—'} ر.س</td>

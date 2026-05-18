@@ -19,6 +19,7 @@ export default function TitlesSetup(props) {
     nickMode,
     joinRoom,
     notify,
+    canCreateRoom,
   } = props;
 
   const [joinRoomNickMode, setJoinRoomNickMode] = useState(1);
@@ -35,6 +36,22 @@ export default function TitlesSetup(props) {
         </button>
         <div className="ptitle">انضمام للعبة</div>
         <div className="psub">أدخل رمز الغرفة المرسل من المشرف</div>
+        {canCreateRoom && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: '9px 12px',
+              background: 'rgba(240,192,64,.08)',
+              border: '1px solid rgba(240,192,64,.22)',
+              borderRadius: 10,
+              fontSize: 11,
+              color: 'var(--muted)',
+              lineHeight: 1.55,
+            }}
+          >
+            👑 لتكون مشرف الغرفة: انقر «إنشاء غرفة» من القائمة الرئيسية؛ هذه الشاشة مخصّصة للاعبين. بعد إنشاء الغرفة على هذا الجهاز يمكنك وضع الرمز هنا أيضاً لتفتح لوحة المشرف.
+          </div>
+        )}
         <div className="card">
           <div className="ig">
             <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>

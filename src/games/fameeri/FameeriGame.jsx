@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { ref as dbRef, set, get, update, push, onValue, off } from 'firebase/database';
-import { db } from '../../core/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../../firebase';
 import { Q_TREES, Q_WEAPONS, Q_TOTAL } from '../../core/constants';
 import { genCode, playSound } from '../../core/helpers';
 import FameeriAdminBattleLog from './FameeriAdminBattleLog';
@@ -92,6 +93,43 @@ const FameeriGame = forwardRef(function FameeriGame(
       if(s.qMyId) setQMyId(s.qMyId);
       if(s.qDistLocked) setQDistLocked(true);
     }catch(e){localStorage.removeItem('ng_qumairi');}
+  }, []);
+
+  /** تصحيح دور المشرف إن كان uid قد تأخر عن القراءة الأولى */
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user?.uid) return;
+      let saved = '';
+      try {
+        const raw = localStorage.getItem('ng_qumairi');
+        if (!raw) return;
+        const p = JSON.parse(raw);
+        if (p.qRole === 'admin' || !p.qRoom) return;
+        saved = p.qRoom;
+      } catch {
+        return;
+      }
+      try {
+        const snap = await get(dbRef(db, `qrooms/${saved}`));
+        if (!snap.exists()) return;
+        const d = snap.val();
+        if (!d?.adminId || d.adminId !== user.uid) return;
+        localStorage.setItem(
+          'ng_qumairi',
+          JSON.stringify({
+            ...readSavedFameeri(),
+            qRoom: saved,
+            qRole: 'admin',
+          })
+        );
+        setQRoom(saved);
+        setQRole('admin');
+        setQMyId(null);
+      } catch {
+        /* ignore */
+      }
+    });
+    return () => unsub();
   }, []);
 
   // Qumairi countdown timer — يحدّث كل ثانية بدقة
@@ -278,7 +316,7 @@ const FameeriGame = forwardRef(function FameeriGame(
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             <button className="btn bg" onClick={()=>{
               if (!canCreateRoom) {
-                notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً', 'error');
+                notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».', 'error');
                 onRequestActivation();
                 return;
               }
@@ -295,12 +333,12 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
 
     /* ══ QUMAIRI SCREENS ══ */
-    if(gameScreen==='qumairi_admin') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">إنشاء غرفة — صيد القميري</div><div className="psub">أنت المشرف</div><button className="btn bg" onClick={async()=>{if(!canCreateRoom){notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً','error');onRequestActivation();return;}const code=genCode();setQRoom(code);setQRole('admin');await set(dbRef(db,`qrooms/${code}`),{game:{phase:'lobby',createdAt:Date.now()},groups:{},members:{},attacks:{}});localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:code,qRole:'admin'}));setGameScreen('qumairi_lobby');notify(`✅ الغرفة: ${code}`,'gold');}}>🏟️ إنشاء الغرفة</button></div>);
+    if(gameScreen==='qumairi_admin') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">إنشاء غرفة — صيد القميري</div><div className="psub">أنت المشرف</div><button className="btn bg" onClick={async()=>{if(!canCreateRoom){notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».','error');onRequestActivation();return;}try{if(typeof auth.authStateReady==='function')await auth.authStateReady();}catch(z){void z;}const code=genCode();setQRoom(code);setQRole('admin');await set(dbRef(db,`qrooms/${code}`),{...(auth.currentUser?.uid?{adminId:auth.currentUser.uid}:{}),game:{phase:'lobby',createdAt:Date.now()},groups:{},members:{},attacks:{}});localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:code,qRole:'admin'}));setGameScreen('qumairi_lobby');notify(`✅ الغرفة: ${code}`,'gold');}}>🏟️ إنشاء الغرفة</button></div>);
 
-    if(gameScreen==='qumairi_join') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">انضمام — صيد القميري</div><div className="card"><div className="ig"><label className="lbl">🔢 رمز الغرفة</label><input className="inp big" placeholder="× × × × × ×" maxLength={4} value={qJoinInput} onChange={e=>{setQJoinInput(e.target.value.replace(/\D/g,''));setQJoinErr('');}}/></div><div className="ig"><label className="lbl">👤 اسمك</label><input className="inp" placeholder="محمد" value={qMyName} onChange={e=>setQMyName(e.target.value)}/></div>{qJoinErr&&<div className="err-msg">⚠️ {qJoinErr}</div>}<button className="btn bg mt2" disabled={qJoinLoading} onClick={async()=>{if(qJoinLoading)return;if(qJoinInput.length!==4){setQJoinErr('الرمز 4 أرقام');return;}if(!qMyName.trim()){setQJoinErr('أدخل اسمك');return;}setQJoinLoading(true);try{const snap=await get(dbRef(db,`qrooms/${qJoinInput}`));if(!snap.exists()){setQJoinErr('الغرفة غير موجودة');return;}const data=snap.val();if(data.game?.phase!=='lobby'){setQJoinErr('اللعبة بدأت');return;}const mRef=push(dbRef(db,`qrooms/${qJoinInput}/members`));await set(mRef,{name:qMyName.trim(),groupId:null,role:'member',joinedAt:Date.now()});setQMyId(mRef.key);setQRoom(qJoinInput);setQRole('member');localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'member',qMyName:qMyName.trim(),qMyId:mRef.key}));setGameScreen('qumairi_lobby');notify('✅ انضممت','success');}catch(e){setQJoinErr('خطأ');}finally{setQJoinLoading(false);}}}>{qJoinLoading?'⏳':'🚀 انضمام'}</button></div></div>);
+    if(gameScreen==='qumairi_join') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">انضمام — صيد القميري</div><div className="card"><div className="ig"><label className="lbl">🔢 رمز الغرفة</label><input className="inp big" placeholder="× × × × × ×" maxLength={4} value={qJoinInput} onChange={e=>{setQJoinInput(e.target.value.replace(/\D/g,''));setQJoinErr('');}}/></div><div className="ig"><label className="lbl">👤 اسمك</label><input className="inp" placeholder="محمد" value={qMyName} onChange={e=>setQMyName(e.target.value)}/></div>{qJoinErr&&<div className="err-msg">⚠️ {qJoinErr}</div>}<button className="btn bg mt2" disabled={qJoinLoading} onClick={async()=>{if(qJoinLoading)return;if(qJoinInput.length!==4){setQJoinErr('الرمز 4 أرقام');return;}setQJoinLoading(true);try{if(typeof auth.authStateReady==='function')await auth.authStateReady();const snap=await get(dbRef(db,`qrooms/${qJoinInput}`));if(!snap.exists()){setQJoinErr('الغرفة غير موجودة');return;}const data=snap.val();if(data.game?.phase!=='lobby'){setQJoinErr('اللعبة بدأت');return;}const uidHm=auth.currentUser?.uid;if(uidHm&&data.adminId===uidHm){setQRoom(qJoinInput);setQRole('admin');setQMyId(null);localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'admin'}));setGameScreen('qumairi_lobby');notify('✅ دخلت كمشرف — صاحب الغرفة','gold');return;}if(!qMyName.trim()){setQJoinErr('أدخل اسمك');return;}const mRef=push(dbRef(db,`qrooms/${qJoinInput}/members`));await set(mRef,{name:qMyName.trim(),groupId:null,role:'member',joinedAt:Date.now(),...(uidHm?{ownerUid:uidHm}:{})});setQMyId(mRef.key);setQRoom(qJoinInput);setQRole('member');localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'member',qMyName:qMyName.trim(),qMyId:mRef.key}));setGameScreen('qumairi_lobby');notify('✅ انضممت','success');}catch(e){setQJoinErr('خطأ');}finally{setQJoinLoading(false);}}}>{qJoinLoading?'⏳':'🚀 انضمام'}</button></div></div>);
 
     if(gameScreen==='qumairi_lobby'){const unassigned=qMList.filter(m=>!m.groupId);return(
-<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');localStorage.removeItem('ng_qumairi');setQRoom('');setQRole(null);setQGroupId(null);}}>← رجوع</button><div className="ptitle" style={{fontSize:18}}>🦅 صيد القميري</div><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div><button className="btn bo bxs" style={{width:'auto',margin:'6px auto 0'}} onClick={()=>{navigator.clipboard?.writeText(qRoom);notify('تم النسخ','success');}}>📋 نسخ</button></div>{isAdmin&&<><div className="card"><div className="ctitle">➕ إنشاء مجموعة</div><div style={{display:'flex',gap:6}}><input className="inp" placeholder="اسم المجموعة" value={qGroupName} onChange={e=>setQGroupName(e.target.value)} style={{flex:1}}/><button className="btn bg bsm" onClick={async()=>{if(!qGroupName.trim())return;if(qGList.length>=6)return;const initW={};Q_WEAPONS.forEach(w=>{initW[w.id]=w.qty;});
+<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');localStorage.removeItem('ng_qumairi');setQRoom('');setQRole(null);setQGroupId(null);}}>← رجوع</button><div className="ptitle" style={{fontSize:18}}>🦅 صيد القميري</div>{isAdmin&&<div className="card" style={{textAlign:'center',marginBottom:10,background:'linear-gradient(135deg, rgba(240,192,64,.12), rgba(79,163,224,.05))',border:'1px solid rgba(240,192,64,.28)'}}><div style={{fontWeight:900,color:'var(--gold)',fontSize:14}}>👑 أنت مشرف هذه الغرفة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:6,lineHeight:1.55}}>أنشئ المجموعات، عيّن القادة، وزّع اللاعبين، ثم ابدأ التوزيع واللعب — المشاركون يرون واجهة مجموعتهم فقط.</div></div>}<div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div><button className="btn bo bxs" style={{width:'auto',margin:'6px auto 0'}} onClick={()=>{navigator.clipboard?.writeText(qRoom);notify('تم النسخ','success');}}>📋 نسخ</button></div>{isAdmin&&<><div className="card"><div className="ctitle">➕ إنشاء مجموعة</div><div style={{display:'flex',gap:6}}><input className="inp" placeholder="اسم المجموعة" value={qGroupName} onChange={e=>setQGroupName(e.target.value)} style={{flex:1}}/><button className="btn bg bsm" onClick={async()=>{if(!qGroupName.trim())return;if(qGList.length>=6)return;const initW={};Q_WEAPONS.forEach(w=>{initW[w.id]=w.qty;});
 const nRef=push(dbRef(db,`qrooms/${qRoom}/groups`));await set(nRef,{name:qGroupName.trim(),trees:{},weapons:initW,totalRemaining:Q_TOTAL,distributed:false,shieldUsed:false});
 setQGroupName('');notify('✅','success');}}>➕</button></div></div><div className="card"><div className="ctitle">👥 المجموعات ({qGList.length})</div>{qGList.map((g,gi)=>{const members=qMList.filter(m=>m.groupId===g.id);const leader=members.find(m=>m.role==='leader');return(
 <div key={g.id} style={{marginBottom:10,padding:10,background:'#09091e',borderRadius:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontWeight:900,color:'var(--gold)'}}>{g.name}</span><span style={{fontSize:10,color:'var(--muted)'}}>{members.length} عضو{leader?` · 👑 ${leader.name}`:''}</span></div>{members.map(m=>(<div key={m.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',fontSize:12}}><span>{m.role==='leader'?'👑':'👤'}</span><span style={{flex:1}}>{m.name}</span>{m.role!=='leader'&&<button className="btn bg bxs" onClick={async()=>{const updates={};members.forEach(mm=>{if(mm.role==='leader')updates[`qrooms/${qRoom}/members/${mm.id}/role`]='member';});

@@ -256,7 +256,7 @@ export default function TitlesPlay(props) {
         >
           <span>{attacksPerRound === 2 ? '⚔️' : '⚡'}</span>
           <span style={{ color: 'var(--gold)', fontWeight: 700 }}>
-            {attacksPerRound === 2 ? 'جولة مزدوجة' : 'جولة الاندفاع'} — لديك <strong>{attacksPerRound}</strong> هجمات هذه الجولة
+            {attacksPerRound === 2 ? 'جولة مزدوجة' : 'جولة المفاجئ'} — لديك <strong>{attacksPerRound}</strong> هجمات هذه الجولة
           </span>
         </div>
       )}

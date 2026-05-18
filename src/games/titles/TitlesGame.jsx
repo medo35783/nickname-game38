@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../firebase';
 import { db, ref, set, get, update, onValue, off, push, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
 import { genCode, fmtMs, shuffle, mkInitials } from '../../core/helpers';
 import { AV_COLORS } from '../../core/constants';
@@ -239,24 +241,87 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   /* ══ ADMIN: CREATE ROOM ══ */
   const createRoom = async () => {
     if (!canCreateRoom) {
-      notify('لإنشاء غرفة جديدة، يجب تفعيل اشتراك أولاً', 'error');
+      notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».', 'error');
       onRequestActivation();
       return;
     }
     // Clear any old session so players aren't stuck in old room
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
-    const code = genCode();
-    setRoomCode(code);
-    await set(roomRef(code), {
-      game: { phase:'lobby', roundNum:0, createdAt: Date.now() },
-      players: {},
-    });
-    // Save admin session
-    localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: code }));
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+    } catch {
+      /* تجاهل */
+    }
+    const hostUid = auth.currentUser?.uid;
+    if (!hostUid) {
+      notify('لم يكتمل اتصال الحساب بعد. انتظر ثانيتين ثم أنشِئ الغرفة من جديد، أو حدّث الصفحة.', 'error');
+      setRoomCode('');
+      return;
+    }
+
+    const isPermissionErr = (err) => {
+      const s = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+      return s.includes('permission');
+    };
+
+    let firstCode = genCode();
+    setRoomCode(firstCode);
+
+    let savedCode = null;
+    let lastErr = null;
+    let lastWasCollision = false;
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const tryCode = attempt === 0 ? firstCode : genCode();
+      if (attempt > 0) setRoomCode(tryCode);
+
+      try {
+        const existing = await get(roomRef(tryCode));
+        if (existing.exists()) {
+          lastWasCollision = true;
+          lastErr = new Error('room_taken');
+          continue;
+        }
+        lastWasCollision = false;
+        await update(ref(db), {
+          [`rooms/${tryCode}/adminId`]: hostUid,
+          [`rooms/${tryCode}/game`]: { phase: 'lobby', roundNum: 0, createdAt: Date.now() },
+          [`rooms/${tryCode}/players`]: {},
+        });
+        savedCode = tryCode;
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        lastWasCollision = false;
+        break;
+      }
+    }
+
+    if (!savedCode) {
+      console.error(lastErr);
+      setRoomCode('');
+      setRole(null);
+      setGameScreen('home');
+      if (lastErr && isPermissionErr(lastErr)) {
+        notify(
+          'رفض الخادم حفظ الغرفة (صلاحيات). من Firebase Console → Realtime Database → Rules انسخ محتوى «firebase-database-rules.json» من المشروع واضغط Publish، ثم حدّث الصفحة وأعد المحاولة.',
+          'error'
+        );
+      } else if (lastWasCollision) {
+        notify('لم يتاح رمز غرفة فاضٍ بعد عدة محاولات. أعد المحاولة بعد قليل.', 'error');
+      } else {
+        notify('تعذّر حفظ الغرفة. تحقق من الإنترنت ثم أعد المحاولة.', 'error');
+      }
+      return;
+    }
+
+    localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: savedCode }));
+    setRoomCode(savedCode);
     setRole('admin');
     setGameScreen('lobby');
-    notify(`✅ الغرفة جاهزة: ${code}`, 'gold');
+    notify(`✅ الغرفة جاهزة: ${savedCode}`, 'gold');
   };
 
   /* ══ ADMIN: ADD PLAYER ══ */
@@ -283,18 +348,72 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   };
 
   /* ══ PLAYER: JOIN ROOM ══ */
+  const applyTitlesAdminScreens = (gamePhase) => {
+    if (gamePhase === 'lobby') setGameScreen('lobby');
+    else if (gamePhase === 'attacking') setGameScreen('admin_live');
+    else if (gamePhase === 'revealing') setGameScreen('results');
+    else if (gamePhase === 'ended') setGameScreen('winner');
+    else setGameScreen('lobby');
+  };
+
   const joinRoom = async () => {
     if(joinLoading) return; // منع الضغط المزدوج
     setJoinErr('');
     if(joinInput.length!==4){setJoinErr('الرمز 4 أرقام');return;}
-    if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
+
     setJoinLoading(true);
     try {
+      if (typeof auth.authStateReady === 'function') {
+        await auth.authStateReady();
+      }
       const snap = await get(roomRef(joinInput));
       if(!snap.exists()){setJoinErr('الغرفة غير موجودة');return;}
       const data = snap.val();
-      const existingPlayers = Object.entries(data.players||{});
       const gamePhase = data.game?.phase || 'lobby';
+      const hostUid = auth.currentUser?.uid;
+
+      if (gamePhase === 'ended') {
+        setJoinErr('انتهت هذه اللعبة');
+        localStorage.removeItem('ng_admin_session');
+        localStorage.removeItem('ng_session');
+        return;
+      }
+
+      /** صاحب الغرفة (مطابق مع قواعد RTDB لـ rooms.adminId) */
+      if (hostUid && data.adminId === hostUid) {
+        localStorage.removeItem('ng_session');
+        localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: joinInput }));
+        setRoomCode(joinInput);
+        setRole('admin');
+        setMyId(null);
+        setMyNickLocal('');
+        applyTitlesAdminScreens(gamePhase);
+        notify('✅ تم الدخول كمشرف — صاحب الغرفة', 'gold');
+        return;
+      }
+
+      /** غرف قديمة بلا adminId: اعتماد جلسة الجهاز فقط */
+      const adminRaw = localStorage.getItem('ng_admin_session');
+      if (adminRaw) {
+        try {
+          const adminSess = JSON.parse(adminRaw);
+          if (adminSess?.roomCode === joinInput) {
+            localStorage.removeItem('ng_session');
+            setRoomCode(joinInput);
+            setRole('admin');
+            setMyId(null);
+            setMyNickLocal('');
+            applyTitlesAdminScreens(gamePhase);
+            notify('✅ تم الدخول كمشرف — لوحة التحكم جاهزة', 'gold');
+            return;
+          }
+        } catch {
+          /* نكمل كمسار لاعب */
+        }
+      }
+
+      if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
+      const existingPlayers = Object.entries(data.players||{});
 
       // Check if player already exists (rejoin)
       const existing = existingPlayers.find(([id,p])=>
@@ -342,6 +461,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         initials:mkInitials(joinName.trim()),
         colorIdx: existingPlayers.length % AV_COLORS.length,
         status:'active', missedRounds:0,
+        ...(hostUid ? { ownerUid: hostUid } : {}),
       });
       setMyId(newRef.key);
       setMyNickLocal(joinNick.trim());
@@ -1084,43 +1204,196 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const admin = localStorage.getItem('ng_admin_session');
-        const player = localStorage.getItem('ng_session');
-        const session = admin ? JSON.parse(admin) : (player ? JSON.parse(player) : null);
-        if (!session?.roomCode) return;
-
-        const snap = await get(roomRef(session.roomCode));
-        if (!snap.exists()) {
-          localStorage.removeItem('ng_session');
-          localStorage.removeItem('ng_admin_session');
-          return;
+        if (typeof auth.authStateReady === 'function') {
+          await auth.authStateReady();
         }
 
-        const phase = snap.val()?.game?.phase;
-        if (phase === 'ended') {
-          localStorage.removeItem('ng_session');
-          localStorage.removeItem('ng_admin_session');
-          return;
-        }
-
-        if (admin) {
-          setRoomCode(session.roomCode);
+        const applyAdminFromRoom = (roomCode, phase) => {
+          const adminPhase = phase || 'lobby';
+          setRoomCode(roomCode);
           setRole('admin');
-          setGameScreen('lobby');
-        } else if (player) {
-          setRoomCode(session.roomCode);
-          setRole('player');
-          setMyId(session.playerId || session.myId || null);
-          setMyNickLocal(session.nick || session.myNick || '');
-          setGameScreen('lobby');
+          setMyId(null);
+          setMyNickLocal('');
+          if (adminPhase === 'lobby') setGameScreen('lobby');
+          else if (adminPhase === 'attacking') setGameScreen('admin_live');
+          else if (adminPhase === 'revealing') setGameScreen('results');
+          else if (adminPhase === 'ended') setGameScreen('winner');
+          else setGameScreen('lobby');
+        };
+
+        const clearLsForRoom = (roomCode) => {
+          try {
+            const pRaw = localStorage.getItem('ng_session');
+            const aRaw = localStorage.getItem('ng_admin_session');
+            if (pRaw && JSON.parse(pRaw)?.roomCode === roomCode) localStorage.removeItem('ng_session');
+            if (aRaw && JSON.parse(aRaw)?.roomCode === roomCode) localStorage.removeItem('ng_admin_session');
+          } catch {
+            /* تجاهل */
+          }
+        };
+
+        /**
+         * نقرأ جلسة المشرف أولاً دائماً من localStorage الحالي (لا نعتمد على قيم قديمة من الإغلاق)
+         * حتى لا يُستعاد دور «لاعب» بعد createRoom بسبب سباق async.
+         */
+        const loadRoomSession = async (roomCode, mode) => {
+          const snap = await get(roomRef(roomCode));
+          if (!snap.exists()) {
+            clearLsForRoom(roomCode);
+            return false;
+          }
+          const roomData = snap.val();
+          const phase = roomData?.game?.phase;
+          const uid = auth.currentUser?.uid;
+
+          if (phase === 'ended') {
+            clearLsForRoom(roomCode);
+            return false;
+          }
+
+          if (uid && roomData?.adminId === uid) {
+            localStorage.removeItem('ng_session');
+            localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode }));
+            applyAdminFromRoom(roomCode, phase);
+            return true;
+          }
+
+          if (mode === 'admin') {
+            applyAdminFromRoom(roomCode, phase);
+            return true;
+          }
+
+          if (mode === 'player') {
+            const pRaw = localStorage.getItem('ng_session');
+            if (!pRaw) return false;
+            let ps;
+            try {
+              ps = JSON.parse(pRaw);
+            } catch {
+              return false;
+            }
+            if (ps?.roomCode !== roomCode) return false;
+            /** إن وُجدت جلسة مشرف أحدث لنفس الرمز، لا تُعدّ لاعباً */
+            const aRaw = localStorage.getItem('ng_admin_session');
+            if (aRaw) {
+              try {
+                if (JSON.parse(aRaw)?.roomCode === roomCode) {
+                  applyAdminFromRoom(roomCode, phase);
+                  return true;
+                }
+              } catch {
+                /* تجاهل */
+              }
+            }
+            setRoomCode(roomCode);
+            setRole('player');
+            setMyId(ps.playerId || ps.myId || null);
+            setMyNickLocal(ps.nick || ps.myNick || '');
+            setGameScreen('lobby');
+            return true;
+          }
+          return false;
+        };
+
+        const adminRaw = localStorage.getItem('ng_admin_session');
+        if (adminRaw) {
+          try {
+            const ac = JSON.parse(adminRaw);
+            if (ac?.roomCode && (await loadRoomSession(ac.roomCode, 'admin'))) return;
+          } catch {
+            /* تجاهل */
+          }
         }
-      } catch(e) {}
-      finally {
+
+        const playerRaw = localStorage.getItem('ng_session');
+        if (playerRaw) {
+          try {
+            const pc = JSON.parse(playerRaw);
+            if (pc?.roomCode && (await loadRoomSession(pc.roomCode, 'player'))) return;
+          } catch {
+            /* تجاهل */
+          }
+        }
+      } catch (e) {
+        void e;
+      } finally {
         setSessionGate('ready');
       }
     };
     restoreSession();
   }, []);
+
+  /** بعد تهيئة anonymous auth قد يتأخر uid — تصحيح دور المشرف عند ظهوره */
+  useEffect(() => {
+    if (sessionGate !== 'ready') return;
+
+    const tryClaimHostRole = async (user) => {
+      if (!user?.uid) return;
+
+      /** حالة تأخر auth بعد «انضمام» أو جلسة لاعب خاطئة لنفس غرفة المشرف */
+      let code = '';
+      try {
+        const admin = localStorage.getItem('ng_admin_session');
+        const player = localStorage.getItem('ng_session');
+        if (admin) code = JSON.parse(admin)?.roomCode || '';
+        if (!code && player) code = JSON.parse(player)?.roomCode || '';
+      } catch {
+        return;
+      }
+      if (!code) return;
+
+      try {
+        const snap = await get(roomRef(code));
+        if (!snap.exists()) return;
+        const pdata = snap.val();
+        const ph = pdata?.game?.phase;
+        if (ph === 'ended' || !pdata?.adminId || pdata.adminId !== user.uid) return;
+
+        const admRaw = localStorage.getItem('ng_admin_session');
+        const playRaw = localStorage.getItem('ng_session');
+        let admRoom = null;
+        let playRoom = null;
+        try {
+          admRoom = admRaw ? JSON.parse(admRaw)?.roomCode : null;
+        } catch {
+          admRoom = null;
+        }
+        try {
+          playRoom = playRaw ? JSON.parse(playRaw)?.roomCode : null;
+        } catch {
+          playRoom = null;
+        }
+
+        if (admRoom !== code && playRoom !== code) return;
+
+        /** جلسة مشرف سليمة ولا يوجد تعارض لاعب لهذه الغرفة */
+        if (admRoom === code && !playRaw) return;
+
+        const hadMislinkedPlayerSession = !!(playRaw && playRoom === code);
+
+        localStorage.removeItem('ng_session');
+        localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: code }));
+        setRoomCode(code);
+        setRole('admin');
+        setMyId(null);
+        setMyNickLocal('');
+        applyTitlesAdminScreens(ph || 'lobby');
+
+        if (hadMislinkedPlayerSession) {
+          notify('✅ تم التعرف على صلاحياتك كمشرف الغرفة', 'gold');
+        }
+      } catch {
+        /* تجاهل */
+      }
+    };
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      void tryClaimHostRole(user);
+    });
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionGate]);
+
   useEffect(()=>{
     if(!roomCode) return;
     // game state
@@ -2168,6 +2441,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           nickMode={nickMode}
           joinRoom={joinRoom}
           notify={notify}
+          canCreateRoom={canCreateRoom}
         />
       );
     }
@@ -2183,6 +2457,14 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           >
             ← رجوع
           </button>
+          {role === 'admin' && (
+            <div style={{ textAlign: 'center', marginBottom: 14 }}>
+              <div className="ptitle" style={{ fontSize: 18 }}>🎭 لعبة الألقاب</div>
+              <div className="psub" style={{ fontSize: 12, marginTop: 4, lineHeight: 1.55 }}>
+                لوحة المشرف — رمز الغرفة والإعدادات والمشاركون في شاشة واحدة
+              </div>
+            </div>
+          )}
           <TitlesLobby
             roomCode={roomCode}
             role={role}
@@ -2201,44 +2483,10 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             startRound={startGameForLobby}
             notify={notify}
             myId={myId}
+            form={role === 'admin' ? form : undefined}
+            setForm={role === 'admin' ? setForm : undefined}
+            onAddManualPlayer={role === 'admin' ? () => addPlayer() : undefined}
           />
-          {role === 'admin' && phase === 'lobby' && (
-            <div className="card">
-              <div className="ctitle">➕ إضافة لاعب</div>
-              <div className="ig">
-                <label className="lbl">الاسم الكامل</label>
-                <input
-                  className="inp"
-                  placeholder="محمد عبدالله"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div className="ig">
-                <label className="lbl">اللقب {nickMode === 2 ? 'الأول' : ''}</label>
-                <input
-                  className="inp"
-                  placeholder="القناص"
-                  value={form.nick}
-                  onChange={(e) => setForm((f) => ({ ...f, nick: e.target.value }))}
-                />
-              </div>
-              {nickMode === 2 && (
-                <div className="ig">
-                  <label className="lbl">اللقب الثاني</label>
-                  <input
-                    className="inp"
-                    placeholder="الصقر"
-                    value={form.nick2}
-                    onChange={(e) => setForm((f) => ({ ...f, nick2: e.target.value }))}
-                  />
-                </div>
-              )}
-              <button type="button" className="btn bg" onClick={() => void addPlayer()}>
-                ➕ إضافة
-              </button>
-            </div>
-          )}
           {role === 'admin' && phase !== 'lobby' && (
             <button type="button" className="btn bb" onClick={() => setGameScreen('attack')} style={{ marginBottom: 8 }}>
               🎮 العودة للعبة

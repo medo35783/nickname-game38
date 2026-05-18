@@ -190,7 +190,7 @@ export default function TitlesAdminLive(props) {
           {[
             [1, '🗡️ عادية'],
             [2, '⚔️ مزدوجة'],
-            [3, '⚡ اندفاع'],
+            [3, '⚡ مفاجئ'],
           ].map(([n, label]) => (
             <button
               key={n}

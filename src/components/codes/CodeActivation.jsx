@@ -1,21 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { activateCode, saveUserActiveCode } from '../../firebaseHelpers';
-import { db } from '../../firebase';
-
-const SUBSCRIBER_UID_KEY = 'pfcc_subscriber_uid';
-
-function getOrCreateSubscriberUserId() {
-  try {
-    let id = localStorage.getItem(SUBSCRIBER_UID_KEY);
-    if (!id) {
-      id = `u_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
-      localStorage.setItem(SUBSCRIBER_UID_KEY, id);
-    }
-    return id;
-  } catch {
-    return `guest_${Date.now()}`;
-  }
-}
+import { activateCode, normalizeSubscriptionCode, formatCodeForDisplay } from '../../firebaseHelpers';
+import { auth } from '../../firebase';
 
 /** بصمة جهاز بسيطة: userAgent + أبعاد الشاشة → base64 (آمن لمسار RTDB) */
 function buildDeviceInfo() {
@@ -46,37 +31,47 @@ function mapActivationError(message) {
   if (m.includes('الحد الأقصى للأجهزة') || m.includes('تجاوز')) {
     return 'تم تجاوز الحد الأقصى للأجهزة (2)';
   }
+  if (m.includes('مُفعّل على حساب آخر')) {
+    return 'الكود مُفعّل على جهاز/حساب آخر';
+  }
+  if (m.includes('صلاحية التفعيل')) {
+    return m;
+  }
+  if (m.includes('تسجيل الدخول')) {
+    return 'جاري الاتصال… أعد المحاولة بعد ثوانٍ';
+  }
   return 'حدث خطأ، يرجى المحاولة مرة أخرى';
 }
 
 /** شاشة تفعيل كود الاشتراك للمستخدمين العاديين. */
 export default function CodeActivation({ onActivationSuccess, notify, onBack }) {
-  void db;
-
   const [codeInput, setCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const deviceInfo = useMemo(() => buildDeviceInfo(), []);
 
-  const normalizedCode = useMemo(() => {
-    const t = codeInput.trim().toUpperCase();
-    return t.replace(/\s+/g, '');
-  }, [codeInput]);
+  const normalizedCode = useMemo(() => normalizeSubscriptionCode(codeInput), [codeInput]);
 
   const handleActivate = useCallback(async () => {
     if (loading) return;
     setError('');
-    if (!normalizedCode) {
-      setError('الكود غير صحيح');
+    if (!normalizedCode || !/^[A-Z0-9]{6}$/.test(formatCodeForDisplay(normalizedCode))) {
+      setError('أدخل 6 أحرف أو أرقام');
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      const msg = 'جاري الاتصال… أعد المحاولة بعد ثوانٍ';
+      setError(msg);
+      notify(msg, 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const userId = getOrCreateSubscriberUserId();
-      const codeData = await activateCode(normalizedCode, userId, deviceInfo);
-      await saveUserActiveCode(userId, codeData);
+      const codeData = await activateCode(normalizedCode, user.uid, deviceInfo);
       onActivationSuccess(codeData);
     } catch (e) {
       const msg = mapActivationError(e?.message);
@@ -116,18 +111,20 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack }) 
       <div className="card">
         <div className="ig">
           <label className="lbl" htmlFor="pfcc-code-inp">
-            كود الاشتراك
+            كود الاشتراك (6 أحرف)
           </label>
           <input
             id="pfcc-code-inp"
             className={`inp big${error ? ' err-b' : ''}`}
-            placeholder="CODE-XXXXXX"
+            placeholder="مثال: KYEFA8"
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
+            maxLength={6}
             value={codeInput}
             onChange={(e) => {
-              setCodeInput(e.target.value);
+              const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+              setCodeInput(v);
               if (error) setError('');
             }}
             onKeyDown={(e) => {
