@@ -42,11 +42,8 @@ export default function TitlesPlay(props) {
   const setGameScreen = props.setGameScreen ?? (() => {});
   const extendTime = props.extendTime ?? (() => {});
   const doReveal = props.doReveal ?? (() => {});
-  const allRoundsData = props.allRoundsData ?? {};
-
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
-  const elimPlayers = playersList.filter((p) => p.status !== 'active');
   const attacksList = Object.values(attacks || {});
   const submittedCount = attacksList.length;
   const roundNum = gameState?.roundNum || 0;
@@ -80,8 +77,6 @@ export default function TitlesPlay(props) {
   const myDoneCount = attacksList.filter((a) => effectiveAttackerNicks.includes(a.attackerNick)).length;
   const myAttacksDone = effectiveAttackerNicks.length > 0 ? myDoneCount >= attacksPerRound : false;
 
-  const allRoundsList = Object.values(allRoundsData || {}).sort((a, b) => a.round - b.round);
-  const allAttacksFlat = allRoundsList.flatMap((r) => Object.values(r.attacks || {}));
 
   const inactiveNicks = playersList.filter((p) => p.status === 'inactive').flatMap((p) => [p.nick, p.nick2].filter(Boolean));
   const activeNicks =
@@ -441,54 +436,7 @@ export default function TitlesPlay(props) {
         </>
       )}
 
-      {/* Graveyard */}
-      {elimPlayers.length > 0 && (
-        <div className="card">
-          <div className="ctitle">⚰️ مقبرة الألقاب ({elimPlayers.length})</div>
-          <div className="sc">
-            {/* Silent pending — show as mystery */}
-            {gameState?.silentPending?.silentExits?.map((ex, i) => (
-              <div key={i} className="grave" style={{ borderColor: 'rgba(79,163,224,.3)', background: 'rgba(79,163,224,.05)' }}>
-                <div className="grave-name" style={{ color: 'var(--blue)' }}>
-                  🤫 لقب مخفي
-                </div>
-                <div className="grave-info" style={{ color: 'var(--blue)' }}>
-                  جولة الصمت {ex.roundNum} — سيُكشف لاحقاً
-                </div>
-              </div>
-            ))}
-            {[...elimPlayers].sort((a, b) => (b.eliminatedRound || 0) - (a.eliminatedRound || 0)).map((p) => (
-              <div key={p.id} className="grave">
-                <div className="grave-name">{p.name}</div>
-                {/* لقب المكشوف فقط — الخارج بالخمول لا يُظهر لقبه */}
-                {p.status === 'eliminated' && (
-                  <div className="grave-nick">
-                    {(() => {
-                      const targetedNick = allAttacksFlat.find((a) => a.correct && a.realOwnerId === p.id)?.targetNick;
-                      const shownNick = targetedNick || p.nick;
-                      const otherTargeted = p.nick2 && allAttacksFlat.some((a) => a.correct && a.realOwnerId === p.id && a.targetNick === p.nick2);
-                      return (
-                        <>
-                          "{shownNick}"
-                          {otherTargeted ? ` / "${p.nick2}"` : ''}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-                {/* الخارج بالخمول — اسم فقط بدون لقب */}
-                <div className="grave-info">
-                  {p.status === 'cheater'
-                    ? '🚫 خرج من المسابقة'
-                    : p.status === 'inactive'
-                      ? `😴 خرج لعدم الهجوم — ج${p.eliminatedRound}`
-                      : `💥 خرج ج${p.eliminatedRound}${p.eliminatedBy ? ` — كشفه: ${p.eliminatedBy}` : ''}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

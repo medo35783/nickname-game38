@@ -83,8 +83,9 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack }) 
   }, [loading, normalizedCode, deviceInfo, notify, onActivationSuccess]);
 
   const goPackages = useCallback(() => {
-    notify('👆 اختر تبويب «الباقات» من الشريط السفلي', 'info');
-  }, [notify]);
+    window.dispatchEvent(new CustomEvent('pfcc-open-packages'));
+    onBack?.();
+  }, [onBack]);
 
   const freeTrial = useCallback(() => {
     notify('🎁 التجربة المجانية قريباً — تابعنا!', 'info');
@@ -104,7 +105,7 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack }) 
           🎮 مرحباً بك في PFCC!
         </div>
         <p className="psub" style={{ marginBottom: 14 }}>
-          لبدء اللعب، يرجى تفعيل كود الاشتراك
+          أدخل كود الاشتراك (6 أحرف) — لا يتطلب تسجيل بريد
         </p>
       </div>
 

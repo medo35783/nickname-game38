@@ -1,41 +1,6 @@
 import { useState } from 'react';
 import Av from '../../shared/Av';
 
-/* ── بطاقة "إحصائياتي" للمتسابق (أو نيابةً عن لاعب في وضع إعارة الجوال) ── */
-export function MyStatsCard({ myNickLocal, attackerNicks, allAttacksFlat }) {
-  const nicks =
-    attackerNicks && attackerNicks.length > 0
-      ? attackerNicks
-      : [myNickLocal].filter(Boolean);
-  const myAttacks = (allAttacksFlat || []).filter((a) => nicks.includes(a.attackerNick));
-  const hits = myAttacks.filter((a) => a.correct).length;
-  const misses = myAttacks.filter((a) => !a.correct).length;
-  const accuracy = myAttacks.length > 0 ? Math.round((hits / myAttacks.length) * 100) : 0;
-
-  return (
-    <div className="card">
-      <div className="ctitle">📊 إحصائياتي</div>
-      <div className="sg sg4">
-        <div className="sbox">
-          <div className="snum">{myAttacks.length}</div>
-          <div className="slbl">هجماتي</div>
-        </div>
-        <div className="sbox">
-          <div className="snum" style={{ color: 'var(--green)' }}>{hits}</div>
-          <div className="slbl">إصابات</div>
-        </div>
-        <div className="sbox">
-          <div className="snum" style={{ color: 'var(--red)' }}>{misses}</div>
-          <div className="slbl">أخطاء</div>
-        </div>
-        <div className="sbox">
-          <div className="snum" style={{ color: 'var(--gold)' }}>{accuracy}%</div>
-          <div className="slbl">دقة</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * شاشتا النتائج والفائز للعبة الألقاب.
@@ -92,12 +57,6 @@ export default function TitlesResults(props) {
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
-
-  const proxyKioskPlayer =
-    role === 'admin' && proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
-  const kioskStatsNicks = proxyKioskPlayer
-    ? [proxyKioskPlayer.nick, proxyKioskPlayer.nick2].filter(Boolean)
-    : null;
 
   const allRoundsList = Object.values(allRoundsData || {}).sort((a, b) => a.round - b.round);
   const allAttacksFlat = allRoundsList.flatMap((r) => Object.values(r.attacks || {}));
@@ -236,15 +195,6 @@ export default function TitlesResults(props) {
           <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: 'var(--green)' }}>
             ✅ لم يُكشف أحد هذه الجولة
           </div>
-        )}
-
-        {/* إحصائيات "أنا" — متسابق أو مشرف في وضع النيابة */}
-        {((role === 'player' && myNickLocal) || (role === 'admin' && kioskStatsNicks?.length > 0)) && (
-          <MyStatsCard
-            myNickLocal={myNickLocal}
-            attackerNicks={kioskStatsNicks}
-            allAttacksFlat={allAttacksFlat}
-          />
         )}
 
         {/* ☠️ ضحايا المسموم */}

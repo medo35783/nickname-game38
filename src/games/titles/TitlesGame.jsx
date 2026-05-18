@@ -1942,40 +1942,37 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           {/* ══ 🎭 الألقاب ══ */}
           {statsTab==='nicks'&&<>
             <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center',lineHeight:1.7}}>
-              خريطة حرارية: الألقاب الأكثر استهدافاً — <strong style={{color:'var(--gold)'}}>كل جولة</strong> ثم المجموع الكلي
+              خريطة حرارية: <strong style={{color:'var(--gold)'}}>الجولة الحالية</strong> ثم المجموع الكلي لكل الجولات
             </div>
             {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
-              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — الجولات المنتهية أدناه
+              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — أدناه آخر جولة منتهية ثم المجموع الكلي
             </div>}
-            {/* خريطة حرارية لكل جولة مؤرشفة */}
-            {allRoundsList.length>0&&<>
-              <div className="ctitle" style={{marginBottom:10}}>🔥 حسب الجولة</div>
-              <div style={{display:'flex',flexDirection:'column',gap:2,marginBottom:14}}>
-                {allRoundsList.map((r)=>{
-                  const ratks=Object.values(r.attacks||{});
-                  const sorted=nickHeatFromAttacks(ratks);
-                  if(sorted.length===0) return null;
-                  const mx=sorted[0][1]||1;
+            {(()=>{
+              let items=[];
+              let label='';
+              let sub='';
+              if(showLiveRoundNickHeat&&roundNickSorted.length>0){
+                items=roundNickSorted;
+                label=`الجولة ${roundNum}`;
+                sub=`${attacksList.length} هجمة`;
+              }else if(allRoundsList.length>0){
+                const lastR=allRoundsList[allRoundsList.length-1];
+                const ratks=Object.values(lastR.attacks||{});
+                items=nickHeatFromAttacks(ratks);
+                if(items.length>0){
                   const hits=ratks.filter(a=>a.correct).length;
-                  const misses=ratks.length-hits;
-                  return(
-                    <div key={`hn-${r.round}`}>
-                      {roundHeatCardShell(
-                        `الجولة ${r.round}${r.silent?' 🤫':''}`,
-                        `${ratks.length} هجمة · ✅${hits} · ❌${misses}`,
-                        <LuxHeatBar items={sorted} maxVal={mx}/>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>}
-            {/* جولة مكشوفة لم تُؤرشف بعد (تأخير الشبكة) */}
-            {showLiveRoundNickHeat&&roundHeatCardShell(
-              `الجولة ${roundNum} — مباشر`,
-              `${attacksList.length} هجمة`,
-              <LuxHeatBar items={roundNickSorted} maxVal={roundNickSorted[0]?.[1]||1}/>
-            )}
+                  label=`الجولة ${lastR.round}${lastR.silent?' 🤫':''}`;
+                  sub=`${ratks.length} هجمة · ✅${hits} · ❌${ratks.length-hits}`;
+                }
+              }
+              if(items.length===0) return null;
+              return(
+                <>
+                  <div className="ctitle" style={{marginBottom:10}}>🔥 الجولة الحالية</div>
+                  {roundHeatCardShell(label,sub,<LuxHeatBar items={items} maxVal={items[0]?.[1]||1}/>)}
+                </>
+              );
+            })()}
             <div className="ctitle" style={{marginTop:4}}>🏅 المجموع الكلي (كل الجولات)</div>
             {allNickSorted.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
@@ -1983,47 +1980,48 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             }
           </>}
 
+
           {/* ══ 👥 الأسماء ══ */}
           {statsTab==='names'&&<>
             <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,textAlign:'center',lineHeight:1.7}}>
-              أكثر الأسماء التي خُيّمت عليها — <strong style={{color:'var(--gold)'}}>كل جولة</strong> ثم المجموع الكلي
+              أكثر الأسماء التي خُمِّن عليها — <strong style={{color:'var(--gold)'}}>الجولة الحالية</strong> ثم المجموع الكلي
             </div>
             {phase==='attacking'&&<div style={{textAlign:'center',background:'rgba(240,192,64,.06)',border:'1px solid rgba(240,192,64,.15)',borderRadius:10,padding:'10px',fontSize:12,color:'var(--muted)',marginBottom:12}}>
-              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — الجولات المنتهية أدناه
+              🔒 الجولة الجارية لا تُعرض هنا حتى الإعلان — أدناه آخر جولة منتهية ثم المجموع الكلي
             </div>}
-            {allRoundsList.length>0&&<>
-              <div className="ctitle" style={{marginBottom:10}}>🔥 حسب الجولة</div>
-              <div style={{display:'flex',flexDirection:'column',gap:2,marginBottom:14}}>
-                {allRoundsList.map((r)=>{
-                  const ratks=Object.values(r.attacks||{});
-                  const sorted=nameHeatFromAttacks(ratks);
-                  if(sorted.length===0) return null;
-                  const mx=sorted[0][1]||1;
+            {(()=>{
+              let items=[];
+              let label='';
+              let sub='';
+              if(showLiveRoundNameHeat&&roundNameSorted.length>0){
+                items=roundNameSorted;
+                label=`الجولة ${roundNum}`;
+                sub=`${attacksList.length} هجمة`;
+              }else if(allRoundsList.length>0){
+                const lastR=allRoundsList[allRoundsList.length-1];
+                const ratks=Object.values(lastR.attacks||{});
+                items=nameHeatFromAttacks(ratks);
+                if(items.length>0){
                   const hits=ratks.filter(a=>a.correct).length;
-                  const misses=ratks.length-hits;
-                  return(
-                    <div key={`hna-${r.round}`}>
-                      {roundHeatCardShell(
-                        `الجولة ${r.round}${r.silent?' 🤫':''}`,
-                        `${ratks.length} هجمة · ✅${hits} · ❌${misses}`,
-                        <LuxHeatBar items={sorted} maxVal={mx}/>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>}
-            {showLiveRoundNameHeat&&roundHeatCardShell(
-              `الجولة ${roundNum} — مباشر`,
-              `${attacksList.length} هجمة`,
-              <LuxHeatBar items={roundNameSorted} maxVal={roundNameSorted[0]?.[1]||1}/>
-            )}
+                  label=`الجولة ${lastR.round}${lastR.silent?' 🤫':''}`;
+                  sub=`${ratks.length} هجمة · ✅${hits} · ❌${ratks.length-hits}`;
+                }
+              }
+              if(items.length===0) return null;
+              return(
+                <>
+                  <div className="ctitle" style={{marginBottom:10}}>🔥 الجولة الحالية</div>
+                  {roundHeatCardShell(label,sub,<LuxHeatBar items={items} maxVal={items[0]?.[1]||1}/>)}
+                </>
+              );
+            })()}
             <div className="ctitle" style={{marginTop:4}}>🏅 المجموع الكلي (كل الجولات)</div>
             {allNameSorted.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا بيانات بعد</div>
               :<LuxHeatBar items={allNameSorted} maxVal={allNameSorted[0]?.[1]||1}/>
             }
           </>}
+
 
           {/* ══ 👤 أنا — للمتسابق فقط (يشمل وضع إعارة الجوال) ══ */}
           {statsTab==='me'&&effectiveRole==='player'&&<>
@@ -2272,8 +2270,14 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                 </div>
               </div>
             ))}
-            {elimPlayers.length>0&&<>
+            {(gameState?.silentPending?.silentExits?.length>0||elimPlayers.length>0)&&<>
               <div className="ctitle" style={{marginBottom:8,marginTop:14}}>⚰️ مقبرة الألقاب</div>
+              {gameState?.silentPending?.silentExits?.map((ex,i)=>(
+                <div key={`silent-${i}`} className="grave" style={{borderColor:'rgba(79,163,224,.3)',background:'rgba(79,163,224,.05)'}}>
+                  <div className="grave-name" style={{color:'var(--blue)'}}>🤫 لقب مخفي</div>
+                  <div className="grave-info" style={{color:'var(--blue)'}}>جولة الصمت {ex.roundNum} — سيُكشف لاحقاً</div>
+                </div>
+              ))}
               {[...elimPlayers].sort((a,b)=>(b.eliminatedRound||0)-(a.eliminatedRound||0)).map(p=>(
                 <div key={p.id} className="grave">
                   <div className="grave-name">{p.name}</div>

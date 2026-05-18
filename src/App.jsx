@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth } from "./firebase";
-import News from './pages/News';
-import Suggestions from './pages/Suggestions';
 import Packages from './pages/Packages';
+import { SUPPORT_EMAIL } from './core/constants';
 import Home from './pages/Home';
 import AdminCodesPanel from './components/admin/AdminCodesPanel';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
@@ -21,6 +20,11 @@ import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerP
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
 const ADMIN_LOGO_TAPS = 7;
 const ADMIN_LOGO_TAP_MS = 2000;
+
+const COMMUNITY_SUGGESTIONS = [
+  { id: 1, cat: 'تصميم', text: 'وضع داكن أكثر', date: '2025-03-10' },
+  { id: 2, cat: 'لعبة', text: 'مؤقت صوتي عند النهاية', date: '2025-03-12' },
+];
 
 /* ══════════════════════════════════════════════════
    MAIN APP
@@ -47,6 +51,8 @@ export default function App() {
   const [showCodeActivation, setShowCodeActivation] = useState(false);
   const [showEndGamePrompt, setShowEndGamePrompt] = useState(false);
   const [endGameData, setEndGameData] = useState(null);
+  const [voiceType, setVoiceType] = useState('suggest');
+  const [suggForm, setSuggForm] = useState({ cat: 'لعبة', text: '' });
 
   useEffect(() => {
     let done = false;
@@ -130,20 +136,18 @@ export default function App() {
   const openAdminGate = useCallback(() => {
     const u = auth.currentUser;
     if (!u) {
-      notify('جاري تهيئة الجلسة… حاول بعد لحظة', 'info');
-      return;
-    }
-    if (u.isAnonymous) {
-      notify('للوحة: افتح «حسابي» ثم «دخول مشرف بالبريد»', 'info');
-      setTab('account');
+      notify('جاري التحميل…', 'info');
       return;
     }
     adminProfileExistsForUid(u.uid).then((ok) => {
       if (ok) {
         setTab('codes');
         notify('🎫 لوحة الأكواد', 'success');
+      } else if (u.isAnonymous) {
+        notify('سجّل بالبريد من «حسابي» (نفس تسجيل الدخول للجميع)', 'info');
+        setTab('account');
       } else {
-        notify('هذا الحساب ليس مشرفاً في النظام', 'error');
+        notify('هذا الحساب ليس مشرفاً', 'error');
       }
     });
   }, [notify]);
@@ -173,26 +177,7 @@ export default function App() {
     }, 2000);
   }, [isAdmin, activeCode]);
 
-  /* ── DERIVED ── */
-  const hasNews      = true;
-
   const renderGame = () => {
-    if (showCodeActivation) {
-      return (
-        <CodeActivation
-          notify={notify}
-          onActivationSuccess={(codeData) => {
-            setActiveCode(codeData);
-            setShowCodeActivation(false);
-            if (auth.currentUser?.isAnonymous) {
-              notify('💡 لحفظ الاشتراك بين الأجهزة: «حسابي» ← احفظ اشتراكك', 'info');
-            }
-          }}
-          onBack={() => setShowCodeActivation(false)}
-        />
-      );
-    }
-
     if(selectedGame === 'nicknames') return (
       <TitlesGame
         ref={titlesRef}
@@ -227,12 +212,98 @@ export default function App() {
     return null;
   };
 
+  const renderVoice = () => {
+    const typeConfig = {
+      suggest: { icon: '💡', label: 'اقتراح', emailSubject: `اقتراح [${suggForm.cat}] — PFCC Playground`, cats: ['لعبة', 'تصميم', 'إحصائيات', 'أسعار', 'أخرى'] },
+      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — PFCC Playground`, cats: ['لعبة الألقاب', 'صيد القميري', 'تسجيل دخول', 'أخرى'] },
+      ask: { icon: '💬', label: 'استفسار', emailSubject: `استفسار — PFCC Playground`, cats: ['عام', 'الأسعار', 'طريقة اللعب', 'أخرى'] },
+    };
+
+    const cfg = typeConfig[voiceType];
+
+    return (
+      <div className="scr">
+        <div className="ptitle" style={{ marginBottom: 4 }}>📣 تحديثات</div>
+        <div className="psub" style={{ marginBottom: 12 }}>آخر ما يصير في PFCC Playground</div>
+        {[
+          { id: 1, date: '2025-03-29', title: '🎉 إطلاق النسخة التجريبية', body: 'تم إطلاق لعبة الألقاب رسمياً مع دعم الغرف الحقيقية عبر Firebase!', isNew: true },
+          { id: 2, date: '2025-03-25', title: '⚡ نظام الهجوم المتزامن', body: 'الكل يهاجم في نفس الوقت — سرية تامة ثم كشف مفاجئ.', isNew: true },
+          { id: 3, date: '2025-03-20', title: '📊 إحصائيات الإثارة', body: 'أكثر لقب مطاردة وأقل اسم استهدافاً.', isNew: false },
+        ].map(n => (
+          <div key={n.id} className="news-item">
+            <div className="news-date">{n.isNew && <span className="news-new">جديد</span>}{n.date}</div>
+            <div className="news-title">{n.title}</div>
+            <div className="news-body">{n.body}</div>
+          </div>
+        ))}
+
+        <div className="div" style={{ margin: '18px 0 14px' }}>تواصل معنا</div>
+
+        <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
+          {Object.entries(typeConfig).map(([key, val]) => (
+            <button
+              key={key}
+              className={`btn bsm ${voiceType === key ? 'bg' : 'bgh'}`}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px' }}
+              onClick={() => {
+                setVoiceType(key);
+                setSuggForm(f => ({ ...f, cat: typeConfig[key].cats[0] }));
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{val.icon}</span>
+              <span style={{ fontSize: 10 }}>{val.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="card">
+          <div className="ctitle">{cfg.icon} {cfg.label} جديد</div>
+          <div className="ig">
+            <label className="lbl">التصنيف</label>
+            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+              {cfg.cats.map(c => (
+                <button key={c} className={`btn bsm ${suggForm.cat === c ? 'bg' : 'bgh'}`} style={{ width: 'auto' }} onClick={() => setSuggForm(f => ({ ...f, cat: c }))}>{c}</button>
+              ))}
+            </div>
+          </div>
+          <div className="ig">
+            <label className="lbl">اكتب رسالتك</label>
+            <textarea className="inp" placeholder="اكتب هنا..." value={suggForm.text} onChange={e => setSuggForm(f => ({ ...f, text: e.target.value }))} />
+          </div>
+          <button className="btn bg" onClick={() => {
+            if (!suggForm.text.trim()) { notify('اكتب رسالتك أولاً', 'error'); return; }
+            const sub = encodeURIComponent(cfg.emailSubject);
+            const bod = encodeURIComponent(`النوع: ${cfg.label}\nالتصنيف: ${suggForm.cat}\n\n${suggForm.text}`);
+            window.open(`mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`);
+            setSuggForm(f => ({ ...f, text: '' }));
+            notify('✅ سيُفتح تطبيق البريد', 'success');
+          }}>📤 إرسال عبر البريد</button>
+          <div style={{ marginTop: 10, padding: '9px 12px', background: 'rgba(79,163,224,.07)', border: '1px solid rgba(79,163,224,.2)', borderRadius: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
+            إلى: <strong style={{ color: 'var(--blue)' }}>{SUPPORT_EMAIL}</strong>
+          </div>
+        </div>
+
+        {COMMUNITY_SUGGESTIONS.length > 0 && (
+          <>
+            <div className="div">من المجتمع</div>
+            {COMMUNITY_SUGGESTIONS.map(s => (
+              <div key={s.id} className="sugg-item">
+                <div className="sugg-cat">{s.cat}</div>
+                <div className="sugg-text">{s.text}</div>
+                <div className="sugg-date">{s.date}</div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  };
+
   const navItems = [
     { id: 'game', icon: '🏟️', label: 'الألعاب' },
-    { id: 'news', icon: '🔔', label: 'أخبار', dot: hasNews },
+    { id: 'voice', icon: '💬', label: 'صوّتك', dot: false },
     ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
     { id: 'pricing', icon: '💎', label: 'الباقات' },
-    { id: 'suggest', icon: '💡', label: 'اقتراح' },
     { id: 'account', icon: '👤', label: 'حسابي' },
   ];
 
@@ -256,7 +327,10 @@ export default function App() {
           <Notif key={n.id} msg={n} />
         ))}
         <div className="main" style={{ paddingTop: 8 }}>
-          <PlayerAuthScreen notify={notify} variant="fallback" />
+          <p className="psub" style={{ textAlign: 'center', marginBottom: 12 }}>
+            تعذّر الدخول التلقائي — فعّل Anonymous في Firebase أو سجّل بالبريد
+          </p>
+          <PlayerAuthScreen notify={notify} />
         </div>
       </div>
     );
@@ -303,15 +377,13 @@ export default function App() {
           style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', userSelect: 'none' }}
           onClick={handleLogoSecretTap}
         >
-          {tab === 'news'
-            ? '🔔 أخبار'
+          {tab === 'voice'
+            ? '💬 صوّتك'
             : tab === 'game'
               ? selectedGame === 'qumairi'
                 ? '🦅 صيد القميري'
                 : '🏟️ ساحة الألعاب'
-              : tab === 'suggest'
-                ? '💡 اقتراح'
-                : tab === 'pricing'
+              : tab === 'pricing'
                   ? '💎 الباقات'
                   : tab === 'codes'
                     ? '🎫 الأكواد'
@@ -346,16 +418,32 @@ export default function App() {
       </div>
 
       <div className="main">
-        {tab==='news'&&<News />}
-        {tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
-        {tab === 'codes' && isAdmin && (
+        {showCodeActivation ? (
+          <CodeActivation
+            notify={notify}
+            onActivationSuccess={(codeData) => {
+              setActiveCode(codeData);
+              setShowCodeActivation(false);
+            }}
+            onBack={() => setShowCodeActivation(false)}
+          />
+        ) : null}
+        {!showCodeActivation && tab==='voice'&&renderVoice()}
+        {!showCodeActivation && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
+        {!showCodeActivation && tab === 'codes' && isAdmin && (
           <AdminCodesPanel notify={notify} />
         )}
-        {tab === 'account' && (
-          <AccountPage notify={notify} activeCode={activeCode} isCodeValid={isCodeValid} />
+        {!showCodeActivation && tab === 'account' && (
+          <AccountPage
+            notify={notify}
+            activeCode={activeCode}
+            isCodeValid={isCodeValid}
+            isAdmin={isAdmin}
+            onActivateCode={() => setShowCodeActivation(true)}
+            onGoPricing={() => setTab('pricing')}
+          />
         )}
-        {tab==='suggest'&&<Suggestions notify={notify} />}
-        {tab==='pricing'&&<Packages />}
+        {!showCodeActivation && tab==='pricing'&&<Packages />}
       </div>
 
       <nav className="bnav">

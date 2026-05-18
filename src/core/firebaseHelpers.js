@@ -142,7 +142,7 @@ export async function activateCode(code, userId, deviceInfo) {
     throw new Error('الكود غير صحيح');
   }
   if (!userId) {
-    throw new Error('يجب تسجيل الدخول قبل التفعيل');
+    throw new Error('الجلسة غير جاهزة — أعد تحميل الصفحة');
   }
   if (!deviceInfo?.fingerprint) {
     throw new Error('معلومات الجهاز ناقصة');

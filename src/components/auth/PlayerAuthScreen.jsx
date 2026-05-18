@@ -26,10 +26,9 @@ function mapAuthError(code) {
 }
 
 /**
- * تسجيل الدخول / إنشاء حساب بالبريد — يُعرض عند تعطيل الدخول المجهول أو كخيار اختياري.
- * @param {{ notify: (t: string, ty?: string) => void; variant?: 'default' | 'fallback' }} props
+ * تسجيل دخول / حساب جديد بالبريد — اختياري، نفس النموذج للجميع (لاعب أو مشرف).
  */
-export default function PlayerAuthScreen({ notify, variant = 'default' }) {
+export default function PlayerAuthScreen({ notify, compact = false, onSuccess }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +40,10 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
     if (error) setError('');
   }, [error]);
 
+  const afterAuth = useCallback(() => {
+    onSuccess?.();
+  }, [onSuccess]);
+
   const handleRegister = useCallback(
     async (e) => {
       e.preventDefault();
@@ -49,17 +52,16 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
       try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const name = displayName.trim().slice(0, 80);
-        if (name) {
-          await updateProfile(cred.user, { displayName: name });
-        }
-        notify('✅ تم إنشاء حسابك — مرحباً بك!', 'success');
+        if (name) await updateProfile(cred.user, { displayName: name });
+        notify('✅ تم إنشاء حسابك', 'success');
+        afterAuth();
       } catch (err) {
         setError(mapAuthError(err?.code));
       } finally {
         setLoading(false);
       }
     },
-    [email, password, displayName, notify]
+    [email, password, displayName, notify, afterAuth]
   );
 
   const handleLogin = useCallback(
@@ -70,47 +72,25 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
       try {
         await signInWithEmailAndPassword(auth, email.trim(), password);
         notify('✅ تم تسجيل الدخول', 'success');
+        afterAuth();
       } catch (err) {
         setError(mapAuthError(err?.code));
       } finally {
         setLoading(false);
       }
     },
-    [email, password, notify]
+    [email, password, notify, afterAuth]
   );
 
   return (
-    <div className="scr" style={{ paddingBottom: 32 }}>
-      <div style={{ textAlign: 'center', padding: '16px 0 12px' }}>
-        <div style={{ fontSize: 52, lineHeight: 1.1, marginBottom: 6 }}>🎮</div>
-        <div className="ptitle" style={{ fontSize: 22 }}>
-          ساحة الألعاب — PFCC
-        </div>
-        <p className="psub" style={{ marginBottom: 0 }}>
-          {variant === 'fallback'
-            ? 'الدخول السريع غير متاح — فعّل «Anonymous» في Firebase أو سجّل بالبريد'
-            : 'سجّل بالبريد لحفظ اشتراكك وسجلّك'}
+    <div>
+      {!compact ? (
+        <p className="psub" style={{ textAlign: 'center', marginBottom: 12 }}>
+          اختياري — لحفظ اشتراكك بين الأجهزة
         </p>
-      </div>
+      ) : null}
 
-      <div className="card ann ag" style={{ marginBottom: 14, textAlign: 'right' }}>
-        <div className="ctitle" style={{ marginBottom: 8 }}>✨ لماذا التسجيل؟</div>
-        <ul
-          style={{
-            margin: 0,
-            padding: '0 18px 0 0',
-            fontSize: 12,
-            color: 'var(--muted)',
-            lineHeight: 1.85,
-          }}
-        >
-          <li>ربط أكواد الاشتراك بحسابك بين الأجهزة</li>
-          <li>سجل اشتراكاتك السابقة داخل «حسابي»</li>
-          <li>تجهيز مزايا قادمة: إحصائيات وشارات</li>
-        </ul>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button
           type="button"
           className={`btn bgh ${mode === 'login' ? 'bo' : ''}`}
@@ -146,7 +126,7 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
       <form className="card" onSubmit={mode === 'login' ? handleLogin : handleRegister}>
         <div className="ig">
           <label className="lbl" htmlFor="pfcc-auth-email">
-            البريد الإلكتروني
+            البريد
           </label>
           <input
             id="pfcc-auth-email"
@@ -166,15 +146,14 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
         </div>
 
         {mode === 'register' ? (
-          <div className="ig" style={{ marginTop: 14 }}>
+          <div className="ig" style={{ marginTop: 12 }}>
             <label className="lbl" htmlFor="pfcc-auth-name">
-              اسم الظهور (اختياري)
+              الاسم (اختياري)
             </label>
             <input
               id="pfcc-auth-name"
               type="text"
               className="inp"
-              placeholder="مثال: أبو فيصل"
               maxLength={80}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -183,7 +162,7 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
           </div>
         ) : null}
 
-        <div className="ig" style={{ marginTop: 14 }}>
+        <div className="ig" style={{ marginTop: 12 }}>
           <label className="lbl" htmlFor="pfcc-auth-password">
             كلمة المرور
           </label>
@@ -205,21 +184,15 @@ export default function PlayerAuthScreen({ notify, variant = 'default' }) {
         </div>
 
         {error ? (
-          <div className="err-msg" style={{ marginTop: 14 }}>
+          <div className="err-msg" style={{ marginTop: 12 }}>
             ⚠️ {error}
           </div>
         ) : null}
 
         <button type="submit" className="btn bg mt2" disabled={loading}>
-          {loading ? '⏳ جاري المعالجة…' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
+          {loading ? '⏳…' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'}
         </button>
       </form>
-
-      <p className="psub" style={{ textAlign: 'center', marginTop: 16, fontSize: 11 }}>
-        {variant === 'fallback'
-          ? 'بعد الدخول يمكنك تفعيل الكود من الألعاب'
-          : 'يمكنك أيضاً البدء كضيف ثم ربط البريد من «حسابي»'}
-      </p>
     </div>
   );
 }
