@@ -1,7 +1,10 @@
+import { useState, useEffect, useMemo } from 'react';
 import Av from '../../shared/Av';
 import { fmtMs } from '../../core/helpers';
+import LiveConnectionBar from './LiveConnectionBar';
+import { attacksForPlayer, countAttackProgress } from './titlesRevealHelpers';
 
-/** شاشة الهجوم (مكافئ لـ gameScreen === 'attack' في App). */
+/** شاشة الهجوم للمتسابق — ويزارد خطوتين + انتظار حي. */
 export default function TitlesPlay(props) {
   const {
     role,
@@ -13,70 +16,54 @@ export default function TitlesPlay(props) {
     setMyNick,
     myGuess,
     setMyGuess,
-    mySubmitted,
-    setMySubmitted,
     proxyFor,
     setProxyFor,
-    isProxyMode,
     setIsProxyMode,
     countdown,
-    flipCards,
-    setFlipCards,
-    exitAnnounce,
     effectiveNickMode,
     submitAttack,
     notify,
+    roomCode,
+    joinName,
+    myId,
+    setGameScreen,
+    extendTime,
+    doReveal,
+    firebaseConnected,
   } = props;
 
-  void mySubmitted;
-  void setMySubmitted;
-  void isProxyMode;
-  void flipCards;
-  void setFlipCards;
-  void exitAnnounce;
   void effectiveNickMode;
   void notify;
 
-  const roomCode = props.roomCode ?? '';
-  const joinName = props.joinName ?? '';
-  const setGameScreen = props.setGameScreen ?? (() => {});
-  const extendTime = props.extendTime ?? (() => {});
-  const doReveal = props.doReveal ?? (() => {});
+  const [attackStep, setAttackStep] = useState(1);
+  const [waitMsgIdx, setWaitMsgIdx] = useState(0);
+
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
   const attacksList = Object.values(attacks || {});
-  const submittedCount = attacksList.length;
   const roundNum = gameState?.roundNum || 0;
   const roundOrder = gameState?.roundOrder || { nicks: [], names: [] };
   const attacksPerRound = gameState?.attacksPerRound || 1;
-
   const activePoisonNick = gameState?.poisonNick || '';
   const isSilentActive = gameState?.silentActive || false;
 
-  /* ── وضع إعارة الجوال (المشرف أعطى جواله لمتسابق ليلعب) ── */
   const isKioskMode = role === 'admin' && !!proxyFor;
+  const proxyPlayer = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
+  const _proxyPlayerEarly = proxyPlayer;
 
   const playerAttackCounts = {};
   attacksList.forEach((a) => {
     if (a.attackerNick) playerAttackCounts[a.attackerNick] = (playerAttackCounts[a.attackerNick] || 0) + 1;
   });
-  const allSubmitted =
-    activePlayers.length > 0 &&
-    activePlayers.every((p) => {
-      const nicks = [p.nick, p.nick2].filter(Boolean);
-      const done = nicks.reduce((sum, n) => sum + (playerAttackCounts[n] || 0), 0);
-      return done >= attacksPerRound;
-    });
 
-  const _proxyPlayerEarly = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
   const effectiveAttackerNicks = _proxyPlayerEarly
     ? [_proxyPlayerEarly.nick, _proxyPlayerEarly.nick2].filter(Boolean)
     : myNickLocal
-    ? [myNickLocal]
-    : [];
+      ? [myNickLocal]
+      : [];
+
   const myDoneCount = attacksList.filter((a) => effectiveAttackerNicks.includes(a.attackerNick)).length;
   const myAttacksDone = effectiveAttackerNicks.length > 0 ? myDoneCount >= attacksPerRound : false;
-
 
   const inactiveNicks = playersList.filter((p) => p.status === 'inactive').flatMap((p) => [p.nick, p.nick2].filter(Boolean));
   const activeNicks =
@@ -84,7 +71,6 @@ export default function TitlesPlay(props) {
       ? roundOrder.nicks
       : playersList.filter((p) => p.status === 'active').flatMap((p) => [p.nick, p.nick2].filter(Boolean));
 
-  const proxyPlayer = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
   const effectivePlayer = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
   const myNicksList = effectivePlayer ? [effectivePlayer.nick, effectivePlayer.nick2].filter(Boolean) : [];
 
@@ -99,6 +85,31 @@ export default function TitlesPlay(props) {
       : playersList.filter((p) => p.status === 'active')
   ).filter((p) => p.id !== myPlayerId);
 
+  const myAtks = useMemo(
+    () => attacksForPlayer(attacks, { playerId: myId, nicks: effectiveAttackerNicks }),
+    [attacks, myId, effectiveAttackerNicks]
+  );
+
+  const progress = countAttackProgress(activePlayers, attacks, attacksPerRound);
+
+  const myP = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
+  const isBanned =
+    myP?.isBannedNextRound && myP.isBannedNextRound >= roundNum;
+
+  useEffect(() => {
+    if (gameState?.phase === 'attacking') {
+      setAttackStep(1);
+      setMyNick(null);
+      setMyGuess(null);
+    }
+  }, [gameState?.phase, roundNum, setMyNick, setMyGuess]);
+
+  useEffect(() => {
+    if (!myAttacksDone) return;
+    const t = setInterval(() => setWaitMsgIdx((i) => i + 1), 6000);
+    return () => clearInterval(t);
+  }, [myAttacksDone]);
+
   const cdInfo = () => {
     if (countdown === null) return { label: '—', urgent: false };
     if (countdown <= 0) return { label: 'انتهى الوقت!', urgent: true };
@@ -106,157 +117,84 @@ export default function TitlesPlay(props) {
   };
   const cdi = cdInfo();
 
+  const waitMessages = useMemo(() => {
+    const msgs = ['انتظر كشف المشرف 🔓'];
+    if (!progress.allSubmitted) {
+      msgs.push(`📨 ${progress.submitted}/${progress.total} أرسلوا هجماتهم`);
+      if (progress.remainingPlayers > 0) {
+        msgs.push(`⏳ باقي ${progress.remainingPlayers} لاعب${progress.remainingPlayers === 1 ? '' : 'ين'}`);
+      }
+    } else {
+      msgs.push('✓ اكتملت الهجمات — المشرف سيكشف قريباً');
+    }
+    return msgs;
+  }, [progress]);
+
+  const statusBanner = () => {
+    if (isBanned)
+      return { icon: '☠️', text: 'أنت محروم هذه الجولة — عقوبة المسموم', tone: 'red' };
+    if (isSilentActive)
+      return { icon: '🤫', text: 'جولة الصمت — النتائج مخفية حتى الجولة القادمة', tone: 'blue' };
+    if (gameState?.silentPending && !isSilentActive)
+      return { icon: '🤫', text: 'جولة صامتة سابقة — تُكشف مع هذه الجولة', tone: 'purple' };
+    if (activePoisonNick)
+      return { icon: '☠️', text: 'يوجد لقب مسموم — احذر من الهجوم الخاطئ', tone: 'purple' };
+    if (attacksPerRound > 1)
+      return {
+        icon: attacksPerRound === 2 ? '⚔️' : '⚡',
+        text: `${attacksPerRound === 2 ? 'جولة مزدوجة' : 'جولة المفاجئ'} — ${attacksPerRound} هجمات لك`,
+        tone: 'gold',
+      };
+    return null;
+  };
+  const banner = statusBanner();
+
+  const pickNick = (nick, isElim) => {
+    if (isElim) return;
+    setMyNick(nick);
+    setMyGuess(null);
+    setAttackStep(2);
+  };
+
   return (
     <div className="scr">
-      {/* Info bar — room + round + player info */}
-      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 12px', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-            <span style={{ color: 'var(--gold)', fontWeight: 700 }}>#{roomCode}</span>
-            <span style={{ margin: '0 8px' }}>·</span>
-            الجولة <strong style={{ color: 'var(--gold)' }}>{roundNum}</strong>
-            <span style={{ margin: '0 8px' }}>·</span>
-            نشطون: <strong style={{ color: 'var(--green)' }}>{activePlayers.length}</strong>
+      <LiveConnectionBar connected={firebaseConnected !== false} roomCode={roomCode} />
+
+      <div className="play-top-bar">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <div className="play-top-meta" style={{ flex: 1 }}>
+            <span className="play-room">#{roomCode}</span>
+            <span>جولة {roundNum}</span>
+            <span className="play-active">{activePlayers.length} نشط</span>
           </div>
-          <div style={{ display: 'flex', gap: 5 }}>
-            <button className="btn bgh bxs" style={{ padding: '3px 8px' }} onClick={() => setGameScreen('stats')}>
-              📊
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn bgh bxs play-stats-btn"
+            title="الإحصائيات — الجولات السابقة والمجموع (الجولة الحالية بعد الكشف)"
+            onClick={() => setGameScreen('stats')}
+          >
+            📊 إحصائيات
+          </button>
         </div>
-        {/* Player's own info — يظهر للمتسابق العادي ولوضع إعارة الجوال */}
         {role === 'player' && myNickLocal && !proxyFor && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.05)', marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: 'var(--muted)' }}>أنت:</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{joinName}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
-            <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700 }}>"{myNickLocal}"</span>
+          <div className="play-you">
+            أنت: <strong>{joinName}</strong> · <span className="gold">"{myNickLocal}"</span>
           </div>
         )}
-        {/* وضع إعارة الجوال — اللاعب يلعب من جوال المشرف */}
         {isKioskMode && _proxyPlayerEarly && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.05)', marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, color: 'var(--purple)' }}>📱 جوال المشرف:</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{_proxyPlayerEarly.name}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted)' }}>·</span>
-            <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700 }}>"{_proxyPlayerEarly.nick}"</span>
+          <div className="play-you">
+            📱 {_proxyPlayerEarly.name} · <span className="gold">"{_proxyPlayerEarly.nick}"</span>
           </div>
         )}
       </div>
 
-      {/* إشعارات الجولة — للجميع بدون كشف تفاصيل */}
-      {isSilentActive && (
-        <div
-          style={{
-            background: 'rgba(79,163,224,.08)',
-            border: '1px solid rgba(79,163,224,.3)',
-            borderRadius: 9,
-            padding: '8px 12px',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 12,
-            color: 'var(--blue)',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>🤫</span>
-          <span>
-            <strong>جولة الصمت</strong> — النتائج تُخفى حتى الجولة القادمة
-          </span>
-        </div>
-      )}
-      {gameState?.silentPending && !isSilentActive && (
-        <div
-          style={{
-            background: 'rgba(155,89,182,.1)',
-            border: '1.5px solid rgba(155,89,182,.4)',
-            borderRadius: 10,
-            padding: '10px 14px',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 13,
-            color: 'var(--purple)',
-          }}
-        >
-          <span style={{ fontSize: 18 }}>🤫</span>
-          <span>
-            <strong>جولة صامتة سابقة!</strong> — ستُكشف نتائجها مع هذه الجولة
-          </span>
-        </div>
-      )}
-      {/* بانر الحرمان من اللقب المسموم */}
-      {(() => {
-        const myP = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
-        if (myP?.isBannedNextRound && myP.isBannedNextRound >= roundNum)
-          return (
-            <div
-              style={{
-                background: 'rgba(230,57,80,.1)',
-                border: '1px solid rgba(230,57,80,.4)',
-                borderRadius: 9,
-                padding: '10px 12px',
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 13,
-                color: 'var(--red)',
-              }}
-            >
-              <span style={{ fontSize: 18 }}>☠️</span>
-              <span>
-                <strong>أنت محروم هذه الجولة!</strong> — عقوبة اللقب المسموم من الجولة الماضية
-              </span>
-            </div>
-          );
-        return null;
-      })()}
-      {activePoisonNick && (
-        <div
-          style={{
-            background: 'rgba(155,89,182,.08)',
-            border: '1px solid rgba(155,89,182,.3)',
-            borderRadius: 9,
-            padding: '8px 12px',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 12,
-            color: 'var(--purple)',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>☠️</span>
-          <span>
-            تحذير: <strong>يوجد لقب مسموم</strong> — إذا هاجمته وأخطأت تخسر جولة!
-          </span>
-        </div>
-      )}
-      {attacksPerRound > 1 && (
-        <div
-          style={{
-            background: 'rgba(240,192,64,.08)',
-            border: '1px solid rgba(240,192,64,.3)',
-            borderRadius: 9,
-            padding: '8px 12px',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 12,
-          }}
-        >
-          <span>{attacksPerRound === 2 ? '⚔️' : '⚡'}</span>
-          <span style={{ color: 'var(--gold)', fontWeight: 700 }}>
-            {attacksPerRound === 2 ? 'جولة مزدوجة' : 'جولة المفاجئ'} — لديك <strong>{attacksPerRound}</strong> هجمات هذه الجولة
-          </span>
+      {banner && (
+        <div className={`play-status play-status-${banner.tone}`}>
+          <span>{banner.icon}</span>
+          <span>{banner.text}</span>
         </div>
       )}
 
-      {/* Timer */}
       <div className={`tbar${cdi.urgent ? ' urg' : ''}`}>
         <div style={{ fontSize: 20 }}>{cdi.urgent ? '🔴' : '⏱️'}</div>
         <div style={{ flex: 1 }}>
@@ -267,15 +205,16 @@ export default function TitlesPlay(props) {
           <div style={{ display: 'flex', gap: 4 }}>
             {!isKioskMode && (
               <>
-                <button className="btn bgh bxs" onClick={() => extendTime(30 * 60 * 1000)}>
+                <button type="button" className="btn bgh bxs" onClick={() => extendTime(30 * 60 * 1000)}>
                   +30د
                 </button>
-                <button className="btn br bxs" onClick={doReveal}>
+                <button type="button" className="btn br bxs" onClick={doReveal}>
                   كشف
                 </button>
               </>
             )}
             <button
+              type="button"
               className="btn bgh bxs"
               onClick={() => {
                 setProxyFor(null);
@@ -291,152 +230,143 @@ export default function TitlesPlay(props) {
         )}
       </div>
 
-      {/* Counter */}
+      {!myAttacksDone && (
+        <div className="play-wizard-steps">
+          <span className={attackStep === 1 ? 'on' : myNick ? 'done' : ''}>① اللقب</span>
+          <span className="play-wizard-line" />
+          <span className={attackStep === 2 ? 'on' : ''}>② التخمين</span>
+        </div>
+      )}
+
       <div className="counter-bar">
         <div style={{ fontSize: 16 }}>📨</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>
-            {submittedCount}/{activePlayers.length * attacksPerRound} هجمة
-            {attacksPerRound > 1 && (
-              <span style={{ fontSize: 11, color: 'var(--gold)', marginRight: 6 }}> ({attacksPerRound} لكل لاعب)</span>
+            {progress.submitted}/{progress.total} هجمة
+            {progress.allSubmitted && (
+              <span style={{ color: 'var(--green)', fontSize: 12, marginRight: 6 }}> ✓ اكتمل!</span>
             )}
-            {allSubmitted && <span style={{ color: 'var(--green)', fontSize: 12, marginRight: 6 }}>✓ اكتمل!</span>}
           </div>
           <div className="counter-track mt2">
-            <div className="counter-fill" style={{ width: `${(submittedCount / Math.max(activePlayers.length * attacksPerRound, 1)) * 100}%` }} />
+            <div
+              className="counter-fill"
+              style={{ width: `${(progress.submitted / progress.total) * 100}%` }}
+            />
           </div>
         </div>
-        {allSubmitted && role === 'admin' && !isKioskMode && (
-          <button className="btn bv bxs" onClick={doReveal}>
-            كشف ▶
-          </button>
-        )}
       </div>
 
-      {/* بانر وضع إعارة الجوال — اللاعب يلعب من جوال المشرف */}
       {proxyPlayer && (
         <div className="ann ag" style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>📱 وضع إعارة الجوال — يلعب من جوال المشرف</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>📱 إعارة جوال المشرف</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)' }}>
             {proxyPlayer.name} — {proxyPlayer.nick}
           </div>
-          <button
-            className="btn bgh bsm"
-            style={{ width: 'auto', margin: '8px auto 0' }}
-            onClick={() => {
-              setProxyFor(null);
-              setIsProxyMode(false);
-              setMyNick(null);
-              setMyGuess(null);
-            }}
-          >
-            إنهاء الإعارة
-          </button>
         </div>
       )}
 
-      {/* SUBMITTED — يشمل وضع إعارة الجوال */}
-      {(myAttacksDone || myDoneCount >= attacksPerRound) ? (
-        <div className="card">
+      {myAttacksDone ? (
+        <div className="card play-wait-card">
           <div className="waiting-box">
-            <div className="waiting-icon">⏳</div>
-            <div className="waiting-title">تم إرسال الهجوم!</div>
-            <div className="waiting-sub">
-              لقب مستهدف: <strong style={{ color: 'var(--gold)' }}>"{myNick}"</strong>
-              <br />
-              تخمين: <strong>{playersList.find((p) => p.id === myGuess)?.name || '—'}</strong>
-              <br />
-              <br />
-              <span style={{ fontSize: 11 }}>انتظر كشف النتائج من المشرف أو انتهاء الوقت 🔓</span>
-            </div>
+            <div className="waiting-icon">✅</div>
+            <div className="waiting-title">تم إرسال هجومك!</div>
+            {myAtks.map((a, i) => (
+              <div key={i} className="play-wait-summary">
+                <div className="play-wait-row">
+                  <span className="lbl">🎭 اللقب</span>
+                  <strong className="gold">"{a.targetNick}"</strong>
+                </div>
+                <div className="play-wait-row">
+                  <span className="lbl">👤 التخمين</span>
+                  <strong>{a.guessedName || '—'}</strong>
+                </div>
+                <div className={`play-wait-verdict${a.correct ? ' ok' : ''}`}>
+                  {a.correct ? '✅ إصابة!' : '⏳ النتيجة عند الكشف'}
+                </div>
+              </div>
+            ))}
+            <p className="play-wait-rotate">{waitMessages[waitMsgIdx % waitMessages.length]}</p>
+            {attacksPerRound > 1 && myDoneCount < attacksPerRound && (
+              <p className="trs-muted">يمكنك إرسال هجمة أخرى</p>
+            )}
           </div>
         </div>
       ) : (
         <>
-          {/* NICK BOARD */}
-          <div className="bwrap">
-            <div className="blbl">🎭 لوحة الألقاب — اضغط لقباً للهجوم عليه</div>
-            <div className="bgrid">
-              {(role === 'admin' && !isKioskMode ? displayNicks : visibleNicks).map((nick, i) => {
-                const owner = playersList.find((p) => p.nick === nick || p.nick2 === nick);
-                const isEliminated = owner && (owner.status === 'eliminated' || owner.status === 'cheater');
-                const isElim = isEliminated;
-                return (
-                  <div
-                    key={i}
-                    className={`nt${isElim ? ' nd' : myNick === nick ? ' nsel' : ''}`}
-                    onClick={() => {
-                      if (!isElim) {
-                        setMyNick(nick);
-                        setMyGuess(null);
-                      }
-                    }}
-                  >
-                    <div>{nick}</div>
-                    {isElim && <div className="nt-sub">✕ ج{owner.eliminatedRound}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* NAMES */}
-          <div className="card">
-            <div className="ctitle">
-              👥 قائمة الأسماء
-              {myNick ? (
-                <span style={{ color: 'var(--text)', fontWeight: 400, fontSize: 11 }}>
-                  {' '}
-                  — صاحب "<span style={{ color: 'var(--gold)' }}>{myNick}</span>" هو؟
-                </span>
-              ) : (
-                <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 11 }}> — اختر لقباً أولاً</span>
-              )}
-            </div>
-            <div className="ngrid">
-              {displayNames.map((p) => {
-                const isElim = p.status !== 'active';
-                return (
-                  <div
-                    key={p.id}
-                    className={`nr${isElim ? ' nrd' : myGuess === p.id ? ' nrsel' : ''}`}
-                    onClick={() => {
-                      if (!isElim && myNick) setMyGuess(p.id);
-                    }}
-                  >
-                    <Av p={p} sz={30} fs={11} />
-                    <div className="nr-info">
-                      <div className="nr-name" style={isElim ? { color: 'var(--dim)' } : {}}>
-                        {p.name}
-                      </div>
-                      {isElim && (
-                        <div className="nr-sub">
-                          "{p.nick}"
-                          {p.nick2 ? ` / "${p.nick2}"` : ''} — خرج ج{p.eliminatedRound}
-                          {p.eliminatedBy ? ` · ${p.eliminatedBy}` : ''}
-                        </div>
-                      )}
-                    </div>
-                    {myGuess === p.id && <div style={{ color: 'var(--gold)', fontSize: 16 }}>✓</div>}
-                  </div>
-                );
-              })}
-            </div>
-            {myNick && myGuess ? (
-              <button className="btn bg mt3" onClick={() => submitAttack(proxyPlayer?.nick || null)}>
-                🎯 تأكيد الهجوم على "{myNick}"
-                {proxyPlayer && <span style={{ fontSize: 11, fontWeight: 400 }}> (نيابةً عن {proxyPlayer.name})</span>}
-              </button>
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11, padding: '10px 0' }}>
-                {!myNick ? '① اختر لقباً من اللوحة' : '② اختر الشخص الذي تخمّن أنه صاحب اللقب'}
+          {attackStep === 1 && (
+            <div className="bwrap">
+              <div className="blbl">🎭 الخطوة ١ — اختر لقباً للهجوم</div>
+              <div className="bgrid play-bgrid">
+                {(role === 'admin' && !isKioskMode ? displayNicks : visibleNicks).map((nick, i) => {
+                  const owner = playersList.find((p) => p.nick === nick || p.nick2 === nick);
+                  const isElim =
+                    owner && (owner.status === 'eliminated' || owner.status === 'cheater');
+                  const isPoison = nick === activePoisonNick;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`nt play-nt${isElim ? ' nd' : ''}${myNick === nick ? ' nsel' : ''}${isPoison ? ' poisoned' : ''}`}
+                      disabled={!!isElim}
+                      onClick={() => pickNick(nick, isElim)}
+                    >
+                      <div>{nick}</div>
+                      {isElim && <div className="nt-sub">✕ ج{owner.eliminatedRound}</div>}
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {attackStep === 2 && (
+            <>
+              <div className="play-selected-nick">
+                <span>الهدف:</span>
+                <strong>"{myNick}"</strong>
+                <button type="button" className="btn bgh bxs" onClick={() => setAttackStep(1)}>
+                  تغيير
+                </button>
+              </div>
+              <div className="card">
+                <div className="ctitle">👥 الخطوة ٢ — من صاحب هذا اللقب؟</div>
+                <div className="ngrid play-ngrid">
+                  {displayNames.map((p) => {
+                    const isElim = p.status !== 'active';
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`nr play-nr${isElim ? ' nrd' : ''}${myGuess === p.id ? ' nrsel' : ''}`}
+                        disabled={isElim || !myNick}
+                        onClick={() => myNick && setMyGuess(p.id)}
+                      >
+                        <Av p={p} sz={36} fs={12} />
+                        <div className="nr-info">
+                          <div className="nr-name">{p.name}</div>
+                          {isElim && <div className="nr-sub">خرج ج{p.eliminatedRound}</div>}
+                        </div>
+                        {myGuess === p.id && <span className="play-check">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {myNick && myGuess ? (
+                  <button
+                    type="button"
+                    className="btn bg mt3 play-confirm-btn"
+                    onClick={() => submitAttack(proxyPlayer?.nick || null)}
+                  >
+                    🎯 تأكيد الهجوم على "{myNick}"
+                  </button>
+                ) : (
+                  <p className="play-hint">اختر الاسم ثم اضغط تأكيد</p>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
-
-
     </div>
   );
 }

@@ -357,14 +357,9 @@ export default function TitlesAdminLive(props) {
             🔓 كشف نتائج الجولة {roundNum}
           </button>
         )}
-        {phase === 'revealing' && activePlayers.length > 2 && (
-          <button className="btn bg" onClick={nextRound}>
-            ▶️ الجولة التالية ({roundNum + 1})
-          </button>
-        )}
-        {phase === 'revealing' && activePlayers.length <= 2 && (
-          <button className="btn br" onClick={endGame}>
-            🏆 إعلان الفائز
+        {phase === 'revealing' && (
+          <button type="button" className="btn bv" onClick={() => setGameScreen('results')}>
+            🎬 شاشة الكشف المتزامن
           </button>
         )}
       </div>

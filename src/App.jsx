@@ -177,6 +177,9 @@ export default function App() {
     }, 2000);
   }, [isAdmin, activeCode]);
 
+  /** مشرف المنصة يفتح الغرف بدون تفعيل كود اشتراك؛ باقي المستخدمين يحتاجون activeCode صالحاً */
+  const canHostRoom = isAdmin || Boolean(activeCode && isCodeValid(activeCode));
+
   const renderGame = () => {
     if(selectedGame === 'nicknames') return (
       <TitlesGame
@@ -185,7 +188,7 @@ export default function App() {
         setTab={setTab}
         setSelectedGame={setSelectedGame}
         onHeaderMeta={setTitlesMeta}
-        canCreateRoom={Boolean(activeCode && isCodeValid(activeCode))}
+        canCreateRoom={canHostRoom}
         onRequestActivation={() => setShowCodeActivation(true)}
         onGameEnd={onGameEnd}
       />
@@ -198,7 +201,7 @@ export default function App() {
           notify={notify}
           setTab={setTab}
           setSelectedGame={setSelectedGame}
-          canCreateRoom={Boolean(activeCode && isCodeValid(activeCode))}
+          canCreateRoom={canHostRoom}
           onRequestActivation={() => setShowCodeActivation(true)}
           onGameEnd={onGameEnd}
         />

@@ -9,6 +9,7 @@ import TitlesSetup from './TitlesSetup';
 import TitlesLobby from './TitlesLobby';
 import TitlesPlay from './TitlesPlay';
 import TitlesResults from './TitlesResults';
+import { buildRevealQueue } from './titlesRevealHelpers';
 import TitlesAdminLive from './TitlesAdminLive';
 
 // شاشة الترحيب (Onboarding)
@@ -91,6 +92,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   const [guideRole, setGuideRole] = useState('player');
   const [countdown, setCountdown] = useState(null);
+  const [firebaseConnected, setFirebaseConnected] = useState(true);
 
   const [poisonNick, setPoisonNick] = useState('');
   const [silentRound, setSilentRound] = useState(false);
@@ -509,7 +511,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       roundOrder: { nicks:allNicks, names:allNames },
       attacksPerRound: activeSpecialRound, // عدد الهجمات الحقيقي
       specialRound: 1, // إعادة للوضع الافتراضي
-      poisonNick: null
+      poisonNick: null,
+      revealQueue: null,
+      revealStep: null,
+      revealStats: null,
     };
     // لا تُعيد silentActive إذا كان مُفعّلاً بالفعل
     if (!isSilentActive) {
@@ -737,21 +742,31 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       updates[`rooms/${roomCode}/game/silentPending`] = null;
     }
 
+    const correctHitsFor = (playerId) =>
+      currentAttacks
+        .filter((a) => a.correct && a.realOwnerId === playerId)
+        .map((a) => ({ attackerNick: a.attackerNick, targetNick: a.targetNick }));
+
     for(const p of playersList){
       if(elimIds.has(p.id)){
-        const attackers = elimAttackers[p.id]||[];
+        const hits = correctHitsFor(p.id);
+        const attackers = [...new Set(hits.map((h) => h.attackerNick).filter(Boolean))];
         const eliminatedByStr = attackers.join(' + ');
 
         // لقبان: تحقق إذا تم كشف كلا اللقبين
         if(p.nick2){
-          const hitNicks = currentAttacks.filter(a=>a.correct&&a.realOwnerId===p.id).map(a=>a.targetNick);
+          const hitNicks = hits.map((h) => h.targetNick);
           const nick1Hit = hitNicks.includes(p.nick);
           const nick2Hit = hitNicks.includes(p.nick2);
           if(!nick1Hit||!nick2Hit){
             // لقب واحد فقط كُشف — اللاعب يبقى لكن نضع علامة
             const revealedNick = nick1Hit ? p.nick : p.nick2;
             updates[`rooms/${roomCode}/players/${p.id}/revealedNick`]=revealedNick;
-            exitList.push({nick:revealedNick, name:null, partial:true, eliminatedBy:eliminatedByStr, attackers, initials:p.initials, colorIdx:p.colorIdx});
+            exitList.push({
+              nick:revealedNick, name:null, partial:true, eliminatedBy:eliminatedByStr,
+              attackers:[...new Set(hits.filter((h) => h.targetNick === revealedNick).map((h) => h.attackerNick))],
+              hits, initials:p.initials, colorIdx:p.colorIdx,
+            });
             continue; // لا يخرج
           }
         }
@@ -762,7 +777,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`]=roundNum;
         exitList.push({
           nick:p.nick, nick2:p.nick2, name:p.name,
-          eliminatedBy:eliminatedByStr, attackers,
+          eliminatedBy:eliminatedByStr, attackers, hits,
           initials:p.initials, colorIdx:p.colorIdx
         });
       } else if(p.status==='active'){
@@ -782,26 +797,32 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     updates[`rooms/${roomCode}/rounds/${roundKey}`]={ round:roundNum, attacks:attacks||{}, endedAt:Date.now() };
     // إذا بقي اثنان أو أقل بعد هذه الجولة — أنهِ المسابقة مباشرة
     const remainingAfter = playersList.filter(p=>p.status==='active'&&!elimIds.has(p.id)).length;
+    const goingToReveal = remainingAfter > 2;
     updates[`rooms/${roomCode}/game/phase`] = remainingAfter<=2 ? 'ended' : 'revealing';
-    await update(ref(db), updates);
 
-    if(exitList.length>0){
-      exitList.forEach((ex,i)=>{
-        setTimeout(()=>{
-          playSound('explosion');
-          setExitAnnounce(ex);
-          setTimeout(()=>setExitAnnounce(null), 3000);
-        }, i*3200);
-      });
+    if (goingToReveal) {
+      const revealQueue = buildRevealQueue(exitList);
+      const correctN = currentAttacks.filter((a) => a.correct).length;
+      updates[`rooms/${roomCode}/game/revealQueue`] = revealQueue;
+      updates[`rooms/${roomCode}/game/revealStep`] = 0;
+      updates[`rooms/${roomCode}/game/revealStats`] = {
+        attacks: currentAttacks.length,
+        correct: correctN,
+        wrong: currentAttacks.length - correctN,
+      };
     }
 
-    // Init flip cards — ONE card per eliminated player (deduplicated)
-    const fc = {};
-    [...elimIds].forEach(id=>{
-      const p = playersList.find(pl=>pl.id===id);
-      if(p) fc[p.nick]=false;
-    });
-    setFlipCards(fc);
+    await update(ref(db), updates);
+    setFlipCards({});
+  };
+
+  const advanceRevealStep = async () => {
+    if (!roomCode || role !== 'admin' || phase !== 'revealing') return;
+    const queue = gameState?.revealQueue || [];
+    const step = typeof gameState?.revealStep === 'number' ? gameState.revealStep : 0;
+    const maxStep = queue.length + 1;
+    if (step >= maxStep) return;
+    await update(gameRef(roomCode), { revealStep: step + 1 });
   };
 
   /* ══ ADMIN: NEXT ROUND ══ */
@@ -1393,6 +1414,22 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionGate]);
+
+  useEffect(() => {
+    const connRef = ref(db, '.info/connected');
+    const unsubConn = onValue(connRef, (snap) => setFirebaseConnected(snap.val() === true));
+    return () => off(connRef);
+  }, []);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && roomCode) {
+        get(gameRef(roomCode)).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [roomCode]);
 
   useEffect(()=>{
     if(!roomCode) return;
@@ -2340,6 +2377,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
     renderFullLog,
     downloadPDFReport,
     proxyFor,
+    advanceRevealStep,
+    firebaseConnected,
   };
 
   const mainEl = (() => {
@@ -2532,6 +2571,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           extendTime={extendTime}
           doReveal={doReveal}
           allRoundsData={allRoundsData}
+          firebaseConnected={firebaseConnected}
         />
       );
     }
