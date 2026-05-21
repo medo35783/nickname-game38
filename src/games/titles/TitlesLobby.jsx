@@ -124,7 +124,7 @@ export default function TitlesLobby(props) {
 
   const activePoisonNick = gameState?.poisonNick ?? poisonNick;
   const activeSpecialRound = gameState?.specialRound ?? specialRound;
-  const isSilentActive = gameState?.silentActive ?? silentRound;
+  const isSilentActive = Boolean(silentRound);
 
   const totalMs = () =>
     Math.max((Number(attackDur.h) * 3600 + Number(attackDur.m) * 60 + Number(attackDur.s)) * 1000, 5 * 60 * 1000);
@@ -275,10 +275,8 @@ export default function TitlesLobby(props) {
               type="button"
               className={`btn ${isSilentActive ? 'bb' : 'bgh'} bxs`}
               style={{ flex: 1 }}
-              onClick={async () => {
-                const v = !isSilentActive;
-                setSilentRound(v);
-                await update(gameRef(roomCode), { silentActive: v });
+              onClick={() => {
+                setSilentRound(!silentRound);
               }}
             >
               {isSilentActive ? '🤫 صمت مفعّل — إلغاء' : '🔕 تفعيل الصمت'}

@@ -300,55 +300,8 @@ export default function TitlesAdminLive(props) {
       </div>
 
       <div style={{ marginBottom: 10 }}>
-        {phase === 'attacking' && isSilentActive && (
-          <button
-            className="btn bb"
-            onClick={async () => {
-              const currentAtks = Object.values(attacks || {});
-              const seenIds = new Set();
-              const elimAtt = {};
-              currentAtks.forEach((a) => {
-                if (a.correct) {
-                  if (!elimAtt[a.realOwnerId]) elimAtt[a.realOwnerId] = [];
-                  elimAtt[a.realOwnerId].push(a.attackerNick);
-                  seenIds.add(a.realOwnerId);
-                }
-              });
-              const silentExits = playersList
-                .filter((p) => seenIds.has(p.id))
-                .map((p) => ({
-                  playerId: p.id,
-                  nick: p.nick,
-                  nick2: p.nick2,
-                  name: p.name,
-                  attackers: elimAtt[p.id] || [],
-                  roundNum,
-                  initials: p.initials,
-                  colorIdx: p.colorIdx,
-                }));
-              const silentMissed = playersList
-                .filter((p) => p.status === 'active' && !currentAtks.some((a) => a.attackerNick === p.nick))
-                .map((p) => ({ playerId: p.id, missedRounds: (p.missedRounds || 0) + 1 }));
-              const updates = {};
-              updates[`rooms/${roomCode}/rounds/round_${roundNum}`] = {
-                round: roundNum,
-                attacks: attacks || {},
-                endedAt: Date.now(),
-                silent: true,
-              };
-              const prev = gameState?.silentPending || { silentExits: [], silentMissed: [] };
-              updates[`rooms/${roomCode}/game/silentPending`] = {
-                silentExits: [...(prev.silentExits || []), ...silentExits],
-                silentMissed: [...(prev.silentMissed || []), ...silentMissed],
-                roundNum,
-              };
-              await update(gameRef(roomCode), { silentActive: false });
-              await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks: {} });
-              await update(ref(db), updates);
-              await launchRound(roundNum + 1);
-              notify(`🤫 الجولة ${roundNum} مخفية — الجولة ${roundNum + 1} بدأت`, 'info');
-            }}
-          >
+        {phase === 'attacking' && isSilentActive && onAdvanceSilentRound && (
+          <button type="button" className="btn bb" onClick={() => void onAdvanceSilentRound()}>
             🤫 ⏭️ الجولة التالية سراً
           </button>
         )}

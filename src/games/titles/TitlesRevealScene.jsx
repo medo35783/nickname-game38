@@ -22,20 +22,27 @@ export default function TitlesRevealScene(props) {
     advanceRevealStep,
     nextRound,
     endGame,
+    declareWinner,
     setGameScreen,
     setStatsTab,
+    onPrepNextRound,
   } = props;
 
   const step = typeof gameState?.revealStep === 'number' ? gameState.revealStep : 0;
   const queue = Array.isArray(gameState?.revealQueue) ? gameState.revealQueue : [];
   const stats = gameState?.revealStats || {};
   const roundNum = gameState?.roundNum || 0;
-  const maxStep = queue.length + 1;
+  const endGameAfterReveal = Boolean(gameState?.endGameAfterReveal);
+  const summaryStep = queue.length + 1;
+  const winnerStep = endGameAfterReveal ? queue.length + 2 : null;
+  const maxStep = endGameAfterReveal ? queue.length + 2 : queue.length + 1;
   const isAdmin = role === 'admin';
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
   const activePoisonNick = gameState?.poisonNick || '';
+  const remainingActive =
+    typeof stats.remainingActive === 'number' ? stats.remainingActive : activePlayers.length;
 
   const me = playersList.find((p) => p.id === myId);
   const myNicks = me ? [me.nick, me.nick2].filter(Boolean) : [myNickLocal].filter(Boolean);
@@ -103,9 +110,21 @@ export default function TitlesRevealScene(props) {
           <PlayerRevealTeaser count={queue.length} />
         )}
 
+        {endGameAfterReveal && (
+          <TrsBanner icon="🏆" color="var(--gold)">
+            بعد إعلان الخروج — مشهد الفائز ({remainingActive === 1 ? 'متبقٍ واحد' : 'متبقيان'})
+          </TrsBanner>
+        )}
+
         <AdminContinue
           isAdmin={isAdmin}
-          hint={queue.length ? 'اقرأ النتائج ثم «متابعة» لبدء الإعلان' : '«متابعة» للملخص'}
+          hint={
+            queue.length
+              ? 'ابدأ إعلان من خرج — مشهد بمشهد'
+              : endGameAfterReveal
+                ? '«متابعة» — جاهزون لإعلان الفائز'
+                : '«متابعة» لملخص الجولة'
+          }
           onContinue={advanceRevealStep}
         />
         {!isAdmin && queue.length > 0 && step === 0 && (
@@ -131,7 +150,7 @@ export default function TitlesRevealScene(props) {
       <div className="trs-scene cinematic">
         {item.fromSilentRound && (
           <TrsBanner icon="🤫" color="var(--purple)">
-            من الجولة الصامتة {item.fromSilentRound}
+            الجولة {item.fromSilentRound} — كان خروجه مخفياً حتى الآن
           </TrsBanner>
         )}
 
@@ -195,14 +214,115 @@ export default function TitlesRevealScene(props) {
 
         <AdminContinue
           isAdmin={isAdmin}
-          hint={step < queue.length ? 'بعد الإعلان: «متابعة» للتالي' : 'بعد الإعلان: «متابعة» للملخص'}
+          hint={
+            step < queue.length
+              ? '«متابعة» للإعلان التالي'
+              : endGameAfterReveal
+                ? '«متابعة» — ثم إعلان الفائز'
+                : '«متابعة» لملخص الجولة'
+          }
           onContinue={advanceRevealStep}
         />
       </div>
     );
   }
 
-  if (step >= maxStep) {
+  if (endGameAfterReveal && step === summaryStep) {
+    const elimCount = queue.filter((q) => q.type === 'elim').length;
+    return (
+      <div className="trs-scene">
+        <h1 className="trs-title">✅ اكتمل إعلان الخروج</h1>
+        <p className="trs-sub">الجولة {roundNum}</p>
+
+        {elimCount > 0 && (
+          <TrsCard accent="red">
+            <div className="snum" style={{ color: 'var(--red)', fontSize: 28 }}>
+              {elimCount}
+            </div>
+            <div className="slbl">أُعلِن خروجهم</div>
+          </TrsCard>
+        )}
+
+        <TrsCard accent="gold">
+          <div className="trs-section-lbl">🏁 النهاية قريبة</div>
+          <div className="snum" style={{ color: 'var(--green)', fontSize: 32 }}>
+            {remainingActive}
+          </div>
+          <div className="slbl">
+            {remainingActive === 1 ? 'متبقٍ — جاهز لإعلان الفائز' : 'متبقيان — جاهزون لإعلان الفائز'}
+          </div>
+        </TrsCard>
+
+        <AdminContinue
+          isAdmin={isAdmin}
+          hint="«متابعة» لمشهد الفائز 🏆"
+          onContinue={advanceRevealStep}
+        />
+        {!isAdmin && <p className="trs-wait-pulse">المشرف يعلن الفائز بعد قليل…</p>}
+      </div>
+    );
+  }
+
+  if (step >= maxStep && endGameAfterReveal && step >= winnerStep) {
+    const elimCount = queue.filter((q) => q.type === 'elim').length;
+    const winners = activePlayers.filter((p) => p.status === 'active').slice(0, 2);
+      return (
+        <div className="trs-scene trs-winner-ceremony">
+          {elimCount > 0 && (
+            <TrsBanner icon="✅" color="var(--green)">
+              انتهى إعلان الخروج — {elimCount} انكشفوا
+            </TrsBanner>
+          )}
+
+          <p className="trs-suspense">... اللحظة الأخيرة ...</p>
+          <h1 className="trs-title trs-winner-headline">🏆 من الفائز؟</h1>
+
+          <div className="trs-winner-stage">
+            {winners.map((w, i) => (
+              <div key={w.id} className="trs-winner-card" style={{ animationDelay: `${i * 0.15}s` }}>
+                <div className="trs-winner-crown">{i === 0 ? '👑' : '🥈'}</div>
+                <Av p={w} sz={64} fs={20} />
+                <div className="trs-winner-name">{w.name}</div>
+                <div className="trs-winner-nick">
+                  &quot;{w.nick}&quot;
+                  {w.nick2 ? <span> · &quot;{w.nick2}&quot;</span> : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {isAdmin ? (
+            <button
+              type="button"
+              className="btn bg trs-winner-btn"
+              onClick={() => {
+                playSound?.('applause');
+                if (declareWinner) void declareWinner();
+                else void endGame?.();
+              }}
+            >
+              🎉 إعلان الفائز رسمياً
+            </button>
+          ) : (
+            <p className="trs-wait-pulse">المشرف يعلن الفائز الآن… 🎉</p>
+          )}
+
+          <button
+            type="button"
+            className="btn bgh bsm"
+            style={{ width: '100%', marginTop: 10 }}
+            onClick={() => {
+              setStatsTab?.('nicks');
+              setGameScreen?.('stats');
+            }}
+          >
+            📊 الإحصائيات
+          </button>
+        </div>
+      );
+  }
+
+  if (step >= summaryStep && !endGameAfterReveal) {
     const elimCount = queue.filter((q) => q.type === 'elim').length;
     return (
       <div className="trs-scene">
@@ -220,14 +340,9 @@ export default function TitlesRevealScene(props) {
         <TrsCard>
           <div className="trs-section-lbl">👥 ما زال في اللعبة</div>
           <div className="snum" style={{ color: 'var(--green)', fontSize: 32 }}>
-            {activePlayers.length}
+            {remainingActive}
           </div>
           <div className="slbl">لاعب نشط</div>
-          {activePlayers.length <= 2 && (
-            <p className="trs-muted" style={{ marginTop: 8, color: 'var(--gold)' }}>
-              اقتربنا من النهاية!
-            </p>
-          )}
         </TrsCard>
 
         {activePoisonNick && poisoned.length > 0 && (
@@ -249,15 +364,19 @@ export default function TitlesRevealScene(props) {
 
         {isAdmin && (
           <div className="trs-admin-actions">
-            {activePlayers.length > 2 ? (
-              <button type="button" className="btn bg" onClick={nextRound}>
-                ▶️ الجولة التالية ({roundNum + 1})
-              </button>
-            ) : (
-              <button type="button" className="btn br" onClick={endGame}>
-                🏆 إعلان الفائز
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn bg"
+              onClick={() => {
+                if (onPrepNextRound) onPrepNextRound();
+                else void nextRound?.();
+              }}
+            >
+              ⚗️ تجهيز الجولة {roundNum + 1}
+            </button>
+            <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8, lineHeight: 1.55 }}>
+              اختر المسموم/الصمت/نوع الجولة قبل الضغط على بدء الجولة التالية
+            </p>
           </div>
         )}
         {!isAdmin && <p className="trs-wait-pulse">انتظر قرار الجولة القادمة… 👑</p>}

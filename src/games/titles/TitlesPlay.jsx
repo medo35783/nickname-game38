@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import Av from '../../shared/Av';
-import { fmtMs } from '../../core/helpers';
 import LiveConnectionBar from './LiveConnectionBar';
+import TitlesPlayCockpitShell from './play/TitlesPlayCockpitShell';
 import { attacksForPlayer, countAttackProgress } from './titlesRevealHelpers';
+import { roundAlertMessages } from './roundAlertHelpers';
 
-/** شاشة الهجوم للمتسابق — ويزارد خطوتين + انتظار حي. */
+/** شاشة الهجوم للمتسابق — كابينة + ويزارد خطوتين + انتظار حي. */
 export default function TitlesPlay(props) {
   const {
     role,
@@ -27,13 +28,10 @@ export default function TitlesPlay(props) {
     joinName,
     myId,
     setGameScreen,
-    extendTime,
-    doReveal,
     firebaseConnected,
   } = props;
 
   void effectiveNickMode;
-  void notify;
 
   const [attackStep, setAttackStep] = useState(1);
   const [waitMsgIdx, setWaitMsgIdx] = useState(0);
@@ -49,15 +47,14 @@ export default function TitlesPlay(props) {
 
   const isKioskMode = role === 'admin' && !!proxyFor;
   const proxyPlayer = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
-  const _proxyPlayerEarly = proxyPlayer;
 
   const playerAttackCounts = {};
   attacksList.forEach((a) => {
     if (a.attackerNick) playerAttackCounts[a.attackerNick] = (playerAttackCounts[a.attackerNick] || 0) + 1;
   });
 
-  const effectiveAttackerNicks = _proxyPlayerEarly
-    ? [_proxyPlayerEarly.nick, _proxyPlayerEarly.nick2].filter(Boolean)
+  const effectiveAttackerNicks = proxyPlayer
+    ? [proxyPlayer.nick, proxyPlayer.nick2].filter(Boolean)
     : myNickLocal
       ? [myNickLocal]
       : [];
@@ -77,7 +74,8 @@ export default function TitlesPlay(props) {
   const displayNicks = [...new Set([...activeNicks, ...inactiveNicks])];
   const visibleNicks = displayNicks.filter((n) => !myNicksList.includes(n));
 
-  const myPlayerId = proxyPlayer?.id || props.myId || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal)?.id;
+  const myPlayerId =
+    proxyPlayer?.id || myId || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal)?.id;
 
   const displayNames = (
     roundOrder.names?.length > 0
@@ -86,15 +84,18 @@ export default function TitlesPlay(props) {
   ).filter((p) => p.id !== myPlayerId);
 
   const myAtks = useMemo(
-    () => attacksForPlayer(attacks, { playerId: myId, nicks: effectiveAttackerNicks }),
-    [attacks, myId, effectiveAttackerNicks]
+    () => attacksForPlayer(attacks, { playerId: myPlayerId, nicks: effectiveAttackerNicks }),
+    [attacks, myPlayerId, effectiveAttackerNicks]
   );
 
   const progress = countAttackProgress(activePlayers, attacks, attacksPerRound);
 
-  const myP = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
-  const isBanned =
-    myP?.isBannedNextRound && myP.isBannedNextRound >= roundNum;
+  const myP = effectivePlayer;
+  const isBanned = myP?.isBannedNextRound && myP.isBannedNextRound >= roundNum;
+
+  const displayName = isKioskMode
+    ? effectivePlayer?.name || '—'
+    : joinName || effectivePlayer?.name || '—';
 
   useEffect(() => {
     if (gameState?.phase === 'attacking') {
@@ -110,13 +111,6 @@ export default function TitlesPlay(props) {
     return () => clearInterval(t);
   }, [myAttacksDone]);
 
-  const cdInfo = () => {
-    if (countdown === null) return { label: '—', urgent: false };
-    if (countdown <= 0) return { label: 'انتهى الوقت!', urgent: true };
-    return { label: fmtMs(countdown), urgent: countdown < 5 * 60 * 1000 };
-  };
-  const cdi = cdInfo();
-
   const waitMessages = useMemo(() => {
     const msgs = ['انتظر كشف المشرف 🔓'];
     if (!progress.allSubmitted) {
@@ -130,21 +124,12 @@ export default function TitlesPlay(props) {
     return msgs;
   }, [progress]);
 
+  const roundAlerts = roundAlertMessages(gameState?.roundAlert);
   const statusBanner = () => {
     if (isBanned)
       return { icon: '☠️', text: 'أنت محروم هذه الجولة — عقوبة المسموم', tone: 'red' };
-    if (isSilentActive)
-      return { icon: '🤫', text: 'جولة الصمت — النتائج مخفية حتى الجولة القادمة', tone: 'blue' };
     if (gameState?.silentPending && !isSilentActive)
       return { icon: '🤫', text: 'جولة صامتة سابقة — تُكشف مع هذه الجولة', tone: 'purple' };
-    if (activePoisonNick)
-      return { icon: '☠️', text: 'يوجد لقب مسموم — احذر من الهجوم الخاطئ', tone: 'purple' };
-    if (attacksPerRound > 1)
-      return {
-        icon: attacksPerRound === 2 ? '⚔️' : '⚡',
-        text: `${attacksPerRound === 2 ? 'جولة مزدوجة' : 'جولة المفاجئ'} — ${attacksPerRound} هجمات لك`,
-        tone: 'gold',
-      };
     return null;
   };
   const banner = statusBanner();
@@ -156,79 +141,48 @@ export default function TitlesPlay(props) {
     setAttackStep(2);
   };
 
+  const copyCode = () => {
+    navigator.clipboard?.writeText(roomCode);
+    notify?.('تم نسخ الرمز ✓', 'success');
+  };
+
+  const returnToHost = () => {
+    setProxyFor(null);
+    setIsProxyMode(false);
+    setMyNick(null);
+    setMyGuess(null);
+    setGameScreen('host');
+  };
+
   return (
-    <div className="scr">
+    <div className="scr play-attack-scr">
       <LiveConnectionBar connected={firebaseConnected !== false} roomCode={roomCode} />
 
-      <div className="play-top-bar">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-          <div className="play-top-meta" style={{ flex: 1 }}>
-            <span className="play-room">#{roomCode}</span>
-            <span>جولة {roundNum}</span>
-            <span className="play-active">{activePlayers.length} نشط</span>
-          </div>
-          <button
-            type="button"
-            className="btn bgh bxs play-stats-btn"
-            title="الإحصائيات — الجولات السابقة والمجموع (الجولة الحالية بعد الكشف)"
-            onClick={() => setGameScreen('stats')}
-          >
-            📊 إحصائيات
-          </button>
-        </div>
-        {role === 'player' && myNickLocal && !proxyFor && (
-          <div className="play-you">
-            أنت: <strong>{joinName}</strong> · <span className="gold">"{myNickLocal}"</span>
-          </div>
-        )}
-        {isKioskMode && _proxyPlayerEarly && (
-          <div className="play-you">
-            📱 {_proxyPlayerEarly.name} · <span className="gold">"{_proxyPlayerEarly.nick}"</span>
-          </div>
-        )}
-      </div>
+      <TitlesPlayCockpitShell
+        roomCode={roomCode}
+        activeCount={activePlayers.length}
+        roundNum={roundNum}
+        displayName={displayName}
+        identityNicks={myNicksList}
+        countdown={countdown}
+        onOpenStats={() => setGameScreen('stats')}
+        onCopyCode={copyCode}
+        isKioskMode={isKioskMode}
+        onReturnToHost={returnToHost}
+      />
 
+      {roundAlerts.map((a, i) => (
+        <div key={i} className={`play-status play-status-${a.tone}`}>
+          <span>{a.icon}</span>
+          <span>{a.text}</span>
+        </div>
+      ))}
       {banner && (
         <div className={`play-status play-status-${banner.tone}`}>
           <span>{banner.icon}</span>
           <span>{banner.text}</span>
         </div>
       )}
-
-      <div className={`tbar${cdi.urgent ? ' urg' : ''}`}>
-        <div style={{ fontSize: 20 }}>{cdi.urgent ? '🔴' : '⏱️'}</div>
-        <div style={{ flex: 1 }}>
-          <div className={`tval${cdi.urgent ? ' urg' : ''}`}>{cdi.label}</div>
-          <div className="tlbl">متبقي للجولة {roundNum}</div>
-        </div>
-        {role === 'admin' && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            {!isKioskMode && (
-              <>
-                <button type="button" className="btn bgh bxs" onClick={() => extendTime(30 * 60 * 1000)}>
-                  +30د
-                </button>
-                <button type="button" className="btn br bxs" onClick={doReveal}>
-                  كشف
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              className="btn bgh bxs"
-              onClick={() => {
-                setProxyFor(null);
-                setIsProxyMode(false);
-                setMyNick(null);
-                setMyGuess(null);
-                setGameScreen('admin_live');
-              }}
-            >
-              👑
-            </button>
-          </div>
-        )}
-      </div>
 
       {!myAttacksDone && (
         <div className="play-wizard-steps">
@@ -256,15 +210,6 @@ export default function TitlesPlay(props) {
         </div>
       </div>
 
-      {proxyPlayer && (
-        <div className="ann ag" style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>📱 إعارة جوال المشرف</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)' }}>
-            {proxyPlayer.name} — {proxyPlayer.nick}
-          </div>
-        </div>
-      )}
-
       {myAttacksDone ? (
         <div className="card play-wait-card">
           <div className="waiting-box">
@@ -280,8 +225,8 @@ export default function TitlesPlay(props) {
                   <span className="lbl">👤 التخمين</span>
                   <strong>{a.guessedName || '—'}</strong>
                 </div>
-                <div className={`play-wait-verdict${a.correct ? ' ok' : ''}`}>
-                  {a.correct ? '✅ إصابة!' : '⏳ النتيجة عند الكشف'}
+                <div className="play-wait-verdict">
+                  ⏳ النتيجة عند الكشف
                 </div>
               </div>
             ))}
@@ -301,12 +246,12 @@ export default function TitlesPlay(props) {
                   const owner = playersList.find((p) => p.nick === nick || p.nick2 === nick);
                   const isElim =
                     owner && (owner.status === 'eliminated' || owner.status === 'cheater');
-                  const isPoison = nick === activePoisonNick;
+                  const showPoisonHint = role === 'admin' && !isKioskMode && nick === activePoisonNick;
                   return (
                     <button
                       key={i}
                       type="button"
-                      className={`nt play-nt${isElim ? ' nd' : ''}${myNick === nick ? ' nsel' : ''}${isPoison ? ' poisoned' : ''}`}
+                      className={`nt play-nt${isElim ? ' nd' : ''}${myNick === nick ? ' nsel' : ''}${showPoisonHint ? ' poisoned' : ''}`}
                       disabled={!!isElim}
                       onClick={() => pickNick(nick, isElim)}
                     >

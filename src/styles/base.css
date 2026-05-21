@@ -111,6 +111,58 @@ textarea.inp{resize:vertical;min-height:80px}
 .tabs{display:flex;gap:5px;margin-bottom:11px}
 .tab{flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,.07);color:var(--muted);font-family:'Tajawal',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
 .tab.on{background:rgba(240,192,64,.1);border-color:var(--gold);color:var(--gold)}
+/* ── كابينة مشرف المسابقة ── */
+.host-cockpit{display:flex;flex-direction:column;min-height:calc(100dvh - 120px);padding-bottom:8px}
+.host-status-bar{display:flex;gap:6px;margin-bottom:10px;position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#07071a 70%,transparent);padding:4px 0 8px}
+.host-stat-chip{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);cursor:pointer;font-family:inherit}
+.host-stat-chip.urg{border-color:rgba(230,57,80,.45);background:rgba(230,57,80,.08)}
+.host-stat-ico{font-size:16px;line-height:1}
+.host-stat-val{font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;color:var(--gold);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.host-stat-lbl{font-size:9px;color:var(--muted);font-weight:700}
+.host-crown-banner{text-align:center;padding:10px 12px;margin-bottom:10px;border-radius:14px;background:linear-gradient(135deg,rgba(240,192,64,.12),rgba(155,89,182,.05));border:1px solid rgba(240,192,64,.28)}
+.host-crown-title{font-weight:900;color:var(--gold);font-size:15px}
+.host-crown-sub{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55}
+/* ── كابينة المتسابق (نفس هيكل المشرف) ── */
+.play-cockpit{margin-bottom:4px}
+.play-id-chip{border-color:rgba(240,192,64,.35);background:rgba(240,192,64,.08)}
+.play-id-chip .host-stat-val{font-size:12px}
+.play-id-nick{font-size:8px;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gold)!important;font-weight:800}
+.play-timer-banner{padding:14px 12px 12px}
+.play-timer-banner.urg{border-color:rgba(230,57,80,.45);background:linear-gradient(135deg,rgba(230,57,80,.14),rgba(155,89,182,.05))}
+.play-timer-val{font-family:'Cairo',sans-serif;font-size:clamp(36px,10vw,52px);font-weight:900;color:var(--gold);line-height:1.1;letter-spacing:.02em}
+.play-timer-val.urg{color:var(--red);text-shadow:0 0 20px rgba(230,57,80,.35)}
+.play-kiosk-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin-bottom:10px;border-radius:12px;background:rgba(79,163,224,.08);border:1px solid rgba(79,163,224,.28)}
+.play-kiosk-lbl{font-size:10px;color:var(--muted);font-weight:700;line-height:1.4;flex:1;min-width:0}
+.play-kiosk-return{flex-shrink:0;white-space:nowrap}
+.host-steps{display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}
+.host-step{flex:1;min-width:72px;text-align:center;padding:8px 4px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);opacity:.55}
+.host-step.on{opacity:1;border-color:rgba(240,192,64,.45);background:rgba(240,192,64,.08);box-shadow:0 0 12px rgba(240,192,64,.12)}
+.host-step.done{opacity:.85;border-color:rgba(46,204,113,.25)}
+.host-step-n{display:block;font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;color:var(--gold)}
+.host-step-lbl{display:block;font-size:9px;color:var(--muted);margin-top:3px;line-height:1.3}
+.host-cockpit-body{flex:1;overflow-y:auto;padding-bottom:8px}
+.host-fab-wrap{position:sticky;bottom:62px;z-index:6;padding:8px 0 4px;background:linear-gradient(0deg,transparent,#07071a 24%)}
+.host-fab-hint{text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px}
+.host-fab{width:100%;font-size:15px;padding:14px;border-radius:14px;box-shadow:0 8px 28px rgba(240,192,64,.2)}
+.host-bnav{display:flex;gap:4px;padding:6px 0;margin-top:4px;border-top:1px solid rgba(255,255,255,.08)}
+.host-bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,.06);color:var(--muted);cursor:pointer;font-family:inherit;transition:all .18s}
+.host-bnav-item.on{background:rgba(240,192,64,.1);border-color:rgba(240,192,64,.35);color:var(--gold)}
+.host-bnav-ico{font-size:20px;line-height:1}
+.host-bnav-lbl{font-size:10px;font-weight:800}
+.host-end-btn{width:100%;margin-top:8px;border:1px solid rgba(230,57,80,.35);color:var(--red)}
+.host-prep-scr{display:flex;flex-direction:column;min-height:calc(100dvh - 120px);max-height:calc(100dvh - 120px)}
+.host-prep-scroll{flex:1;overflow-y:auto;padding-bottom:12px}
+.host-prep-fab-bar{flex-shrink:0;padding:12px 0 8px;background:linear-gradient(0deg,transparent,#07071a 20%);border-top:1px solid rgba(240,192,64,.15);position:sticky;bottom:0;z-index:8}
+.host-prep-fab-bar .host-fab{width:100%;margin:0}
+.host-out-toggle{width:100%;margin-top:8px;font-size:11px}
+.host-copy-btn{width:100%;margin-bottom:10px}
+.host-empty-card{text-align:center;padding:18px}
+.summary-cta-card{text-align:center;padding:18px 14px;margin-top:12px;background:linear-gradient(135deg,rgba(79,163,224,.1),rgba(240,192,64,.08));border:1px solid rgba(79,163,224,.28);border-radius:16px}
+.summary-overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.summary-ov-cell{padding:12px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);text-align:center}
+.summary-ov-num{font-family:'Cairo',sans-serif;font-size:22px;font-weight:900;color:var(--gold)}
+.summary-ov-lbl{font-size:10px;color:var(--muted);margin-top:4px}
+.stats-tab-hint{font-size:11px;color:var(--muted);text-align:center;margin:-4px 0 10px;line-height:1.6;padding:8px 10px;border-radius:10px;background:rgba(240,192,64,.05);border:1px solid rgba(240,192,64,.12)}
 .notif{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:999;padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;text-align:center;animation:sdn .3s ease,fdo .3s ease 2.7s forwards;min-width:210px;max-width:88vw;box-shadow:0 8px 28px rgba(0,0,0,.6)}
 .ns{background:#0c2d1c;border:1px solid var(--green);color:var(--green)}
 .ne{background:#2d0c0c;border:1px solid var(--red);color:var(--red)}
@@ -332,6 +384,19 @@ textarea.inp{resize:vertical;min-height:80px}
 
 /* ── مشهد الكشف المتزامن ── */
 .trs-scene{animation:fi .45s ease;padding-bottom:80px}
+.trs-winner-ceremony{text-align:center;padding-top:8px}
+.trs-winner-headline{font-size:26px;margin:12px 0 20px;animation:numBurst .8s ease}
+.trs-winner-stage{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
+.trs-winner-card{
+  padding:18px 14px;border-radius:16px;
+  background:linear-gradient(145deg,rgba(240,192,64,.12),rgba(7,7,26,.9));
+  border:2px solid rgba(240,192,64,.35);
+  animation:fi .6s ease both;
+}
+.trs-winner-crown{font-size:36px;margin-bottom:8px}
+.trs-winner-name{font-family:'Cairo',sans-serif;font-size:22px;font-weight:900;color:var(--gold);margin-top:10px}
+.trs-winner-nick{font-size:13px;color:var(--muted);margin-top:4px}
+.trs-winner-btn{width:100%;font-size:16px;padding:16px;border-radius:14px;box-shadow:0 10px 32px rgba(240,192,64,.25)}
 .trs-scene.cinematic{background:linear-gradient(180deg,rgba(20,0,0,.4),transparent);border-radius:16px;padding:16px 12px}
 .trs-title{font-family:'Cairo',sans-serif;font-size:22px;font-weight:900;text-align:center;color:var(--gold);margin:0 0 4px}
 .trs-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 16px}
@@ -408,3 +473,13 @@ textarea.inp{resize:vertical;min-height:80px}
 
 /* ── SILENT ROUND ── */
 .silent-badge{background:rgba(79,163,224,.08);border:1px solid rgba(79,163,224,.3);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:12px;color:var(--blue)}
+.host-stat-chip.silent-on{border-color:rgba(79,163,224,.45);background:rgba(79,163,224,.08)}
+.host-stat-chip.silent-on .host-stat-val{color:var(--blue);font-size:11px}
+.host-fab-wrap.silent-mode .host-fab{box-shadow:0 8px 28px rgba(79,163,224,.25)}
+.host-silent-pill{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;margin-bottom:8px;border-radius:12px;background:linear-gradient(135deg,rgba(79,163,224,.15),rgba(155,89,182,.08));border:1px solid rgba(79,163,224,.4);font-size:13px;font-weight:800;color:var(--blue)}
+.host-silent-pill-ico{font-size:18px}
+.host-fab-secondary{width:100%;margin-top:8px;border-radius:12px}
+.host-silent-status-card{margin-bottom:12;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,rgba(79,163,224,.1),rgba(7,7,26,.5));border:1px solid rgba(79,163,224,.3)}
+.host-silent-status-title{font-size:14px;font-weight:800;color:var(--blue);margin-bottom:6px}
+.host-silent-status-line{font-size:11px;color:var(--muted);line-height:1.65;margin:0 0 8px}
+.host-silent-status-muted{font-size:11px;color:var(--muted);margin:0}

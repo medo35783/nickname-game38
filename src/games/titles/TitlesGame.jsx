@@ -10,7 +10,16 @@ import TitlesLobby from './TitlesLobby';
 import TitlesPlay from './TitlesPlay';
 import TitlesResults from './TitlesResults';
 import { buildRevealQueue } from './titlesRevealHelpers';
-import TitlesAdminLive from './TitlesAdminLive';
+import {
+  buildSilentSnapshot,
+  mergeSilentPending,
+  applySilentPendingToReveal,
+  sanitizeForFirebase,
+} from './silentRoundHelpers';
+import TitlesHostCockpit from './host/TitlesHostCockpit';
+import TitlesHostPrep from './host/TitlesHostPrep';
+import TitlesGameSummary from './TitlesGameSummary';
+import { buildRoundAlert } from './roundAlertHelpers';
 
 // شاشة الترحيب (Onboarding)
 function OnboardingScreen({ role, onDismiss }) {
@@ -31,7 +40,7 @@ function OnboardingScreen({ role, onDismiss }) {
         <div className="onb-title">{role === 'admin' ? 'دليل المشرف' : 'دليل المتسابق'}</div>
         <div className="onb-sub">
           {role === 'admin' 
-            ? 'أنت المدير الكامل للمسابقة — تحكم بكل شيء!' 
+            ? 'أنت مشرف المسابقة — تحكم بالغرفة والجولات!' 
             : 'استعد للمنافسة — أخفِ هويتك واكشف الآخرين!'}
         </div>
         {steps.map((step, i) => (
@@ -87,7 +96,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [isProxyMode, setIsProxyMode] = useState(false);
 
   const [modal, setModal] = useState(null);
-  const [statsTab, setStatsTab] = useState('nicks');
+  const [statsTab, setStatsTab] = useState('overview');
   const [heatmapView, setHeatmapView] = useState('nicks');
 
   const [guideRole, setGuideRole] = useState('player');
@@ -122,14 +131,16 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const effectiveNickMode = role === 'admin' ? nickMode : gameState?.nickMode || 1;
   const activePoisonNick = gameState?.poisonNick || poisonNick;
   const activeSpecialRound = gameState?.specialRound || specialRound;
-  const isSilentActive = gameState?.silentActive || silentRound;
+  const phase = gameState?.phase || 'lobby';
+  /** صمت الجولة الحالية فقط — silentRound = تجهيز للجولة القادمة */
+  const isSilentActive =
+    phase === 'attacking' ? Boolean(gameState?.silentActive) : Boolean(silentRound);
 
   const playersList  = Object.entries(players).map(([id,p])=>({...p, id}));
   const activePlayers= playersList.filter(p=>p.status==='active');
   const elimPlayers  = playersList.filter(p=>p.status!=='active');
   const attacksList  = Object.values(attacks||{});
   const submittedCount = attacksList.length;
-  const phase        = gameState?.phase || 'lobby';
   const roundNum     = gameState?.roundNum || 0;
   const roundOrder      = gameState?.roundOrder || {nicks:[], names:[]};
   const attacksPerRound = gameState?.attacksPerRound || 1; // هجمات مسموحة لكل لاعب
@@ -322,7 +333,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: savedCode }));
     setRoomCode(savedCode);
     setRole('admin');
-    setGameScreen('lobby');
+    setGameScreen('host');
     notify(`✅ الغرفة جاهزة: ${savedCode}`, 'gold');
   };
 
@@ -351,11 +362,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   /* ══ PLAYER: JOIN ROOM ══ */
   const applyTitlesAdminScreens = (gamePhase) => {
-    if (gamePhase === 'lobby') setGameScreen('lobby');
-    else if (gamePhase === 'attacking') setGameScreen('admin_live');
+    if (gamePhase === 'lobby' || gamePhase === 'attacking') setGameScreen('host');
     else if (gamePhase === 'revealing') setGameScreen('results');
-    else if (gamePhase === 'ended') setGameScreen('winner');
-    else setGameScreen('lobby');
+    else if (gamePhase === 'ended') setGameScreen('summary');
+    else setGameScreen('host');
   };
 
   const joinRoom = async () => {
@@ -436,7 +446,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         if(gamePhase==='lobby') setGameScreen('lobby');
         else if(gamePhase==='attacking') setGameScreen('attack');
         else if(gamePhase==='revealing') setGameScreen('results');
-        else if(gamePhase==='ended') setGameScreen('winner');
+        else if(gamePhase==='ended') setGameScreen('summary');
         notify('✅ تم الرجوع للعبة!', 'success');
         return;
       }
@@ -504,25 +514,36 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     });
     if(Object.keys(banCleanup).length>0) await update(ref(db), banCleanup);
 
+    const spec = gameState?.specialRound ?? specialRound ?? 1;
+    const poisonForRound = gameState?.poisonNick || poisonNick || null;
+    const silentForRound = Boolean(silentRound);
+    const roundAlert = buildRoundAlert({
+      poisonNick: poisonForRound,
+      silentActive: silentForRound,
+      specialRound: spec,
+    });
     const updates = {
       phase:'attacking',
       roundNum: rn,
       deadline: dl,
       roundOrder: { nicks:allNicks, names:allNames },
-      attacksPerRound: activeSpecialRound, // عدد الهجمات الحقيقي
-      specialRound: 1, // إعادة للوضع الافتراضي
-      poisonNick: null,
+      attacksPerRound: spec,
+      specialRound: 1,
+      poisonNick: poisonForRound || null,
+      roundAlert,
       revealQueue: null,
       revealStep: null,
       revealStats: null,
+      silentActive: silentForRound,
+      endGameAfterReveal: null,
     };
-    // لا تُعيد silentActive إذا كان مُفعّلاً بالفعل
-    if (!isSilentActive) {
-      updates.silentActive = false;
-    }
     await update(gameRef(roomCode), updates);
-    setSpecialRound(1); // إعادة local state
-    notify(`🔔 الجولة ${rn} بدأت!`, 'gold');
+    setSilentRound(false);
+    setSpecialRound(1);
+    notify(
+      silentForRound ? `🤫 الجولة ${rn} — وضع الصمت` : `🔔 الجولة ${rn} بدأت!`,
+      silentForRound ? 'info' : 'gold'
+    );
   };
 
   const startGame = async () => {
@@ -680,66 +701,29 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     });
     const elimIds = seenElimIds;
 
-    // ══ SILENT ROUND: store attacks only, keep everyone active ══
-    if(isSilentActive){
-      const roundKey = `round_${roundNum}`;
-      // Build silent exit data (for later reveal) but DON'T change player status
-      const silentExits = playersList
-        .filter(p=>elimIds.has(p.id))
-        .map(p=>({
-          playerId: p.id, nick:p.nick, nick2:p.nick2, name:p.name,
-          attackers: elimAttackers[p.id]||[], roundNum,
-          initials:p.initials, colorIdx:p.colorIdx
-        }));
-      // Also track missed rounds for silent
-      const silentMissed = playersList
-        .filter(p=>p.status==='active'&&!currentAttacks.some(a=>a.attackerNick===p.nick))
-        .map(p=>({playerId:p.id, missedRounds:(p.missedRounds||0)+1}));
-
-      const updates = {};
-      updates[`rooms/${roomCode}/rounds/${roundKey}`]={
-        round:roundNum, attacks:attacks||{}, endedAt:Date.now(), silent:true
-      };
-      updates[`rooms/${roomCode}/game/phase`]='attacking';
-      updates[`rooms/${roomCode}/game/silentPending`]={ silentExits, silentMissed, roundNum };
-      await update(ref(db), updates);
-      setSilentRound(false); await update(gameRef(roomCode),{silentActive:false});
-      // Launch next round immediately — silent results hidden
-      notify(`🤫 جولة الصمت ${roundNum} — انتقلنا للجولة ${roundNum+1}`,'info');
-      await launchRound(roundNum+1);
-      return;
-    }
-
-    // ══ NORMAL ROUND ══
+    // ══ NORMAL + إعلان جولات الصمت المخزّنة ══
     const updates = {};
     const exitList = [];
 
-    // ── دمج الجولة الصامتة السابقة إن وُجدت ──
-    const pendingSilent = gameState?.silentPending;
-    if(pendingSilent?.silentExits?.length > 0){
-      pendingSilent.silentExits.forEach(ex=>{
-        const p = playersList.find(pl=>pl.id===ex.playerId);
-        if(p && p.status==='active'){
-          const attackersStr = (ex.attackers||[]).join(' + ');
-          updates[`rooms/${roomCode}/players/${p.id}/status`] = 'eliminated';
-          updates[`rooms/${roomCode}/players/${p.id}/eliminatedBy`] = attackersStr;
-          updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`] = ex.roundNum;
-          exitList.push({nick:ex.nick, nick2:ex.nick2, name:ex.name, eliminatedBy:attackersStr, attackers:ex.attackers, initials:ex.initials, colorIdx:ex.colorIdx, fromSilentRound:ex.roundNum});
-        }
-      });
-      // حدّث الخامل من الجولة الصامتة
-      pendingSilent.silentMissed?.forEach(m=>{
-        const p = playersList.find(pl=>pl.id===m.playerId);
-        if(p && p.status==='active'){
-          updates[`rooms/${roomCode}/players/${p.id}/missedRounds`] = m.missedRounds;
-          if(m.missedRounds >= 2){
-            updates[`rooms/${roomCode}/players/${p.id}/status`] = 'inactive';
-            updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`] = pendingSilent.roundNum;
-          }
-        }
-      });
-      // امسح silentPending
-      updates[`rooms/${roomCode}/game/silentPending`] = null;
+    let pendingSilent = gameState?.silentPending;
+    if (isSilentActive) {
+      const snapshot = buildSilentSnapshot(attacks, playersList, roundNum);
+      pendingSilent = mergeSilentPending(pendingSilent, snapshot);
+      updates[`rooms/${roomCode}/rounds/round_${roundNum}`] = {
+        round: roundNum,
+        attacks: attacks || {},
+        endedAt: Date.now(),
+        silent: true,
+      };
+      updates[`rooms/${roomCode}/game/silentPending`] = sanitizeForFirebase(pendingSilent);
+      updates[`rooms/${roomCode}/game/silentActive`] = false;
+      setSilentRound(false);
+    }
+
+    const silentAppliedIds = new Set();
+    if (pendingSilent?.silentExits?.length > 0 || pendingSilent?.silentMissed?.length > 0) {
+      applySilentPendingToReveal(pendingSilent, playersList, updates, exitList, roomCode);
+      (pendingSilent.silentExits || []).forEach((ex) => silentAppliedIds.add(ex.playerId));
     }
 
     const correctHitsFor = (playerId) =>
@@ -748,6 +732,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         .map((a) => ({ attackerNick: a.attackerNick, targetNick: a.targetNick }));
 
     for(const p of playersList){
+      if(silentAppliedIds.has(p.id)) continue;
       if(elimIds.has(p.id)){
         const hits = correctHitsFor(p.id);
         const attackers = [...new Set(hits.map((h) => h.attackerNick).filter(Boolean))];
@@ -794,25 +779,35 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
 
     const roundKey = `round_${roundNum}`;
-    updates[`rooms/${roomCode}/rounds/${roundKey}`]={ round:roundNum, attacks:attacks||{}, endedAt:Date.now() };
-    // إذا بقي اثنان أو أقل بعد هذه الجولة — أنهِ المسابقة مباشرة
-    const remainingAfter = playersList.filter(p=>p.status==='active'&&!elimIds.has(p.id)).length;
-    const goingToReveal = remainingAfter > 2;
-    updates[`rooms/${roomCode}/game/phase`] = remainingAfter<=2 ? 'ended' : 'revealing';
-
-    if (goingToReveal) {
-      const revealQueue = buildRevealQueue(exitList);
-      const correctN = currentAttacks.filter((a) => a.correct).length;
-      updates[`rooms/${roomCode}/game/revealQueue`] = revealQueue;
-      updates[`rooms/${roomCode}/game/revealStep`] = 0;
-      updates[`rooms/${roomCode}/game/revealStats`] = {
-        attacks: currentAttacks.length,
-        correct: correctN,
-        wrong: currentAttacks.length - correctN,
-      };
+    if (!updates[`rooms/${roomCode}/rounds/${roundKey}`]) {
+      updates[`rooms/${roomCode}/rounds/${roundKey}`] = { round: roundNum, attacks: attacks || {}, endedAt: Date.now() };
     }
+    const willLeave = new Set(elimIds);
+    silentAppliedIds.forEach((id) => willLeave.add(id));
+    exitList.filter((ex) => ex.inactive).forEach((ex) => {
+      const p = playersList.find((pl) => pl.nick === ex.nick);
+      if (p) willLeave.add(p.id);
+    });
+    const remainingAfter = playersList.filter((p) => p.status === 'active' && !willLeave.has(p.id)).length;
+    /** مشهد الفائز فقط عند بقاء لاعب واحد أو اثنين — لا يُعلَن الفائز إذا بقي 3+ */
+    const gameEndsAfterReveal = remainingAfter >= 1 && remainingAfter <= 2;
+    const revealQueue = buildRevealQueue(exitList);
+    const correctN = currentAttacks.filter((a) => a.correct).length;
 
-    await update(ref(db), updates);
+    updates[`rooms/${roomCode}/game/phase`] = 'revealing';
+    updates[`rooms/${roomCode}/game/revealQueue`] = revealQueue;
+    updates[`rooms/${roomCode}/game/revealStep`] = 0;
+    updates[`rooms/${roomCode}/game/endGameAfterReveal`] = gameEndsAfterReveal;
+    updates[`rooms/${roomCode}/game/silentActive`] = false;
+    setSilentRound(false);
+    updates[`rooms/${roomCode}/game/revealStats`] = {
+      attacks: currentAttacks.length,
+      correct: correctN,
+      wrong: currentAttacks.length - correctN,
+      remainingActive: remainingAfter,
+    };
+
+    await update(ref(db), sanitizeForFirebase(updates));
     setFlipCards({});
   };
 
@@ -820,16 +815,67 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (!roomCode || role !== 'admin' || phase !== 'revealing') return;
     const queue = gameState?.revealQueue || [];
     const step = typeof gameState?.revealStep === 'number' ? gameState.revealStep : 0;
-    const maxStep = queue.length + 1;
+    const endsAfter = Boolean(gameState?.endGameAfterReveal);
+    const maxStep = queue.length + (endsAfter ? 2 : 1);
     if (step >= maxStep) return;
     await update(gameRef(roomCode), { revealStep: step + 1 });
   };
 
+  /** جولة صمت: احفظ النتائج مخفية وابدأ الجولة التالية دون إعلان */
+  const declareWinner = async () => {
+    if (role !== 'admin' || !roomCode) return;
+    await update(gameRef(roomCode), {
+      phase: 'ended',
+      endGameAfterReveal: null,
+      revealQueue: null,
+      revealStep: null,
+      revealStats: null,
+    });
+    notify('🏆 تم إعلان الفائز!', 'gold');
+  };
+
+  const advanceSilentRound = async () => {
+    if (phase !== 'attacking' || !isSilentActive) return;
+    try {
+      setSilentRound(false);
+      const snapshot = buildSilentSnapshot(attacks, playersList, roundNum);
+      const merged = mergeSilentPending(gameState?.silentPending, snapshot);
+      const updates = {};
+      updates[`rooms/${roomCode}/rounds/round_${roundNum}`] = {
+        round: roundNum,
+        attacks: attacks || {},
+        endedAt: Date.now(),
+        silent: true,
+      };
+      updates[`rooms/${roomCode}/game/silentPending`] = merged;
+      updates[`rooms/${roomCode}/game/silentActive`] = false;
+      await update(ref(db), sanitizeForFirebase(updates));
+      await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks: {} });
+      await launchRound(roundNum + 1);
+      const summary = merged.silentExits?.length
+        ? `${merged.silentExits.length} خروج مخزّن`
+        : 'لا خروج هذه الجولة';
+      notify(`🤫 بدأت الجولة ${roundNum + 1} — بدون كشف (${summary})`, 'success');
+    } catch (e) {
+      console.error(e);
+      notify('تعذّر بدء الجولة — تحقق من الاتصال وحاول مرة أخرى', 'error');
+    }
+  };
+
   /* ══ ADMIN: NEXT ROUND ══ */
   const nextRound = async () => {
-    const still = playersList.filter(p=>p.status==='active');
-    if(still.length<=2){ await update(gameRef(roomCode),{phase:'ended'}); return; } // اثنان أو أقل = فائزان
-    await launchRound(roundNum+1);
+    const still = playersList.filter((p) => p.status === 'active');
+    if (still.length <= 2) {
+      notify(
+        still.length === 0
+          ? '🏁 لا يوجد لاعبون نشطون — انتهت المسابقة'
+          : `🏁 بقي ${still.length} لاعبين نشطين فقط — انتهت المسابقة حسب القواعد`,
+        'gold'
+      );
+      await update(gameRef(roomCode), { phase: 'ended' });
+      return;
+    }
+    await launchRound(roundNum + 1);
   };
 
   /* ══ ADMIN CONTROLS ══ */
@@ -1229,17 +1275,12 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           await auth.authStateReady();
         }
 
-        const applyAdminFromRoom = (roomCode, phase) => {
-          const adminPhase = phase || 'lobby';
+        const applyAdminFromRoom = (roomCode, ph) => {
           setRoomCode(roomCode);
           setRole('admin');
           setMyId(null);
           setMyNickLocal('');
-          if (adminPhase === 'lobby') setGameScreen('lobby');
-          else if (adminPhase === 'attacking') setGameScreen('admin_live');
-          else if (adminPhase === 'revealing') setGameScreen('results');
-          else if (adminPhase === 'ended') setGameScreen('winner');
-          else setGameScreen('lobby');
+          applyTitlesAdminScreens(ph || 'lobby');
         };
 
         const clearLsForRoom = (roomCode) => {
@@ -1475,12 +1516,13 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
     titlesPhaseRef.current = phase;
 
     if (phase === 'lobby') {
-      setGameScreen('lobby');
+      if (role === 'admin' && !proxyFor) setGameScreen('host');
+      else setGameScreen('lobby');
       return;
     }
     if (phase === 'attacking') {
       window._resultsPlayed = false;
-      if (role === 'admin' && !proxyFor) setGameScreen('admin_live');
+      if (role === 'admin' && !proxyFor) setGameScreen('host');
       else setGameScreen('attack');
       setMyNick(null);
       setMyGuess(null);
@@ -1489,11 +1531,12 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       return;
     }
     if (phase === 'revealing') {
-      setGameScreen('results');
+      if (gameScreen !== 'host_prep' && gameScreen !== 'stats') setGameScreen('results');
       return;
     }
     if (phase === 'ended') {
-      setGameScreen('winner');
+      setGameScreen('summary');
+      setStatsTab('overview');
       setTimeout(() => playSound('applause'), 500);
       setTimeout(() => playSound('applause'), 1400);
 
@@ -1537,8 +1580,9 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
 
   useEffect(() => {
     if (gameScreen !== 'stats') return;
-    const playerTabs = ['nicks', 'names', 'fierce', 'poison', 'remaining', 'me'];
+    const playerTabs = ['overview', 'nicks', 'names', 'fierce', 'poison', 'remaining', 'me', 'log'];
     const adminTabs = [
+      'overview',
       'nicks',
       'names',
       'fierce',
@@ -1560,7 +1604,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
         roomCode &&
         role === 'admin' &&
         phase !== 'lobby' &&
-        gameScreen !== 'admin_live'
+        gameScreen !== 'host' &&
+        gameScreen !== 'host_prep'
       ),
     });
   }, [roomCode, role, phase, gameScreen, onHeaderMeta]);
@@ -1588,7 +1633,9 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
         if (role !== 'admin' || !roomCode) return false;
         setIsProxyMode(false);
         setProxyFor(null);
-        setGameScreen('admin_live');
+        const ph = gameState?.phase || phase;
+        if (ph === 'revealing') setGameScreen('host_prep');
+        else setGameScreen('host');
         return true;
       },
     }),
@@ -1764,7 +1811,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
   );
 
 
-  const renderStatsScreen = () => {
+  const renderStatsScreen = (opts = {}) => {
+      const embedded = opts.embedded === true;
 
       // ── هيت ماب الجولة الحالية ──
       const roundNickMap={};
@@ -1840,24 +1888,26 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       const myAccuracy = myAtks.length>0?Math.round(myHits.length/myAtks.length*100):0;
       const myRank = myPlayer ? attackerRank.findIndex(p=>p.id===myPlayer.id)+1 : 0;
 
-      // تبويبات — «التمويه» للمشرف فقط بعد انتهاء المسابقة (مثل إبقاء التفاصيل الحساسة للختام)
       const tabs = effectiveRole === 'admin'
         ? [
+            ['overview', '📊 ملخص'],
             ['nicks', '🎭 الألقاب'],
             ['names', '👥 الأسماء'],
             ['fierce', '⚔️ الأشرس'],
             ['poison', '☠️ المسموم'],
             ['remaining', '✅ المتبقون'],
             ...(phase === 'ended' && role === 'admin' ? [['decoys', '🎭 التمويه']] : []),
-            ['log', '📋 مسار اللعبة'],
+            ['log', '📍 مسار اللعبة'],
           ]
         : [
+            ['overview', '📊 ملخص'],
             ['nicks', '🎭 الألقاب'],
             ['names', '👥 الأسماء'],
             ['fierce', '⚔️ الأشرس'],
             ['poison', '☠️ المسموم'],
             ['remaining', '✅ المتبقون'],
             ['me', '👤 أنا'],
+            ['log', '📍 مسار اللعبة'],
           ];
 
       const LuxHeatBar = ({ items, maxVal }) => (
@@ -1953,11 +2003,19 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       );
 
       return(
-        <div className="scr">
-          <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setGameScreen(phase==='revealing'||phase==='ended'?'results':'attack')}>← رجوع</button>
+        <div className={embedded ? '' : 'scr'}>
+          {!embedded && (
+          <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{
+            if(phase==='ended') setGameScreen('summary');
+            else if(phase==='revealing'&&role==='admin') setGameScreen('host_prep');
+            else if(phase==='revealing') setGameScreen('results');
+            else if(phase==='attacking'&&role==='admin') setGameScreen('host');
+            else setGameScreen('attack');
+          }}>← رجوع</button>
+          )}
 
           {/* جولة الصمت — إخفاء كامل للإحصائيات للمتسابقين */}
-          {gameState?.silentPending && effectiveRole === 'player' ? (
+          {gameState?.silentPending && role === 'player' ? (
             <div style={{textAlign:'center',padding:'40px 20px'}}>
               <div style={{fontSize:48,marginBottom:12}}>🤫</div>
               <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--blue)',marginBottom:8}}>
@@ -1975,6 +2033,44 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                 onClick={()=>setStatsTab(k)}>{l}</button>
             ))}
           </div>
+
+          {statsTab !== 'log' && statsTab !== 'overview' && (
+            <div className="stats-tab-hint">
+              📈 رسوم وإحصائيات — للتفصيل جولة بجولة انتقل إلى <strong>«مسار اللعبة»</strong>
+            </div>
+          )}
+
+          {/* ══ 📊 ملخص — رسوم قبل المسار ══ */}
+          {statsTab==='overview'&&<>
+            <div className="summary-overview-grid">
+              <div className="summary-ov-cell"><div className="summary-ov-num">{allRoundsList.length}</div><div className="summary-ov-lbl">جولات</div></div>
+              <div className="summary-ov-cell"><div className="summary-ov-num">{allAttacksFlat.length}</div><div className="summary-ov-lbl">هجمات</div></div>
+              <div className="summary-ov-cell"><div className="summary-ov-num" style={{color:'var(--green)'}}>{allAttacksFlat.filter(a=>a.correct).length}</div><div className="summary-ov-lbl">إصابات</div></div>
+              <div className="summary-ov-cell"><div className="summary-ov-num">{activePlayers.length}</div><div className="summary-ov-lbl">متبقون</div></div>
+            </div>
+            {allNickSorted.length>0&&<>
+              <div className="ctitle" style={{marginBottom:8}}>🔥 أبرز الألقاب المستهدفة</div>
+              <LuxHeatBar items={allNickSorted.slice(0,6)} maxVal={allNickSorted[0]?.[1]||1}/>
+            </>}
+            {allNameSorted.length>0&&<>
+              <div className="ctitle" style={{marginTop:12,marginBottom:8}}>👥 أبرز التخمينات</div>
+              <LuxHeatBar items={allNameSorted.slice(0,6)} maxVal={allNameSorted[0]?.[1]||1}/>
+            </>}
+            {attackerRank.length>0&&<>
+              <div className="ctitle" style={{marginTop:12,marginBottom:8}}>⚔️ الأشرس (ملخص)</div>
+              {attackerRank.slice(0,4).map((p,i)=>(
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',fontSize:12}}>
+                  <span style={{fontWeight:900,color:i===0?'var(--gold)':'var(--muted)'}}>{i===0?'👑':i+1}</span>
+                  {effectiveRole==='admin'&&<Av p={p} sz={28} fs={10}/>}
+                  <span style={{flex:1,fontWeight:700,color:'var(--gold)'}}>{effectiveRole==='admin'?p.name:`"${p.nick}"`}</span>
+                  <span style={{color:'var(--green)',fontSize:11}}>{p.hits}✅</span>
+                </div>
+              ))}
+            </>}
+            {allNickSorted.length===0&&allNameSorted.length===0&&(
+              <div style={{textAlign:'center',color:'var(--muted)',padding:16,fontSize:12}}>لا بيانات كافية بعد — ستظهر مع انتهاء الجولات</div>
+            )}
+          </>}
 
           {/* ══ 🎭 الألقاب ══ */}
           {statsTab==='nicks'&&<>
@@ -2336,10 +2432,12 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             </>}
           </>}
 
-          {/* ══ 🕵️ التقرير الكامل — للمشرف فقط ══ */}
-          {statsTab==='log'&&effectiveRole==='admin'&&<>
-            <div style={{fontSize:11,color:'var(--gold)',fontWeight:700,marginBottom:12}}>🕵️ السجل الكامل — للمشرف فقط</div>
-            {renderFullLog(false)}
+          {/* ══ 📍 مسار اللعبة — جولة بجولة (آخر التبويبات) ══ */}
+          {statsTab==='log'&&<>
+            <div style={{fontSize:11,color:'var(--gold)',fontWeight:700,marginBottom:12,textAlign:'center',lineHeight:1.6}}>
+              📍 مسار المسابقة — تفصيل كل جولة بالترتيب
+            </div>
+            {renderFullLog(effectiveRole!=='admin')}
           </>}
           </>
           )}
@@ -2378,7 +2476,9 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
     downloadPDFReport,
     proxyFor,
     advanceRevealStep,
+    declareWinner,
     firebaseConnected,
+    onPrepNextRound: () => setGameScreen('host_prep'),
   };
 
   const mainEl = (() => {
@@ -2427,7 +2527,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button type="button" className="btn bg" onClick={() => void createRoom()}>
-              👑 إنشاء غرفة كمسؤول
+              👑 أنا مشرف — إنشاء غرفة
             </button>
             <button type="button" className="btn bo" onClick={() => setGameScreen('join')}>
               🎮 انضمام برمز الغرفة
@@ -2489,6 +2589,96 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       );
     }
 
+    const openHostStats = () => {
+      setStatsTab('overview');
+      setGameScreen('stats');
+    };
+
+    if (gameScreen === 'host_prep' && role === 'admin') {
+      const rem =
+        typeof gameState?.revealStats?.remainingActive === 'number'
+          ? gameState.revealStats.remainingActive
+          : activePlayers.length;
+      return (
+        <div className="scr">
+        <TitlesHostPrep
+          roundNum={roundNum}
+          playersList={playersList}
+          activePlayers={activePlayers}
+          gameState={gameState}
+          roomCode={roomCode}
+          nickMode={nickMode}
+          setNickMode={setNickMode}
+          attackDur={attackDur}
+          setAttackDur={setAttackDur}
+          specialRound={specialRound}
+          setSpecialRound={setSpecialRound}
+          poisonNick={poisonNick}
+          setPoisonNick={setPoisonNick}
+          silentRound={silentRound}
+          setSilentRound={setSilentRound}
+          remainingActive={rem}
+          onStartNextRound={nextRound}
+          onOpenStats={openHostStats}
+          setGameScreen={setGameScreen}
+        />
+        </div>
+      );
+    }
+
+    if (gameScreen === 'host' && role === 'admin') {
+      return (
+        <div className="scr">
+          <button
+            type="button"
+            className="btn bgh bsm"
+            style={{ width: 'auto', marginBottom: 8 }}
+            onClick={() => setModal({ type: 'exit_game' })}
+          >
+            ← رجوع
+          </button>
+          <TitlesHostCockpit
+            roomCode={roomCode}
+            phase={phase}
+            roundNum={roundNum}
+            players={players}
+            gameState={gameState}
+            attacks={attacks}
+            countdown={countdown}
+            nickMode={nickMode}
+            setNickMode={setNickMode}
+            attackDur={attackDur}
+            setAttackDur={setAttackDur}
+            specialRound={specialRound}
+            setSpecialRound={setSpecialRound}
+            poisonNick={poisonNick}
+            setPoisonNick={setPoisonNick}
+            silentRound={silentRound}
+            setSilentRound={setSilentRound}
+            form={form}
+            setForm={setForm}
+            onAddManualPlayer={() => addPlayer()}
+            startRound={startGameForLobby}
+            doReveal={doReveal}
+            extendTime={extendTime}
+            endGame={endGame}
+            setModal={setModal}
+            setGameScreen={setGameScreen}
+            setProxyFor={setProxyFor}
+            setIsProxyMode={setIsProxyMode}
+            setMyNick={setMyNick}
+            setMyGuess={setMyGuess}
+            setMySubmitted={setMySubmitted}
+            notify={notify}
+            allSubmitted={allSubmitted}
+            attacksPerRound={attacksPerRound}
+            onOpenStats={openHostStats}
+            onAdvanceSilentRound={advanceSilentRound}
+          />
+        </div>
+      );
+    }
+
     if (gameScreen === 'lobby') {
       return (
         <div className="scr">
@@ -2500,14 +2690,6 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           >
             ← رجوع
           </button>
-          {role === 'admin' && (
-            <div style={{ textAlign: 'center', marginBottom: 14 }}>
-              <div className="ptitle" style={{ fontSize: 18 }}>🎭 لعبة الألقاب</div>
-              <div className="psub" style={{ fontSize: 12, marginTop: 4, lineHeight: 1.55 }}>
-                لوحة المشرف — رمز الغرفة والإعدادات والمشاركون في شاشة واحدة
-              </div>
-            </div>
-          )}
           <TitlesLobby
             roomCode={roomCode}
             role={role}
@@ -2526,15 +2708,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             startRound={startGameForLobby}
             notify={notify}
             myId={myId}
-            form={role === 'admin' ? form : undefined}
-            setForm={role === 'admin' ? setForm : undefined}
-            onAddManualPlayer={role === 'admin' ? () => addPlayer() : undefined}
           />
-          {role === 'admin' && phase !== 'lobby' && (
-            <button type="button" className="btn bb" onClick={() => setGameScreen('attack')} style={{ marginBottom: 8 }}>
-              🎮 العودة للعبة
-            </button>
-          )}
         </div>
       );
     }
@@ -2576,35 +2750,24 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
       );
     }
 
-    if (gameScreen === 'admin_live') {
-      return (
-        <TitlesAdminLive
-          players={players}
-          gameState={gameState}
-          attacks={attacks}
-          allRoundsData={allRoundsData}
-          roomCode={roomCode}
-          proxyFor={proxyFor}
-          setProxyFor={setProxyFor}
-          isProxyMode={isProxyMode}
-          setIsProxyMode={setIsProxyMode}
-          countdown={countdown}
-          effectiveNickMode={effectiveNickMode}
-          doReveal={doReveal}
-          endGame={endGame}
-          setModal={setModal}
-          setGameScreen={setGameScreen}
-          notify={notify}
-          setMyNick={setMyNick}
-          setMyGuess={setMyGuess}
-          setMySubmitted={setMySubmitted}
-          attackDur={attackDur}
-        />
-      );
+    if (gameScreen === 'results') {
+      return <TitlesResults {...sharedProps} />;
     }
 
-    if (gameScreen === 'results' || gameScreen === 'winner') {
-      return <TitlesResults {...sharedProps} />;
+    if (gameScreen === 'summary') {
+      return (
+        <TitlesGameSummary
+          role={role}
+          players={players}
+          gameState={gameState}
+          allRoundsData={allRoundsData}
+          renderStatsPanel={(opts) => renderStatsScreen(opts)}
+          downloadPDFReport={downloadPDFReport}
+          setTab={setTab}
+          setSelectedGame={setSelectedGame}
+          onCreateAccount={() => setTab('account')}
+        />
+      );
     }
 
     if (gameScreen === 'stats') {

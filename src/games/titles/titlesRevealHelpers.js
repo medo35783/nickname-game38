@@ -35,8 +35,10 @@ export function multiArrowAnnounce(count, targetNick) {
   return '';
 }
 
+import { sortRevealQueueBySilentRound } from './silentRoundHelpers';
+
 export function buildRevealQueue(exitList) {
-  return (exitList || [])
+  const items = (exitList || [])
     .filter((ex) => !ex.inactive)
     .map((ex) => {
       const attackers = uniqueAttackerNicks(
@@ -54,6 +56,7 @@ export function buildRevealQueue(exitList) {
       item.arrowCount = arrowCountOnNick(item);
       return item;
     });
+  return sortRevealQueueBySilentRound(items);
 }
 
 /** سينكشف لقب واحد / لقبان / N ألقاب — صياغة صحيحة مع العدد */

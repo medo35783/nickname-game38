@@ -474,9 +474,10 @@ export default function App() {
             setEndGameData(null);
           }}
           onTryFree={() => {
-            notify('🎁 التجربة المجانية مُفعّلة!', 'success');
             setShowEndGamePrompt(false);
             setEndGameData(null);
+            setTab('account');
+            notify('📝 أنشئ حسابك لتصبح مشرف مسابقة', 'gold');
           }}
           onNewGame={() => {
             setShowEndGamePrompt(false);

@@ -298,8 +298,8 @@ export default function EndGameJoinPrompt({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" className="btn bv bsm" style={{ width: '100%' }} onClick={onTryFree}>
-            🎁 جرّب مجاناً
+          <button type="button" className="btn bg" style={{ width: '100%' }} onClick={onTryFree}>
+            📝 إنشاء حساب — كن مشرفاً
           </button>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" className="btn bgh bsm" style={{ flex: 1, minWidth: 120 }} onClick={onClose}>
