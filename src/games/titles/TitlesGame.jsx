@@ -9,7 +9,19 @@ import TitlesSetup from './TitlesSetup';
 import TitlesLobby from './TitlesLobby';
 import TitlesPlay from './TitlesPlay';
 import TitlesResults from './TitlesResults';
-import { buildRevealQueue } from './titlesRevealHelpers';
+import {
+  buildRevealQueue,
+  attacksForPlayer,
+  attackableNicksForPlayer,
+  hiddenNickForPlayer,
+  isDualTitleFullyRevealed,
+  isDecoyRequired,
+  nickRevealedThisRound,
+  playerSubmittedAttack,
+  playersAfterReveal,
+  remainingTitlesCount,
+  shouldEndGameByRemainingTitles,
+} from './titlesRevealHelpers';
 import {
   buildSilentSnapshot,
   mergeSilentPending,
@@ -20,42 +32,8 @@ import TitlesHostCockpit from './host/TitlesHostCockpit';
 import TitlesHostPrep from './host/TitlesHostPrep';
 import TitlesGameSummary from './TitlesGameSummary';
 import { buildRoundAlert } from './roundAlertHelpers';
-
-// شاشة الترحيب (Onboarding)
-function OnboardingScreen({ role, onDismiss }) {
-  const steps = role === 'admin' ? [
-    { icon: '👥', text: 'أضف المتسابقين أو دعهم ينضمون برمز الغرفة' },
-    { icon: '⏱️', text: 'حدد وقت الجولة وفعّل الخيارات الخاصة' },
-    { icon: '🔓', text: 'اكشف النتائج واعلن الفائز بنهاية المسابقة' }
-  ] : [
-    { icon: '🎭', text: 'اختر لقباً سرياً لا يمت بصلة لاهتماماتك' },
-    { icon: '⚔️', text: 'هاجم الألقاب وخمّن أصحابها قبل أن يكشفوك' },
-    { icon: '🏆', text: 'آخر لاعب باقٍ = الفائز!' }
-  ];
-
-  return (
-    <div className="onb-bg">
-      <div className="onb-card">
-        <div className="onb-icon">{role === 'admin' ? '👑' : '🎮'}</div>
-        <div className="onb-title">{role === 'admin' ? 'دليل المشرف' : 'دليل المتسابق'}</div>
-        <div className="onb-sub">
-          {role === 'admin' 
-            ? 'أنت مشرف المسابقة — تحكم بالغرفة والجولات!' 
-            : 'استعد للمنافسة — أخفِ هويتك واكشف الآخرين!'}
-        </div>
-        {steps.map((step, i) => (
-          <div key={i} className="onb-step">
-            <span className="onb-step-num">{i + 1}</span>
-            <span className="onb-step-text">{step.icon} {step.text}</span>
-          </div>
-        ))}
-        <button className="btn bg mt3" onClick={onDismiss}>
-          ✅ فهمت، لنبدأ!
-        </button>
-      </div>
-    </div>
-  );
-}
+import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
+import TitlesGuideModal from './TitlesGuideModal';
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
   { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
@@ -66,6 +44,26 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [sessionGate, setSessionGate] = useState('checking');
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
+  const pendingOnboardingRef = useRef(null);
+
+  useEffect(() => {
+    if (!canCreateRoom || pendingOnboardingRef.current !== 'admin') return;
+    pendingOnboardingRef.current = null;
+    setShowOnboarding('admin');
+  }, [canCreateRoom]);
+
+  const handleAdminEntry = () => {
+    if (!canCreateRoom) {
+      pendingOnboardingRef.current = 'admin';
+      onRequestActivation();
+      return;
+    }
+    setShowOnboarding('admin');
+  };
+
+  const handlePlayerEntry = () => {
+    setShowOnboarding('player');
+  };
 
   const [role, setRole] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -78,7 +76,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [joinNick, setJoinNick] = useState('');
   const [joinNick2, setJoinNick2] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
-  const [roomNickMode, setRoomNickMode] = useState(1);
+  const [joinPreviewNickMode, setJoinPreviewNickMode] = useState(1);
+  const [joinPreviewLoading, setJoinPreviewLoading] = useState(false);
 
   const [gameState, setGameState] = useState(null);
   const [players, setPlayers] = useState({});
@@ -99,7 +98,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [statsTab, setStatsTab] = useState('overview');
   const [heatmapView, setHeatmapView] = useState('nicks');
 
-  const [guideRole, setGuideRole] = useState('player');
   const [countdown, setCountdown] = useState(null);
   const [firebaseConnected, setFirebaseConnected] = useState(true);
 
@@ -148,14 +146,23 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   // allSubmitted: كل لاعب نشط أكمل عدد هجماته المطلوب
   const playerAttackCounts = {};
   attacksList.forEach(a=>{if(a.attackerNick)playerAttackCounts[a.attackerNick]=(playerAttackCounts[a.attackerNick]||0)+1;});
-  const allSubmitted = activePlayers.length > 0 && activePlayers.every(p=>{
-    const nicks=[p.nick,p.nick2].filter(Boolean);
-    const done=nicks.reduce((sum,n)=>sum+(playerAttackCounts[n]||0),0);
-    return done>=attacksPerRound;
+  const allSubmitted = activePlayers.length > 0 && activePlayers.every((p) => {
+    const done = attacksForPlayer(attacks, {
+      playerId: p.id,
+      nicks: [p.nick, p.nick2].filter(Boolean),
+    }).length;
+    return done >= attacksPerRound;
   });
   // هل المتسابق الحالي أتم هجماته؟ — نحسب من Firebase لا من state محلي
-  // هل أتممت هجماتي؟ — بناء على Firebase مباشرة
-  const myDoneCount = attacksList.filter(a=>a.attackerNick===myNickLocal).length;
+  const myPlayerForDone = myId ? playersList.find((p) => p.id === myId) : null;
+  const myAttackNicks = myPlayerForDone
+    ? [myPlayerForDone.nick, myPlayerForDone.nick2].filter(Boolean)
+    : [myNickLocal].filter(Boolean);
+  const myDoneCount = attacksList.filter(
+    (a) =>
+      myAttackNicks.includes(a.attackerNick) ||
+      (myId && a.attackerPlayerId === myId)
+  ).length;
   const myAttacksDone = myNickLocal ? myDoneCount >= attacksPerRound : false;
   const allRoundsList= Object.values(allRoundsData||{}).sort((a,b)=>a.round-b.round);
   const allAttacksFlat = allRoundsList.flatMap(r=>Object.values(r.attacks||{}));
@@ -461,15 +468,29 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       const normalizedExisting = existingNicks.map(normalizeName);
       if(normalizedExisting.includes(normalizeName(joinNick))){setJoinErr(`⚠️ اللقب "${joinNick.trim()}" سبقك أحد عليه — اختر لقباً مختلفاً`);return;}
       // Validate nick2 if nickMode=2
-      if(roomNickMode===2){
-        if(!joinNick2.trim()){setJoinErr('أدخل لقبك الثاني');setJoinLoading(false);return;}
-        if(normalizedExisting.includes(normalizeName(joinNick2))){setJoinErr('اللقب الثاني سبقك أحد عليه — اختر لقباً آخر');setJoinLoading(false);return;}
-        if(normalizeName(joinNick)===normalizeName(joinNick2)){setJoinErr('اللقبان يجب أن يختلفا');setJoinLoading(false);return;}
+      const roomNickMode = Number(data.game?.nickMode) || 1;
+      if (roomNickMode === 2) {
+        if (!joinNick2.trim()) {
+          setJoinErr('أدخل لقبك الثاني');
+          setJoinLoading(false);
+          return;
+        }
+        if (normalizedExisting.includes(normalizeName(joinNick2))) {
+          setJoinErr('اللقب الثاني سبقك أحد عليه — اختر لقباً آخر');
+          setJoinLoading(false);
+          return;
+        }
+        if (normalizeName(joinNick) === normalizeName(joinNick2)) {
+          setJoinErr('اللقبان يجب أن يختلفا');
+          setJoinLoading(false);
+          return;
+        }
       }
       const newRef = push(playersRef(joinInput));
       await set(newRef, {
-        name:joinName.trim(), nick:joinNick.trim(),
-        nick2: roomNickMode===2 ? joinNick2.trim() : null,
+        name: joinName.trim(),
+        nick: joinNick.trim(),
+        nick2: roomNickMode === 2 ? joinNick2.trim() : null,
         initials:mkInitials(joinName.trim()),
         colorIdx: existingPlayers.length % AV_COLORS.length,
         status:'active', missedRounds:0,
@@ -498,7 +519,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     const dl = Date.now() + totalMs();
     const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
     const allNicks = shuffle([
-      ...playersList.flatMap(p=>[p.nick,p.nick2].filter(Boolean)),
+      ...playersList.flatMap((p) => attackableNicksForPlayer(p)),
       ...decoyNicks,
     ]);
     const allNames = shuffle(playersList.map(p=>p.id));
@@ -549,6 +570,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const startGame = async () => {
     const minPlayers = nickMode===2 ? 4 : 6;
     if(activePlayers.length<minPlayers){notify(`يلزم ${minPlayers} لاعبين على الأقل`,'error');return;}
+    const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
+    if (isDecoyRequired(nickMode) && decoyNicks.length === 0) {
+      notify('⚠️ وضع اللقبين يشترط إضافة لقب تمويه واحد على الأقل قبل البدء', 'error');
+      return;
+    }
     // احفظ nickMode في Firebase عشان المتسابقين يعرفون
     await update(gameRef(roomCode), { nickMode });
     await launchRound(1);
@@ -660,7 +686,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const doReveal = async () => {
     if(phase!=='attacking') return;
     const currentAttacks = Object.values(attacks||{});
-    const notSent = activePlayers.filter(p=>!currentAttacks.some(a=>a.attackerNick===p.nick));
+    const notSent = activePlayers.filter((p) => !playerSubmittedAttack(currentAttacks, p));
     if(notSent.length>0 && !modal){
       setModal({type:'confirm_reveal', notSent});
       return;
@@ -721,7 +747,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
 
     const silentAppliedIds = new Set();
-    if (pendingSilent?.silentExits?.length > 0 || pendingSilent?.silentMissed?.length > 0) {
+    if (
+      pendingSilent?.silentExits?.length > 0 ||
+      pendingSilent?.silentMissed?.length > 0 ||
+      pendingSilent?.silentPartialReveals?.length > 0
+    ) {
       applySilentPendingToReveal(pendingSilent, playersList, updates, exitList, roomCode);
       (pendingSilent.silentExits || []).forEach((ex) => silentAppliedIds.add(ex.playerId));
     }
@@ -738,25 +768,34 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         const attackers = [...new Set(hits.map((h) => h.attackerNick).filter(Boolean))];
         const eliminatedByStr = attackers.join(' + ');
 
-        // لقبان: تحقق إذا تم كشف كلا اللقبين
-        if(p.nick2){
-          const hitNicks = hits.map((h) => h.targetNick);
-          const nick1Hit = hitNicks.includes(p.nick);
-          const nick2Hit = hitNicks.includes(p.nick2);
-          if(!nick1Hit||!nick2Hit){
-            // لقب واحد فقط كُشف — اللاعب يبقى لكن نضع علامة
-            const revealedNick = nick1Hit ? p.nick : p.nick2;
-            updates[`rooms/${roomCode}/players/${p.id}/revealedNick`]=revealedNick;
-            exitList.push({
-              nick:revealedNick, name:null, partial:true, eliminatedBy:eliminatedByStr,
-              attackers:[...new Set(hits.filter((h) => h.targetNick === revealedNick).map((h) => h.attackerNick))],
-              hits, initials:p.initials, colorIdx:p.colorIdx,
-            });
-            continue; // لا يخرج
-          }
+        // لقبان: يخرج فقط إذا كُشف اللقبان (هذه الجولة أو جولة سابقة)
+        if (p.nick2 && !isDualTitleFullyRevealed(p, hits)) {
+          const justRevealed = nickRevealedThisRound(p, hits);
+          if (!justRevealed) continue;
+          updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = justRevealed;
+          const hiddenNick = hiddenNickForPlayer(p, hits);
+          exitList.push({
+            nick: justRevealed,
+            nick2: hiddenNick,
+            name: null,
+            partial: true,
+            eliminatedBy: eliminatedByStr,
+            attackers: [
+              ...new Set(
+                hits
+                  .filter((h) => h.targetNick === justRevealed)
+                  .map((h) => h.attackerNick)
+              ),
+            ],
+            hits,
+            initials: p.initials,
+            colorIdx: p.colorIdx,
+          });
+          continue;
         }
 
-        updates[`rooms/${roomCode}/players/${p.id}/status`]='eliminated';
+        updates[`rooms/${roomCode}/players/${p.id}/status`] = 'eliminated';
+        updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = null;
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedBy`]=eliminatedByStr;
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedByList`]=attackers;
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`]=roundNum;
@@ -765,9 +804,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           eliminatedBy:eliminatedByStr, attackers, hits,
           initials:p.initials, colorIdx:p.colorIdx
         });
-      } else if(p.status==='active'){
-        const submitted = currentAttacks.some(a=>a.attackerNick===p.nick);
-        const nm = submitted ? 0 : (p.missedRounds||0)+1;
+      } else if (p.status === 'active') {
+        const submitted = playerSubmittedAttack(currentAttacks, p);
+        const nm = submitted ? 0 : (p.missedRounds || 0) + 1;
         updates[`rooms/${roomCode}/players/${p.id}/missedRounds`]=nm;
         // المعاقب بالمسموم لا يُطرد بالخمول
         if(nm>=2 && !p.isBannedNextRound){
@@ -782,15 +821,28 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (!updates[`rooms/${roomCode}/rounds/${roundKey}`]) {
       updates[`rooms/${roomCode}/rounds/${roundKey}`] = { round: roundNum, attacks: attacks || {}, endedAt: Date.now() };
     }
-    const willLeave = new Set(elimIds);
-    silentAppliedIds.forEach((id) => willLeave.add(id));
-    exitList.filter((ex) => ex.inactive).forEach((ex) => {
-      const p = playersList.find((pl) => pl.nick === ex.nick);
-      if (p) willLeave.add(p.id);
-    });
-    const remainingAfter = playersList.filter((p) => p.status === 'active' && !willLeave.has(p.id)).length;
-    /** مشهد الفائز فقط عند بقاء لاعب واحد أو اثنين — لا يُعلَن الفائز إذا بقي 3+ */
-    const gameEndsAfterReveal = remainingAfter >= 1 && remainingAfter <= 2;
+    const leavingIds = new Set([...silentAppliedIds]);
+    for (const p of playersList) {
+      if (silentAppliedIds.has(p.id)) continue;
+      if (elimIds.has(p.id)) {
+        const hits = correctHitsFor(p.id);
+        if (!p.nick2 || isDualTitleFullyRevealed(p, hits)) {
+          leavingIds.add(p.id);
+        }
+      }
+    }
+    exitList
+      .filter((ex) => ex.inactive)
+      .forEach((ex) => {
+        const p = playersList.find((pl) => pl.nick === ex.nick);
+        if (p) leavingIds.add(p.id);
+      });
+    const roomPath = `rooms/${roomCode}`;
+    const postRevealPlayers = playersAfterReveal(playersList, updates, leavingIds, roomPath);
+    const remainingTitles = remainingTitlesCount(postRevealPlayers);
+    const remainingPlayers = postRevealPlayers.filter((p) => p.status === 'active').length;
+    /** مشهد الفائز عند بقاء لقب أو لقبين فقط في الساحة */
+    const gameEndsAfterReveal = shouldEndGameByRemainingTitles(postRevealPlayers);
     const revealQueue = buildRevealQueue(exitList);
     const correctN = currentAttacks.filter((a) => a.correct).length;
 
@@ -804,7 +856,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       attacks: currentAttacks.length,
       correct: correctN,
       wrong: currentAttacks.length - correctN,
-      remainingActive: remainingAfter,
+      remainingTitles,
+      remainingActive: remainingPlayers,
     };
 
     await update(ref(db), sanitizeForFirebase(updates));
@@ -864,12 +917,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   /* ══ ADMIN: NEXT ROUND ══ */
   const nextRound = async () => {
-    const still = playersList.filter((p) => p.status === 'active');
-    if (still.length <= 2) {
+    const titlesLeft = remainingTitlesCount(playersList);
+    if (titlesLeft <= 2) {
       notify(
-        still.length === 0
-          ? '🏁 لا يوجد لاعبون نشطون — انتهت المسابقة'
-          : `🏁 بقي ${still.length} لاعبين نشطين فقط — انتهت المسابقة حسب القواعد`,
+        titlesLeft === 0
+          ? '🏁 لا يوجد ألقاب متبقية — انتهت المسابقة'
+          : `🏁 بقي ${titlesLeft === 1 ? 'لقب واحد' : 'لقبان'} فقط — انتهت المسابقة حسب القواعد`,
         'gold'
       );
       await update(gameRef(roomCode), { phase: 'ended' });
@@ -1463,6 +1516,32 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
   }, []);
 
   useEffect(() => {
+    if (gameScreen !== 'join' || joinInput.length !== 4) {
+      setJoinPreviewNickMode(1);
+      setJoinPreviewLoading(false);
+      return undefined;
+    }
+    setJoinPreviewLoading(true);
+    const gRef = gameRef(joinInput);
+    const unsub = onValue(
+      gRef,
+      (snap) => {
+        setJoinPreviewNickMode(Number(snap.val()?.nickMode) || 1);
+        setJoinPreviewLoading(false);
+      },
+      () => {
+        setJoinPreviewNickMode(1);
+        setJoinPreviewLoading(false);
+      }
+    );
+    return () => off(gRef);
+  }, [gameScreen, joinInput]);
+
+  useEffect(() => {
+    if (joinPreviewNickMode !== 2) setJoinNick2('');
+  }, [joinPreviewNickMode]);
+
+  useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === 'visible' && roomCode) {
         get(gameRef(roomCode)).catch(() => {});
@@ -1670,89 +1749,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
 
 
     {/* ══ TUTORIAL MODAL ══ */}
-    {modal?.type==='guide'&&(
-      <div className="mbg" style={{alignItems:'flex-start',paddingTop:16,overflowY:'auto'}}>
-        <div style={{background:'var(--card)',border:'1.5px solid var(--border)',borderRadius:16,padding:20,maxWidth:430,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
-
-          {/* Header + close */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-            <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--gold)'}}>📖 دليل لعبة الألقاب</div>
-            <button className="btn bgh bxs" onClick={()=>setModal(null)}>✕</button>
-          </div>
-
-          {/* Role toggle */}
-          <div className="role-toggle" style={{marginBottom:16}}>
-            <button className={`role-btn ${guideRole==='player'?'active':''}`} onClick={()=>setGuideRole('player')}>
-              🎮 أنا متسابق
-            </button>
-            <button className={`role-btn ${guideRole==='admin'?'active':''}`} onClick={()=>setGuideRole('admin')}>
-              👑 أنا المشرف
-            </button>
-          </div>
-
-          {/* ══ متسابق ══ */}
-          {guideRole==='player'&&<>
-            {[
-              {n:1, title:'ادخل رمز الغرفة وسجّل بياناتك', desc:'المشرف يرسل رمزاً من 4 أرقام. أدخله واكتب اسمك ولقبك السري.', tip:'اختر لقباً لا يمت بصلة لاهتماماتك — يجعل كشفك أصعب!'},
-              {n:2, title:'انتظر في غرفة الانتظار', desc:'لقبك مخفي تماماً. انتظر حتى يبدأ المشرف اللعبة — ستنتقل تلقائياً.'},
-              {n:3, title:'شاشة الهجوم', desc:'لوحة الألقاب فوق + قائمة الأسماء تحت. اختر لقباً تعرف صاحبه ثم اختر الاسم واضغط تأكيد.', tip:'الكل يهاجم في نفس الوقت سراً — لا أحد يرى هجومك!'},
-              {n:4, title:'كشف النتائج', desc:'المشرف يقرر متى تُكشف. النتائج تظهر للجميع في نفس اللحظة — اضغط البطاقات لتكشف الهوية!'},
-            ].map(s=>(
-              <div key={s.n} className="step-card" style={{marginBottom:9}}>
-                <div className="step-num">{s.n}</div>
-                <div className="step-body">
-                  <div className="step-title">{s.title}</div>
-                  <div className="step-desc">{s.desc}</div>
-                  {s.tip&&<div className="step-tip">💡 {s.tip}</div>}
-                </div>
-              </div>
-            ))}
-
-            <div style={{marginTop:4,marginBottom:12,fontSize:12,color:'var(--gold)',fontWeight:700}}>⚠️ قوانين مهمة</div>
-            {[
-              ['❌','جولتان بدون هجوم = خروج صامت بدون كشف لقبك'],
-              ['🚫','التعاون ممنوع — المشرف يراقب'],
-              ['🔄','لو خرجت عن طريق الخطأ — أدخل نفس البيانات للرجوع'],
-              ['🏆','الهدف: ابقَ آخر لاعب دون أن يُكشف لقبك'],
-            ].map(([ic,tx],i)=>(
-              <div key={i} className="rule-row">{ic} <span>{tx}</span></div>
-            ))}
-          </>}
-
-          {/* ══ مشرف ══ */}
-          {guideRole==='admin'&&<>
-            {[
-              {n:1, title:'أنشئ الغرفة', desc:'اضغط "إنشاء غرفة كمسؤول". أرسل الرمز الظاهر للمتسابقين أو أضفهم يدوياً.'},
-              {n:2, title:'حدّد الإعدادات', desc:'عدد الألقاب (1 أو 2) ومدة كل جولة. الحد الأدنى 5 دقائق — لا حد أقصى.', tip:'رحلة 3 أيام؟ اجعل كل جولة 2-6 ساعات'},
-              {n:3, title:'ابدأ اللعبة', desc:'بعد 6 لاعبين على الأقل، اضغط "بدء اللعبة". الجميع ينتقلون تلقائياً.'},
-              {n:4, title:'راقب من زر 👑 تحكم', desc:'ترى من أرسل هجومه، السجل السري، وتمديد الوقت والهجوم بالنيابة.'},
-              {n:5, title:'كشف النتائج', desc:'اضغط "كشف نتائج الجولة" متى أردت. النتائج تظهر للجميع معاً.', tip:'⚠️ "إنهاء المسابقة كاملاً" يختلف عن "كشف نتائج الجولة" — الأول لا رجعة فيه!'},
-            ].map(s=>(
-              <div key={s.n} className="step-card" style={{marginBottom:9}}>
-                <div className="step-num">{s.n}</div>
-                <div className="step-body">
-                  <div className="step-title">{s.title}</div>
-                  <div className="step-desc">{s.desc}</div>
-                  {s.tip&&<div className="step-tip">💡 {s.tip}</div>}
-                </div>
-              </div>
-            ))}
-
-            <div style={{marginTop:4,marginBottom:12,fontSize:12,color:'var(--gold)',fontWeight:700}}>🎲 أدوات الإثارة</div>
-            {[
-              ['☠️','اللقب المسموم — من يهاجمه ويخطئ يخسر جولة'],
-              ['🤫','جولة الصمت — النتائج مخفية حتى تقرر أنت'],
-              ['🎮','هجوم بالنيابة — إذا لاعب جواله أُغلق'],
-              ['🚫','إخراج للغش — إذا رأيت تعاوناً مشبوهاً'],
-            ].map(([ic,tx],i)=>(
-              <div key={i} className="rule-row">{ic} <span>{tx}</span></div>
-            ))}
-          </>}
-
-          <button className="btn bg" style={{marginTop:16}} onClick={()=>setModal(null)}>✅ فهمت!</button>
-        </div>
-      </div>
-    )}
+    {modal?.type === 'guide' && <TitlesGuideModal onClose={() => setModal(null)} />}
 
     {modal?.type==='exit_game'&&(
       <div className="mbg"><div className="modal">
@@ -2484,7 +2481,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
   const mainEl = (() => {
     if (showOnboarding) {
       return (
-        <OnboardingScreen
+        <QuickOnboarding
+          game="titles"
           role={showOnboarding}
           onDismiss={() => {
             const r = showOnboarding;
@@ -2526,10 +2524,10 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             <div className="psub">أخفِ هويتك • الكل يهاجم معاً • اكشف الهويات</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button type="button" className="btn bg" onClick={() => void createRoom()}>
+            <button type="button" className="btn bg" onClick={handleAdminEntry}>
               👑 أنا مشرف — إنشاء غرفة
             </button>
-            <button type="button" className="btn bo" onClick={() => setGameScreen('join')}>
+            <button type="button" className="btn bo" onClick={handlePlayerEntry}>
               🎮 انضمام برمز الغرفة
             </button>
           </div>
@@ -2581,10 +2579,9 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           joinNick2={joinNick2}
           setJoinNick2={setJoinNick2}
           joinLoading={joinLoading}
-          nickMode={nickMode}
+          joinRoomNickMode={joinPreviewNickMode}
+          joinRoomModeLoading={joinPreviewLoading}
           joinRoom={joinRoom}
-          notify={notify}
-          canCreateRoom={canCreateRoom}
         />
       );
     }
@@ -2595,10 +2592,10 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
     };
 
     if (gameScreen === 'host_prep' && role === 'admin') {
-      const rem =
-        typeof gameState?.revealStats?.remainingActive === 'number'
-          ? gameState.revealStats.remainingActive
-          : activePlayers.length;
+      const remTitles =
+        typeof gameState?.revealStats?.remainingTitles === 'number'
+          ? gameState.revealStats.remainingTitles
+          : remainingTitlesCount(playersList);
       return (
         <div className="scr">
         <TitlesHostPrep
@@ -2617,7 +2614,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           setPoisonNick={setPoisonNick}
           silentRound={silentRound}
           setSilentRound={setSilentRound}
-          remainingActive={rem}
+          remainingTitles={remTitles}
           onStartNextRound={nextRound}
           onOpenStats={openHostStats}
           setGameScreen={setGameScreen}

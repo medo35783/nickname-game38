@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react';
-import { get, roomRef } from '../../core/firebaseHelpers';
+import {
+  ROOM_CODE_PLACEHOLDER,
+  PLAYER_DISPLAY_NAME_PLACEHOLDER,
+  PLAYER_NICK_PLACEHOLDER,
+  PLAYER_NICK2_PLACEHOLDER,
+  PLAYER_NICK_HINT_SINGLE,
+  PLAYER_NICK_HINT_FIRST,
+  PLAYER_NICK_HINT_SECOND,
+} from '../../core/formLabels';
 
 export default function TitlesSetup(props) {
   const {
@@ -16,130 +23,128 @@ export default function TitlesSetup(props) {
     joinNick2,
     setJoinNick2,
     joinLoading,
-    nickMode,
+    joinRoomNickMode,
+    joinRoomModeLoading,
     joinRoom,
-    notify,
-    canCreateRoom,
   } = props;
 
-  const [joinRoomNickMode, setJoinRoomNickMode] = useState(1);
+  const isDualMode = joinRoomNickMode === 2;
+  const roomReady = joinInput.length === 4 && !joinRoomModeLoading;
 
-  useEffect(() => {
-    if (gameScreen !== 'join') setJoinRoomNickMode(1);
-  }, [gameScreen]);
+  if (gameScreen !== 'join') return null;
 
-  if (gameScreen === 'join') {
-    return (
-      <div className="scr">
-        <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
-          ← رجوع
-        </button>
-        <div className="ptitle">انضمام للعبة</div>
-        <div className="psub">أدخل رمز الغرفة المرسل من المشرف</div>
-        {canCreateRoom && (
-          <div
-            style={{
-              marginBottom: 12,
-              padding: '9px 12px',
-              background: 'rgba(240,192,64,.08)',
-              border: '1px solid rgba(240,192,64,.22)',
-              borderRadius: 10,
-              fontSize: 11,
-              color: 'var(--muted)',
-              lineHeight: 1.55,
+  return (
+    <div className="scr">
+      <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
+        ← رجوع
+      </button>
+      <div className="ptitle">انضمام للعبة</div>
+      <div className="psub">
+        {isDualMode && roomReady
+          ? 'رمز الغرفة + اسمك + لقبان سريان (وضع اللقبين)'
+          : 'رمز الغرفة (4 أرقام) + اسمك ولقبك السري'}
+      </div>
+      <div className="card">
+        <div className="ig">
+          <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
+          <input
+            className={`inp big${joinErr ? ' err-b' : ''}`}
+            placeholder={ROOM_CODE_PLACEHOLDER}
+            maxLength={4}
+            value={joinInput}
+            onChange={(e) => {
+              setJoinInput(e.target.value.replace(/\D/g, ''));
+              setJoinErr('');
             }}
-          >
-            👑 لتكون مشرف الغرفة: انقر «إنشاء غرفة» من القائمة الرئيسية؛ هذه الشاشة مخصّصة للاعبين. بعد إنشاء الغرفة على هذا الجهاز يمكنك وضع الرمز هنا أيضاً لتفتح لوحة المشرف.
-          </div>
-        )}
-        <div className="card">
-          <div className="ig">
-            <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
-            <input
-              className={`inp big${joinErr ? 'err-b' : ''}`}
-              placeholder="× × × × × ×"
-              maxLength={4}
-              value={joinInput}
-              onChange={async (e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                setJoinInput(val);
-                setJoinErr('');
-                if (val.length === 4) {
-                  try {
-                    const s = await get(roomRef(val));
-                    if (s.exists()) setJoinRoomNickMode(s.val()?.game?.nickMode || 1);
-                  } catch (err) {
-                    void err;
-                  }
-                } else setJoinRoomNickMode(1);
-              }}
-            />
-          </div>
-        </div>
-        <div className="card">
-          <div className="ctitle">👤 بياناتك</div>
-          <div className="ig">
-            <label className="lbl">اسمك الكامل</label>
-            <input className="inp" placeholder="محمد عبدالله" value={joinName} onChange={(e) => setJoinName(e.target.value)} />
-          </div>
-          <div className="ig">
-            <label className="lbl">{nickMode === 2 ? 'لقبك الأول' : 'لقبك الذي اخترته'}</label>
-            <input className="inp" placeholder="القناص" value={joinNick} onChange={(e) => setJoinNick(e.target.value)} />
-          </div>
-          {joinRoomNickMode === 2 && (
-            <div className="ig">
-              <label className="lbl">لقبك الثاني</label>
-              <input className="inp" placeholder="الصقر" value={joinNick2} onChange={(e) => setJoinNick2(e.target.value)} />
-            </div>
+          />
+          {joinInput.length === 4 && joinRoomModeLoading && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>⏳ جاري التحقق من إعدادات الغرفة…</div>
           )}
-          {joinRoomNickMode === 2 && (
+          {roomReady && isDualMode && (
             <div
               style={{
+                marginTop: 8,
                 background: 'rgba(79,163,224,.08)',
                 border: '1px solid rgba(79,163,224,.25)',
                 borderRadius: 8,
                 padding: '7px 12px',
                 fontSize: 11,
                 color: 'var(--blue)',
-                marginBottom: 6,
               }}
             >
-              ℹ️ هذه اللعبة تستخدم نظام اللقبين
+              🎭 هذه الغرفة بوضع <strong>لقبان</strong> — أدخل لقبين مختلفين
             </div>
           )}
-          <div
-            style={{
-              background: 'rgba(240,192,64,.06)',
-              border: '1px solid rgba(240,192,64,.2)',
-              borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 11,
-              color: 'var(--muted)',
-            }}
-          >
-            💡 اختر لقب{joinRoomNickMode === 2 ? 'ين لا يمتان' : 'اً لا يمت'} بصلة لاهتماماتك!
-          </div>
-          <div
-            style={{
-              marginTop: 8,
-              background: 'rgba(79,163,224,.06)',
-              border: '1px solid rgba(79,163,224,.2)',
-              borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 11,
-              color: 'var(--muted)',
-            }}
-          >
-            🔄 إذا خرجت من اللعبة عن طريق الخطأ، أدخل نفس البيانات للرجوع
-          </div>
-          {joinErr && <div className="err-msg">⚠️ {joinErr}</div>}
         </div>
-        <button type="button" className="btn bg" onClick={joinRoom} disabled={joinLoading}>
-          {joinLoading ? '⏳ جارٍ الانضمام...' : `🚀 انضمام`}
-        </button>
       </div>
-    );
-  }
-
-  return null;
+      <div className="card">
+        <div className="ctitle">👤 بياناتك</div>
+        <div className="ig">
+          <label className="lbl">اسمك</label>
+          <input
+            className="inp"
+            placeholder={PLAYER_DISPLAY_NAME_PLACEHOLDER}
+            value={joinName}
+            onChange={(e) => setJoinName(e.target.value)}
+          />
+        </div>
+        <div className="ig">
+          <label className="lbl">{isDualMode ? '🎭 لقبك الأول' : '🎭 لقبك السري'}</label>
+          <input
+            className="inp"
+            placeholder={PLAYER_NICK_PLACEHOLDER}
+            value={joinNick}
+            onChange={(e) => setJoinNick(e.target.value)}
+            disabled={joinInput.length === 4 && joinRoomModeLoading}
+          />
+          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+            {isDualMode ? PLAYER_NICK_HINT_FIRST : PLAYER_NICK_HINT_SINGLE}
+          </div>
+        </div>
+        {isDualMode && roomReady && (
+          <div className="ig">
+            <label className="lbl">🎭 لقبك الثاني</label>
+            <input
+              className="inp"
+              placeholder={PLAYER_NICK2_PLACEHOLDER}
+              value={joinNick2}
+              onChange={(e) => setJoinNick2(e.target.value)}
+            />
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+              {PLAYER_NICK_HINT_SECOND}
+            </div>
+          </div>
+        )}
+        <div
+          style={{
+            background: 'rgba(240,192,64,.06)',
+            border: '1px solid rgba(240,192,64,.2)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 11,
+            color: 'var(--muted)',
+          }}
+        >
+          💡 اختر {isDualMode ? 'لقبين لا يمتان' : 'لقباً لا يمت'} بصلة لاهتماماتك!
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            background: 'rgba(79,163,224,.06)',
+            border: '1px solid rgba(79,163,224,.2)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 11,
+            color: 'var(--muted)',
+          }}
+        >
+          🔄 إذا خرجت من اللعبة عن طريق الخطأ، أدخل نفس البيانات للرجوع
+        </div>
+        {joinErr && <div className="err-msg">⚠️ {joinErr}</div>}
+      </div>
+      <button type="button" className="btn bg" onClick={joinRoom} disabled={joinLoading || (joinInput.length === 4 && joinRoomModeLoading)}>
+        {joinLoading ? '⏳ جارٍ الانضمام...' : '🚀 انضمام'}
+      </button>
+    </div>
+  );
 }

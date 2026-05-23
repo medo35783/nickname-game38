@@ -2,6 +2,15 @@ import { useState } from 'react';
 import Av from '../../shared/Av';
 import { fmtMs } from '../../core/helpers';
 import { db, ref, set, update, gameRef } from '../../core/firebaseHelpers';
+import {
+  PLAYER_DISPLAY_NAME_PLACEHOLDER,
+  PLAYER_NICK_PLACEHOLDER,
+  PLAYER_NICK2_PLACEHOLDER,
+  DECOY_NICK_PLACEHOLDER,
+  PLAYER_NICK_HINT_FIRST,
+  PLAYER_NICK_HINT_SECOND,
+} from '../../core/formLabels';
+import { isDecoyRequired } from './titlesRevealHelpers';
 
 export default function TitlesLobby(props) {
   const {
@@ -130,7 +139,9 @@ export default function TitlesLobby(props) {
     Math.max((Number(attackDur.h) * 3600 + Number(attackDur.m) * 60 + Number(attackDur.s)) * 1000, 5 * 60 * 1000);
 
   const minPlayers = nickMode === 2 ? 4 : 6;
-  const canStart = activePlayers.length >= minPlayers;
+  const needsDecoy = isDecoyRequired(nickMode);
+  const hasDecoy = decoyNicks.length > 0;
+  const canStart = activePlayers.length >= minPlayers && (!needsDecoy || hasDecoy);
 
   return (
     <>
@@ -303,7 +314,7 @@ export default function TitlesLobby(props) {
           <input
             className="inp"
             style={{ flex: 1, fontSize: 12, padding: '6px 10px' }}
-            placeholder="مثلاً: الشبح، النمر..."
+            placeholder={DECOY_NICK_PLACEHOLDER}
             value={decoyInput}
             onChange={(e) => setDecoyInput(e.target.value)}
             onKeyDown={(e) => {
@@ -442,42 +453,52 @@ export default function TitlesLobby(props) {
       </button>
       <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginBottom: 12, lineHeight: 1.55 }}>
         الحد الأدنى للبدء: <strong style={{ color: 'var(--gold)' }}>{minPlayers} لاعبين نشطين</strong>
-        {nickMode === 2 ? ' (وضع لقبان)' : ' (وضع لقب واحد)'}
+        {nickMode === 2 ? ' (وضع لقبان — تمويه إلزامي)' : ' (وضع لقب واحد)'}
         {activePlayers.length < minPlayers && playersList.length > 0
-          ? ` — يتبقى ${minPlayers - activePlayers.length}`
-          : ''}
+          ? ` — يتبقى ${minPlayers - activePlayers.length} لاعبين`
+          : needsDecoy && !hasDecoy
+            ? ' — أضف لقب تمويه واحد على الأقل'
+            : ''}
       </div>
 
       {isAdmin && form && setForm && onAddManualPlayer && (
         <div className="card">
           <div className="ctitle">➕ إضافة لاعب يدوياً</div>
           <div className="ig">
-            <label className="lbl">الاسم الكامل</label>
+            <label className="lbl">اسم اللاعب</label>
             <input
               className="inp"
-              placeholder="محمد عبدالله"
+              placeholder={PLAYER_DISPLAY_NAME_PLACEHOLDER}
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
           <div className="ig">
-            <label className="lbl">اللقب {nickMode === 2 ? 'الأول' : ''}</label>
+            <label className="lbl">🎭 اللقب {nickMode === 2 ? 'الأول' : ''}</label>
             <input
               className="inp"
-              placeholder="القناص"
+              placeholder={PLAYER_NICK_PLACEHOLDER}
               value={form.nick}
               onChange={(e) => setForm((f) => ({ ...f, nick: e.target.value }))}
             />
+            {nickMode === 2 && (
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+                {PLAYER_NICK_HINT_FIRST}
+              </div>
+            )}
           </div>
           {nickMode === 2 && (
             <div className="ig">
-              <label className="lbl">اللقب الثاني</label>
+              <label className="lbl">🎭 اللقب الثاني</label>
               <input
                 className="inp"
-                placeholder="الصقر"
+                placeholder={PLAYER_NICK2_PLACEHOLDER}
                 value={form.nick2}
                 onChange={(e) => setForm((f) => ({ ...f, nick2: e.target.value }))}
               />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+                {PLAYER_NICK_HINT_SECOND}
+              </div>
             </div>
           )}
           <button type="button" className="btn bg" onClick={() => void onAddManualPlayer()}>

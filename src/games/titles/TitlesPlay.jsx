@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Av from '../../shared/Av';
 import LiveConnectionBar from './LiveConnectionBar';
 import TitlesPlayCockpitShell from './play/TitlesPlayCockpitShell';
-import { attacksForPlayer, countAttackProgress } from './titlesRevealHelpers';
+import { attacksForPlayer, countAttackProgress, attackableNicksForPlayer } from './titlesRevealHelpers';
 import { roundAlertMessages } from './roundAlertHelpers';
 
 /** شاشة الهجوم للمتسابق — كابينة + ويزارد خطوتين + انتظار حي. */
@@ -66,13 +66,18 @@ export default function TitlesPlay(props) {
   const activeNicks =
     roundOrder.nicks?.length > 0
       ? roundOrder.nicks
-      : playersList.filter((p) => p.status === 'active').flatMap((p) => [p.nick, p.nick2].filter(Boolean));
+      : playersList.flatMap((p) => attackableNicksForPlayer(p));
 
   const effectivePlayer = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
   const myNicksList = effectivePlayer ? [effectivePlayer.nick, effectivePlayer.nick2].filter(Boolean) : [];
 
   const displayNicks = [...new Set([...activeNicks, ...inactiveNicks])];
-  const visibleNicks = displayNicks.filter((n) => !myNicksList.includes(n));
+  const visibleNicks = displayNicks.filter((n) => {
+    if (myNicksList.includes(n)) return false;
+    const owner = playersList.find((p) => p.nick === n || p.nick2 === n);
+    if (owner?.revealedNick === n) return false;
+    return true;
+  });
 
   const myPlayerId =
     proxyPlayer?.id || myId || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal)?.id;

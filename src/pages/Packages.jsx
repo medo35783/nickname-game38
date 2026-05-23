@@ -1,32 +1,118 @@
 import { SUPPORT_EMAIL } from '../core/constants';
+import {
+  SUBSCRIPTION_PACKAGES,
+  SUBSCRIPTION_FEATURES,
+  savingsPercent
+} from '../core/subscriptionPackages';
+import PackagePlanBadges, { badgesForPackage } from '../components/codes/PackagePlanBadges';
 
-const PLANS = [
-  { cls: 'plan-super', badge: { bg: 'var(--purple)', c: '#fff', label: '⭐ الأشهر' }, name: 'سوبر 🚀', nameColor: 'var(--purple)', feats: '✦ لاعبون غير محدودون\n✦ جلسات متزامنة متعددة\n✦ تقارير تفصيلية كاملة\n✦ دعم أولوية 24/7\n✦ جميع مميزات الذهبي والفضي' },
-  { cls: 'plan-gold', badge: { bg: 'var(--gold)', c: '#07070f', label: '🏆 ذهبي' }, name: 'ذهبي ✨', nameColor: 'var(--gold)', feats: '✦ حتى 50 لاعب\n✦ إحصائيات متقدمة\n✦ سجل تاريخ الجلسات\n✦ ألقاب وأيقونات مخصصة' },
-  { cls: 'plan-silver', badge: { bg: 'rgba(200,200,220,.4)', c: 'var(--text)', label: '🥈 فضي' }, name: 'فضي', nameColor: 'rgba(210,210,230,.9)', feats: '✦ حتى 20 لاعب\n✦ إحصائيات أساسية\n✦ غرفة واحدة نشطة' },
-];
+/**
+ * @param {object} props
+ * @param {(pkg: import('../core/subscriptionPackages').SubscriptionPackage) => void} [props.onSubscribe]
+ */
+export default function Packages({ onSubscribe }) {
+  const handleSubscribe = (pkg) => {
+    if (onSubscribe) {
+      onSubscribe(pkg);
+      return;
+    }
+    const subject = encodeURIComponent(`اشتراك ${pkg.durationLabel} — لعبة الألقاب`);
+    const body = encodeURIComponent(
+      `أرغب بالاشتراك في باقة ${pkg.durationLabel} (${pkg.price} ريال).\n\nالاسم:\nرقم الجوال:`
+    );
+    window.open(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`, '_blank');
+  };
 
-export default function Packages() {
+  const openCodes = () => {
+    window.dispatchEvent(new CustomEvent('pfcc-open-code-activation'));
+  };
+
   return (
-    <div className="scr">
+    <div className="scr packages-scr">
       <div className="ptitle">💎 باقات الاشتراك</div>
-      <div className="psub">اشتراك شهري أو سنوي — الأسعار تُعلن قريباً</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>{['شهري', 'سنوي (وفّر 20%)'].map((t, i) => <button key={t} className={`btn ${i === 1 ? 'bo' : 'bgh'}`} style={{ flex: 1 }}>{t}</button>)}</div>
-      {PLANS.map((p, i) => (
-        <div key={i} className={`plan-card ${p.cls}`}>
-          <div className="plan-badge" style={{ background: p.badge.bg, color: p.badge.c }}>{p.badge.label}</div>
-          <div className="plan-name" style={{ color: p.nameColor }}>{p.name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 6px' }}>
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>السعر:</span>
-            <span style={{ background: 'rgba(255,255,255,.08)', color: 'var(--muted)', padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>يُعلن قريباً</span>
+      <p className="psub" style={{ marginBottom: 14 }}>
+        اشترِ بالأيام — بدون التزام شهري. كل الباقات تشمل نفس المميزات.
+      </p>
+
+      <div className="pkg-launch-banner card ann ag">
+        <div className="pkg-launch-icon">🎉</div>
+        <div className="pkg-launch-title">أسعار إطلاق ترحيبية</div>
+        <p className="pkg-launch-sub">
+          تسعير تجريبي للمستخدمين الأوائل — لفترة محدودة وقد يُحدَّث لاحقاً دون إشعار مسبق.
+        </p>
+        <span className="tag tv pkg-launch-tag">عرض المؤسسين</span>
+      </div>
+
+      <div className="card2 pkg-features-block">
+        {SUBSCRIPTION_FEATURES.map((line) => (
+          <div key={line} className="pkg-feature-line">
+            {line}
           </div>
-          <div className="plan-feat">{p.feats.split('\n').map((f, j) => <div key={j}>{f}</div>)}</div>
+        ))}
+      </div>
+
+      <div className="ctitle" style={{ marginBottom: 10, justifyContent: 'center' }}>
+        اختر مدة الاشتراك
+      </div>
+
+      <div className="pkg-cards-col">
+        {SUBSCRIPTION_PACKAGES.map((pkg) => {
+          const save = savingsPercent(pkg.days, pkg.price);
+          const perDay = (pkg.price / pkg.days).toFixed(1);
+
+          return (
+            <div
+              key={pkg.id}
+              className={`plan-card ${pkg.planClass} pkg-plan-card`}
+              style={pkg.cardStyle}
+            >
+              <PackagePlanBadges badges={badgesForPackage(pkg)} />
+
+              <div className="pkg-plan-head">
+                <span className="pkg-plan-icon">{pkg.icon}</span>
+                <div className="plan-name">{pkg.durationLabel}</div>
+                <div className="pkg-days-pill">{pkg.days} {pkg.days === 1 ? 'يوم' : 'أيام'}</div>
+                <div className="pkg-price-row">
+                  <span className="pkg-price-num">{pkg.price}</span>
+                  <span className="pkg-price-currency">ريال</span>
+                </div>
+                <div className="pkg-per-day">≈ {perDay} ريال / يوم</div>
+                {save != null && save > 0 ? (
+                  <div className="tag tv pkg-save-tag">وفر {save}% مقارنة باليومي</div>
+                ) : (
+                  <div className="tag tm pkg-save-tag">بداية ممتازة للتجربة</div>
+                )}
+              </div>
+
+              <ul className="pkg-feat-list">
+                {pkg.feats.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+
+              <button type="button" className="btn bg" onClick={() => handleSubscribe(pkg)}>
+                🛒 اشترك — {pkg.durationLabel}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card pkg-trust-card">
+        <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
+        <div className="pkg-trust-title">دفع آمن وتفعيل فوري</div>
+        <p className="psub" style={{ marginBottom: 0, fontSize: 12 }}>
+          لا نخزّن بيانات بطاقتك. التفعيل يتم عبر كود اشتراك بعد إتمام الدفع.
+        </p>
+      </div>
+
+      <div className="card2 pkg-code-hint" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>
+          لديك كود اشتراك؟
         </div>
-      ))}
-      <div className="card" style={{ textAlign: 'center', padding: '14px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>🎉 سجّل اهتمامك الآن</div>
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>كن أول من يعرف عند إطلاق الأسعار</div>
-        <button className="btn bg bsm" style={{ width: 'auto', margin: '0 auto' }} onClick={() => window.open(`mailto:${SUPPORT_EMAIL}?subject=أريد الاشتراك — لعبة الألقاب&body=أرجو إشعاري عند إطلاق الباقات`)}>📧 أبلغني عند الإطلاق</button>
+        <button type="button" className="btn bo bsm" onClick={openCodes}>
+          🔑 تفعيل الكود
+        </button>
       </div>
     </div>
   );

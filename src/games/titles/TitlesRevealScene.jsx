@@ -3,6 +3,7 @@ import Av from '../../shared/Av';
 import {
   attacksForPlayer,
   arrowCountOnNick,
+  attackableNicksForPlayer,
   multiArrowAnnounce,
   revealAdminQueueHint,
   revealNickCountPhrase,
@@ -41,8 +42,10 @@ export default function TitlesRevealScene(props) {
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
   const activePoisonNick = gameState?.poisonNick || '';
-  const remainingActive =
-    typeof stats.remainingActive === 'number' ? stats.remainingActive : activePlayers.length;
+  const remainingTitles =
+    typeof stats.remainingTitles === 'number'
+      ? stats.remainingTitles
+      : activePlayers.reduce((sum, p) => sum + attackableNicksForPlayer(p).length, 0);
 
   const me = playersList.find((p) => p.id === myId);
   const myNicks = me ? [me.nick, me.nick2].filter(Boolean) : [myNickLocal].filter(Boolean);
@@ -112,7 +115,8 @@ export default function TitlesRevealScene(props) {
 
         {endGameAfterReveal && (
           <TrsBanner icon="🏆" color="var(--gold)">
-            بعد إعلان الخروج — مشهد الفائز ({remainingActive === 1 ? 'متبقٍ واحد' : 'متبقيان'})
+            بعد إعلان الخروج — مشهد الفائز (
+            {remainingTitles === 1 ? 'متبقٍ لقب واحد' : 'متبقيان لقبان'})
           </TrsBanner>
         )}
 
@@ -246,10 +250,12 @@ export default function TitlesRevealScene(props) {
         <TrsCard accent="gold">
           <div className="trs-section-lbl">🏁 النهاية قريبة</div>
           <div className="snum" style={{ color: 'var(--green)', fontSize: 32 }}>
-            {remainingActive}
+            {remainingTitles}
           </div>
           <div className="slbl">
-            {remainingActive === 1 ? 'متبقٍ — جاهز لإعلان الفائز' : 'متبقيان — جاهزون لإعلان الفائز'}
+            {remainingTitles === 1
+              ? 'لقب متبقٍ — جاهز لإعلان الفائز'
+              : 'لقبان متبقيان — جاهزون لإعلان الفائز'}
           </div>
         </TrsCard>
 
@@ -284,8 +290,7 @@ export default function TitlesRevealScene(props) {
                 <Av p={w} sz={64} fs={20} />
                 <div className="trs-winner-name">{w.name}</div>
                 <div className="trs-winner-nick">
-                  &quot;{w.nick}&quot;
-                  {w.nick2 ? <span> · &quot;{w.nick2}&quot;</span> : ''}
+                  {attackableNicksForPlayer(w).map((n) => `"${n}"`).join(' · ')}
                 </div>
               </div>
             ))}
@@ -338,11 +343,11 @@ export default function TitlesRevealScene(props) {
         )}
 
         <TrsCard>
-          <div className="trs-section-lbl">👥 ما زال في اللعبة</div>
+          <div className="trs-section-lbl">🎭 ألقاب ما زالت في الساحة</div>
           <div className="snum" style={{ color: 'var(--green)', fontSize: 32 }}>
-            {remainingActive}
+            {remainingTitles}
           </div>
-          <div className="slbl">لاعب نشط</div>
+          <div className="slbl">{remainingTitles === 1 ? 'لقب متبقٍ' : 'ألقاب متبقية'}</div>
         </TrsCard>
 
         {activePoisonNick && poisoned.length > 0 && (

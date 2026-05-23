@@ -1,5 +1,12 @@
 /** مساعدات جولة الصمت — تخزين مؤقت ثم إعلان مجمّع بفصل حسب رقم الجولة. */
 
+import {
+  hiddenNickForPlayer,
+  isDualTitleFullyRevealed,
+  nickRevealedThisRound,
+  playerSubmittedAttack,
+} from './titlesRevealHelpers';
+
 /** Firebase يرفض undefined — نُزيلها أو نُبقي الحقول الاختيارية فقط عند وجود قيمة */
 export function sanitizeForFirebase(value) {
   if (value === undefined) return null;
@@ -38,23 +45,35 @@ export function buildSilentSnapshot(attacks, playersList, roundNum) {
     }
   });
 
-  const silentExits = (playersList || [])
-    .filter((p) => seenIds.has(p.id))
-    .map((p) => silentExitFromPlayer(p, elimAtt, roundNum));
+  const silentExits = [];
+  const silentPartialReveals = [];
+
+  (playersList || []).forEach((p) => {
+    if (!seenIds.has(p.id)) return;
+    const hits = currentAtks.filter((a) => a.correct && a.realOwnerId === p.id);
+    if (p.nick2 && !isDualTitleFullyRevealed(p, hits)) {
+      const justRevealed = nickRevealedThisRound(p, hits);
+      if (justRevealed) {
+        silentPartialReveals.push({ playerId: p.id, revealedNick: justRevealed, roundNum });
+      }
+      return;
+    }
+    silentExits.push(silentExitFromPlayer(p, elimAtt, roundNum));
+  });
 
   const silentMissed = (playersList || [])
-    .filter((p) => p.status === 'active' && !currentAtks.some((a) => a.attackerNick === p.nick))
+    .filter((p) => p.status === 'active' && !playerSubmittedAttack(currentAtks, p))
     .map((p) => ({
       playerId: p.id,
       missedRounds: (p.missedRounds || 0) + 1,
       roundNum,
     }));
 
-  return { silentExits, silentMissed, roundNum };
+  return { silentExits, silentMissed, silentPartialReveals, roundNum };
 }
 
 export function mergeSilentPending(prev, snapshot) {
-  const base = prev || { silentExits: [], silentMissed: [] };
+  const base = prev || { silentExits: [], silentMissed: [], silentPartialReveals: [] };
   const roundNums = new Set([
     ...(base.roundNums || []),
     ...(base.silentExits || []).map((e) => e.roundNum),
@@ -63,6 +82,10 @@ export function mergeSilentPending(prev, snapshot) {
   return sanitizeForFirebase({
     silentExits: [...(base.silentExits || []), ...(snapshot.silentExits || [])],
     silentMissed: [...(base.silentMissed || []), ...(snapshot.silentMissed || [])],
+    silentPartialReveals: [
+      ...(base.silentPartialReveals || []),
+      ...(snapshot.silentPartialReveals || []),
+    ],
     roundNums: [...roundNums].filter((n) => n != null).sort((a, b) => a - b),
     lastRoundNum: snapshot.roundNum,
   });
@@ -70,7 +93,33 @@ export function mergeSilentPending(prev, snapshot) {
 
 /** يدمج كل خروج/خمول صامت في قائمة الكشف — كل خروج يحمل fromSilentRound */
 export function applySilentPendingToReveal(pendingSilent, playersList, updates, exitList, roomCode) {
-  if (!pendingSilent?.silentExits?.length && !pendingSilent?.silentMissed?.length) return;
+  if (
+    !pendingSilent?.silentExits?.length &&
+    !pendingSilent?.silentMissed?.length &&
+    !pendingSilent?.silentPartialReveals?.length
+  ) {
+    return;
+  }
+
+  (pendingSilent.silentPartialReveals || []).forEach((pr) => {
+    const p = playersList.find((pl) => pl.id === pr.playerId);
+    if (p && p.status === 'active' && pr.revealedNick) {
+      updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = pr.revealedNick;
+      const patched = { ...p, revealedNick: pr.revealedNick };
+      exitList.push({
+        nick: pr.revealedNick,
+        nick2: hiddenNickForPlayer(patched, []),
+        name: null,
+        partial: true,
+        eliminatedBy: '',
+        attackers: [],
+        hits: [],
+        initials: p.initials,
+        colorIdx: p.colorIdx,
+        fromSilentRound: pr.roundNum,
+      });
+    }
+  });
 
   (pendingSilent.silentExits || []).forEach((ex) => {
     const p = playersList.find((pl) => pl.id === ex.playerId);

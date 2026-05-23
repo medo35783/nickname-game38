@@ -5,12 +5,10 @@ import { auth, db } from '../../firebase';
 import { ref, onValue as onDbValue } from 'firebase/database';
 import { adminProfileExistsForUid, createCode, codesRef, ensureCodeIndexesFromRows, formatCodeForDisplay } from '../../firebaseHelpers';
 
+import { ADMIN_PACKAGE_OPTIONS } from '../../core/subscriptionPackages';
+
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
-const PACKAGES = [
-  { id: 'p1', duration: 1, price: 15, labelShort: '1 يوم', labelPrice: '15ر' },
-  { id: 'p3', duration: 3, price: 35, labelShort: '3 أيام', labelPrice: '35ر' },
-  { id: 'p7', duration: 7, price: 50, labelShort: '7 أيام', labelPrice: '50ر' },
-];
+const PACKAGES = ADMIN_PACKAGE_OPTIONS;
 
 /**
  * الحالة الفعلية للعرض والإحصاء (نشط لكن انتهت المدة → منتهي)

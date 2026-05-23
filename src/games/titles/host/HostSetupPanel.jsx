@@ -2,6 +2,7 @@ import { update, gameRef } from '../../../core/firebaseHelpers';
 import { fmtMs } from '../../../core/helpers';
 import { silentPendingSummary } from '../silentRoundHelpers';
 import HostToolsPanel from './HostToolsPanel';
+import { DECOY_NICK_PLACEHOLDER } from '../../../core/formLabels';
 
 /**
  * إعداد + أدوات — تبويب واحد للمشرف (قبل وبعد بدء المسابقة).
@@ -134,13 +135,15 @@ export default function HostSetupPanel({
         >
           <div className="ctitle">③ ألقاب التمويه (قبل أول جولة)</div>
           <div style={{ fontSize: 11, color: 'var(--gold)', marginBottom: 8, lineHeight: 1.55 }}>
-            أضفها قبل أول جولة فقط
+            {nickMode === 2
+              ? 'إلزامي في وضع اللقبين — يُضاف قبل أول جولة فقط'
+              : 'اختياري — يُضاف قبل أول جولة فقط'}
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <input
               className="inp"
               style={{ flex: 1, fontSize: 12 }}
-              placeholder="مثلاً: الشبح..."
+              placeholder={DECOY_NICK_PLACEHOLDER}
               value={decoyInput}
               onChange={(e) => setDecoyInput(e.target.value)}
               onKeyDown={(e) => {

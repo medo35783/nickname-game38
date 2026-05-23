@@ -3,7 +3,9 @@ import Av from '../../../shared/Av';
 import { fmtMs } from '../../../core/helpers';
 import { ref, set, update, db, gameRef } from '../../../core/firebaseHelpers';
 import { silentPendingSummary } from '../silentRoundHelpers';
+import { isDecoyRequired } from '../titlesRevealHelpers';
 import HostSetupPanel from './HostSetupPanel';
+import { PLAYER_DISPLAY_NAME_PLACEHOLDER, PLAYER_NICK_PLACEHOLDER } from '../../../core/formLabels';
 
 const HOST_TABS = [
   { id: 'players', icon: '👥', label: 'لاعبون' },
@@ -78,7 +80,9 @@ export default function TitlesHostCockpit(props) {
   const canEditDecoys = phase === 'lobby' && (roundNum || 0) === 0;
 
   const minPlayers = nickMode === 2 ? 4 : 6;
-  const canStart = activePlayers.length >= minPlayers;
+  const needsDecoy = isDecoyRequired(nickMode);
+  const hasDecoy = decoyNicks.length > 0;
+  const canStart = activePlayers.length >= minPlayers && (!needsDecoy || hasDecoy);
 
   const totalMs = () =>
     Math.max((Number(attackDur.h) * 3600 + Number(attackDur.m) * 60 + Number(attackDur.s)) * 1000, 5 * 60 * 1000);
@@ -97,7 +101,8 @@ export default function TitlesHostCockpit(props) {
   const setupStep = (() => {
     if (phase !== 'lobby') return null;
     if (activePlayers.length < minPlayers) return 2;
-    if (canEditDecoys && decoyNicks.length === 0) return 3;
+    if (canEditDecoys && needsDecoy && !hasDecoy) return 3;
+    if (canEditDecoys && !needsDecoy && decoyNicks.length === 0) return 3;
     return 4;
   })();
 
@@ -128,7 +133,12 @@ export default function TitlesHostCockpit(props) {
   };
 
   const handleStartRound = () => {
-    if (phase === 'lobby' && canEditDecoys && decoyNicks.length === 0) {
+    if (phase === 'lobby' && needsDecoy && !hasDecoy) {
+      notify('⚠️ وضع اللقبين يشترط لقب تمويه واحد على الأقل — أضفه من تبويب الإعداد', 'error');
+      setHostTab('setup');
+      return;
+    }
+    if (phase === 'lobby' && canEditDecoys && !needsDecoy && decoyNicks.length === 0) {
       setDecoyAskOpen(true);
       return;
     }
@@ -157,8 +167,12 @@ export default function TitlesHostCockpit(props) {
         disabled: !canStart,
         onClick: handleStartRound,
         hint: canStart
-          ? 'تأكد من أدوات الجولة في تبويب «أدوات» إن رغبت'
-          : `تحتاج ${minPlayers - activePlayers.length} لاعبين نشطين`,
+          ? needsDecoy
+            ? 'تمويه مفعّل — جاهز للبدء'
+            : 'تأكد من أدوات الجولة في تبويب «أدوات» إن رغبت'
+          : activePlayers.length < minPlayers
+            ? `تحتاج ${minPlayers - activePlayers.length} لاعبين نشطين`
+            : 'أضف لقب تمويه واحد على الأقل (وضع اللقبين)',
       };
     }
     if (phase === 'attacking') {
@@ -416,7 +430,7 @@ export default function TitlesHostCockpit(props) {
                   <label className="lbl">الاسم</label>
                   <input
                     className="inp"
-                    placeholder="محمد"
+                    placeholder={PLAYER_DISPLAY_NAME_PLACEHOLDER}
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   />
@@ -425,7 +439,7 @@ export default function TitlesHostCockpit(props) {
                   <label className="lbl">اللقب{nickMode === 2 ? ' الأول' : ''}</label>
                   <input
                     className="inp"
-                    placeholder="القناص"
+                    placeholder={PLAYER_NICK_PLACEHOLDER}
                     value={form.nick}
                     onChange={(e) => setForm((f) => ({ ...f, nick: e.target.value }))}
                   />
@@ -559,9 +573,19 @@ export default function TitlesHostCockpit(props) {
               ألقاب التمويه؟
             </div>
             <div className="msub" style={{ lineHeight: 1.75 }}>
-              التمويه <strong>اختياري</strong> لكنه يزيد فرص التخمين ويُضاف <strong>قبل أول جولة فقط</strong>.
-              <br />
-              هل تريد إضافة ألقاب وهمية قبل البدء؟
+              {needsDecoy ? (
+                <>
+                  وضع <strong>اللقبين</strong> يشترط <strong>لقب تمويه واحد على الأقل</strong> — يُضاف قبل أول جولة فقط.
+                  <br />
+                  أضف تمويهاً من تبويب الإعداد ثم ابدأ.
+                </>
+              ) : (
+                <>
+                  التمويه <strong>اختياري</strong> لكنه يزيد فرص التخمين ويُضاف <strong>قبل أول جولة فقط</strong>.
+                  <br />
+                  هل تريد إضافة ألقاب وهمية قبل البدء؟
+                </>
+              )}
             </div>
             <button
               type="button"
@@ -572,19 +596,21 @@ export default function TitlesHostCockpit(props) {
                 setHostTab('setup');
               }}
             >
-              ➕ نعم — أضيف تمويه الآن
+              ➕ {needsDecoy ? 'إضافة تمويه (مطلوب)' : 'نعم — أضيف تمويه الآن'}
             </button>
-            <button
-              type="button"
-              className="btn bo"
-              style={{ width: '100%', marginBottom: 8 }}
-              onClick={() => {
-                setDecoyAskOpen(false);
-                void startRound();
-              }}
-            >
-              🚀 لا — ابدأ بدون تمويه
-            </button>
+            {!needsDecoy && (
+              <button
+                type="button"
+                className="btn bo"
+                style={{ width: '100%', marginBottom: 8 }}
+                onClick={() => {
+                  setDecoyAskOpen(false);
+                  void startRound();
+                }}
+              >
+                🚀 لا — ابدأ بدون تمويه
+              </button>
+            )}
             <button type="button" className="btn bgh bsm" style={{ width: '100%' }} onClick={() => setDecoyAskOpen(false)}>
               إلغاء
             </button>

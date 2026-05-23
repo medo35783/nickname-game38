@@ -17,13 +17,13 @@ export default function TitlesHostPrep({
   setPoisonNick,
   silentRound,
   setSilentRound,
-  remainingActive,
+  remainingTitles,
   onStartNextRound,
   onOpenStats,
   setGameScreen,
 }) {
   const nextRn = roundNum + 1;
-  const canStart = remainingActive > 2;
+  const canStart = remainingTitles > 2;
 
   return (
     <div className="host-prep-scr">
@@ -36,7 +36,8 @@ export default function TitlesHostPrep({
           <div className="host-crown-title">⚗️ تجهيز الجولة {nextRn}</div>
           <div className="host-crown-sub">
             اختر المدة والأدوات ثم اضغط الزر الذهبي بالأسفل — يبقى{' '}
-            <strong style={{ color: 'var(--green)' }}>{remainingActive}</strong> لاعبين نشطين
+            <strong style={{ color: 'var(--green)' }}>{remainingTitles}</strong>{' '}
+            {remainingTitles === 1 ? 'لقب' : 'ألقاب'} في الساحة
           </div>
         </div>
 
@@ -73,7 +74,7 @@ export default function TitlesHostPrep({
       <div className="host-prep-fab-bar">
         {!canStart && (
           <div style={{ fontSize: 11, color: 'var(--gold)', textAlign: 'center', marginBottom: 8, lineHeight: 1.5 }}>
-            بقي {remainingActive} لاعبين — القواعد تعتبر المسابقة منتهية
+            بقي {remainingTitles === 1 ? 'لقب واحد' : `${remainingTitles} ألقاب`} — القواعد تعتبر المسابقة منتهية
           </div>
         )}
         <button

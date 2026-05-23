@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import Av from '../../shared/Av';
 import { fmtMs, shuffle } from '../../core/helpers';
 import { db, ref, set, update, gameRef } from '../../core/firebaseHelpers';
+import { attackableNicksForPlayer, remainingTitlesCount } from '../titlesRevealHelpers';
 
 /**
  * شاشة تحكم المشرف أثناء اللعب (مكافئ gameScreen === 'admin_live' في App).
@@ -90,7 +91,7 @@ export default function TitlesAdminLive(props) {
     const dl = Date.now() + totalMs();
     const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
     const allNicks = shuffle([
-      ...playersList.flatMap((p) => [p.nick, p.nick2].filter(Boolean)),
+      ...playersList.flatMap((p) => attackableNicksForPlayer(p)),
       ...decoyNicks,
     ]);
     const allNames = shuffle(playersList.map((p) => p.id));
@@ -122,8 +123,8 @@ export default function TitlesAdminLive(props) {
   };
 
   const nextRound = async () => {
-    const still = playersList.filter((p) => p.status === 'active');
-    if (still.length <= 2) {
+    const titlesLeft = remainingTitlesCount(playersList);
+    if (titlesLeft <= 2) {
       await update(gameRef(roomCode), { phase: 'ended' });
       return;
     }

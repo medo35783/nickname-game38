@@ -27,3 +27,10 @@ export const Q_WEAPONS = [
 export const Q_TOTAL = 100;
 
 export const SUPPORT_EMAIL = 'nicknameGame.support@gmail.com';
+
+/** واتساب الدعم — الرابط wa.me يستخدم 966 بدون الصفر الأول */
+export const SUPPORT_WHATSAPP = '0539999010';
+export const SUPPORT_WHATSAPP_URL = 'https://wa.me/966539999010';
+
+/** اسم المنصة المؤقت حتى اعتماد براند نهائي */
+export const PLATFORM_NAME = 'ساحة الألعاب';

@@ -1,10 +1,16 @@
 import { useEffect } from 'react';
+import {
+  SUBSCRIPTION_PACKAGES,
+  SUBSCRIPTION_FEATURES,
+  savingsPercent
+} from '../../core/subscriptionPackages';
+import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
 
 /**
  * شاشة بعد انتهاء اللعبة للمتسابقين غير المشتركين — دعوة للاشتراك والباقات.
  *
  * @typedef {{ rank?: number; hits?: number; accuracy?: number; time?: string | number }} PlayerStats
- * @typedef {{ id: string; icon: string; durationLabel: string; price: number; days: number; badge?: string | null; planClass: string; feats: string[]; popular?: boolean; best?: boolean; cardStyle?: object }} SubscriptionPackage
+ * @typedef {import('../../core/subscriptionPackages').SubscriptionPackage} SubscriptionPackage
  *
  * @param {object} props
  * @param {string} props.winner
@@ -14,22 +20,9 @@ import { useEffect } from 'react';
  * @param {() => void} props.onTryFree
  * @param {() => void} [props.onNewGame] — إن لم يُمرَّر، يُستدعى `onClose` عند «لعبة جديدة»
  */
-const SUB_FEATURES = [
-  '✅ إنشاء غرف غير محدودة',
-  '✅ كن المشرف وتحكم باللعبة',
-  '✅ حفظ إحصائياتك وإنجازاتك',
-  '✅ أولوية في الميزات الجديدة'
-];
 
-const DAY_PRICE_REF = 19;
-
-/** @returns {number | null} */
-function savingsPercent(days, price) {
-  if (days <= 1) return null;
-  const ref = days * DAY_PRICE_REF;
-  if (ref <= 0) return null;
-  return Math.round(((ref - price) / ref) * 100);
-}
+const SUB_FEATURES = SUBSCRIPTION_FEATURES;
+const PACKAGES = SUBSCRIPTION_PACKAGES;
 
 function formatTimeDisplay(time) {
   if (time == null || time === '') return '—';
@@ -41,50 +34,6 @@ function formatTimeDisplay(time) {
   if (m <= 0) return `${sec}ث`;
   return `${m}د ${sec}ث`;
 }
-
-const PACKAGES = [
-  {
-    id: '1d',
-    icon: '🌟',
-    durationLabel: 'يوم واحد',
-    price: 19,
-    days: 1,
-    planClass: 'plan-silver',
-    badge: null,
-    cardStyle: { transform: 'none' },
-    feats: ['وصول كامل طوال المدة', 'تفعيل فوري بعد الدفع', 'دعم عبر التطبيق']
-  },
-  {
-    id: '3d',
-    icon: '⭐',
-    durationLabel: '3 أيام',
-    price: 38,
-    days: 3,
-    planClass: 'plan-gold',
-    badge: 'الأشهر',
-    popular: true,
-    cardStyle: {
-      boxShadow: '0 0 0 2px rgba(240, 192, 64, 0.45), 0 12px 40px rgba(240, 192, 64, 0.12)',
-      transform: 'scale(1.02)'
-    },
-    feats: ['أفضل توازن سعر ومدة', 'مثالي لعطلة نهاية الأسبوع', 'غرف غير محدودة', 'تحكم كامل كمشرف']
-  },
-  {
-    id: '7d',
-    icon: '💎',
-    durationLabel: '7 أيام',
-    price: 57,
-    days: 7,
-    planClass: 'plan-super',
-    badge: 'الأفضل',
-    best: true,
-    cardStyle: {
-      boxShadow: '0 0 0 2px rgba(155, 89, 182, 0.55), 0 14px 44px rgba(155, 89, 182, 0.18)',
-      transform: 'scale(1.03)'
-    },
-    feats: ['أقصى وفر مقارنة باليومي', 'أسبوع كامل مع أصدقائك', 'إحصائيات وإنجازات محفوظة', 'أولوية في الميزات الجديدة']
-  }
-];
 
 export default function EndGameJoinPrompt({
   winner,
@@ -228,18 +177,7 @@ export default function EndGameJoinPrompt({
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                 }}
               >
-                {pkg.badge ? (
-                  <span
-                    className="plan-badge badge"
-                    style={
-                      pkg.best
-                        ? { background: 'rgba(155, 89, 182, 0.25)', color: '#e8d4ff', border: '1px solid rgba(155, 89, 182, 0.55)', right: 10, left: 'auto' }
-                        : { background: 'rgba(240, 192, 64, 0.2)', color: 'var(--gold)', border: '1px solid rgba(240, 192, 64, 0.45)', right: 10, left: 'auto' }
-                    }
-                  >
-                    {pkg.badge}
-                  </span>
-                ) : null}
+                <PackagePlanBadges badges={badgesForPackage(pkg)} />
                 <div style={{ textAlign: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 40, lineHeight: 1, display: 'block' }}>{pkg.icon}</span>
                   <div className="plan-name" style={{ marginTop: 6 }}>

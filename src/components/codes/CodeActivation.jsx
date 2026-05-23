@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { activateCode, normalizeSubscriptionCode, formatCodeForDisplay } from '../../firebaseHelpers';
 import { auth } from '../../firebase';
+import { PLATFORM_NAME } from '../../core/constants';
 
 /** بصمة جهاز بسيطة: userAgent + أبعاد الشاشة → base64 (آمن لمسار RTDB) */
 function buildDeviceInfo() {
@@ -102,7 +103,7 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack }) 
       ) : null}
       <div style={{ textAlign: 'center', padding: '12px 0 14px' }}>
         <div className="ptitle" style={{ fontSize: 22 }}>
-          🎮 مرحباً بك في PFCC!
+          🎮 مرحباً بك في {PLATFORM_NAME}!
         </div>
         <p className="psub" style={{ marginBottom: 14 }}>
           أدخل كود الاشتراك (6 أحرف) — لا يتطلب تسجيل بريد

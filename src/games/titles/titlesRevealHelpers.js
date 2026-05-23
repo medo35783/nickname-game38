@@ -1,5 +1,88 @@
 /** مساعدات كشف النتائج المتزامن (المشرف يضغط متابعة — الجميع يرون نفس المشهد). */
 
+/** هل أرسل اللاعب هجوماً هذه الجولة؟ (هوية واحدة حتى مع لقبين) */
+export function playerSubmittedAttack(attacks, player) {
+  if (!player) return false;
+  const list = Object.values(attacks || {});
+  const nicks = [player.nick, player.nick2].filter(Boolean);
+  return list.some(
+    (a) =>
+      (player.id && a.attackerPlayerId === player.id) || nicks.includes(a.attackerNick)
+  );
+}
+
+/** الألقاب التي يمكن استهدافها — تستثني المكشوفة مسبقاً */
+export function attackableNicksForPlayer(player) {
+  if (!player || player.status !== 'active') return [];
+  const nicks = [player.nick, player.nick2].filter(Boolean);
+  if (player.revealedNick) return nicks.filter((n) => n !== player.revealedNick);
+  return nicks;
+}
+
+/** كل الألقاب المكشوفة للاعب (جولة سابقة + هذه الجولة) */
+export function getRevealedNicks(player, roundHits = []) {
+  const nicks = [player?.nick, player?.nick2].filter(Boolean);
+  const fromHits = (roundHits || [])
+    .map((h) => (typeof h === 'string' ? h : h.targetNick))
+    .filter((n) => nicks.includes(n));
+  const prev = player?.revealedNick ? [player.revealedNick] : [];
+  return [...new Set([...prev, ...fromHits])];
+}
+
+/** في وضع اللقبين: هل كُشف اللقبان معاً؟ */
+export function isDualTitleFullyRevealed(player, roundHits = []) {
+  if (!player?.nick2) return roundHits.length > 0;
+  const revealed = getRevealedNicks(player, roundHits);
+  return revealed.includes(player.nick) && revealed.includes(player.nick2);
+}
+
+/** اللقب المخفي المتبقي (وضع لقبين) */
+export function hiddenNickForPlayer(player, roundHits = []) {
+  if (!player?.nick2) return null;
+  const revealed = getRevealedNicks(player, roundHits);
+  return [player.nick, player.nick2].find((n) => !revealed.includes(n)) || null;
+}
+
+/** اللقب الذي كُشف لأول مرة هذه الجولة (للإعلان) */
+export function nickRevealedThisRound(player, roundHits = []) {
+  const hitNicks = (roundHits || []).map((h) => h.targetNick).filter(Boolean);
+  const prev = player?.revealedNick;
+  const newlyHit = hitNicks.filter((n) => n === player.nick || n === player.nick2);
+  if (!newlyHit.length) return null;
+  return newlyHit.find((n) => n !== prev) || null;
+}
+
+/** عدد الألقاب المتبقية في الساحة (المخفية لنشطين) */
+export function remainingTitlesCount(playersList) {
+  return (playersList || [])
+    .filter((p) => p.status === 'active')
+    .reduce((sum, p) => sum + attackableNicksForPlayer(p).length, 0);
+}
+
+/** هل تنتهي المسابقة؟ — يبقى لقب أو لقبان فقط في الساحة */
+export function shouldEndGameByRemainingTitles(playersList) {
+  const n = remainingTitlesCount(playersList);
+  return n >= 1 && n <= 2;
+}
+
+/** محاكاة حالة اللاعبين بعد الكشف — لحساب الألقاب المتبقية */
+export function playersAfterReveal(playersList, updates, leavingIds, roomPath) {
+  return (playersList || []).map((p) => {
+    if (leavingIds.has(p.id)) return { ...p, status: 'eliminated' };
+    if (p.status !== 'active') return p;
+    const revKey = `${roomPath}/players/${p.id}/revealedNick`;
+    if (updates[revKey] !== undefined) {
+      return { ...p, revealedNick: updates[revKey] };
+    }
+    return p;
+  });
+}
+
+/** وضع اللقبين يشترط تمويهاً واحداً على الأقل */
+export function isDecoyRequired(nickMode) {
+  return Number(nickMode) === 2;
+}
+
 export function attacksForPlayer(attacks, { playerId, nicks }) {
   const nk = (nicks || []).filter(Boolean);
   return Object.values(attacks || {})
@@ -101,8 +184,10 @@ export function countAttackProgress(activePlayers, attacks, attacksPerRound) {
   const total = Math.max(activePlayers.length * attacksPerRound, 1);
   const submitted = list.length;
   const remainingPlayers = activePlayers.filter((p) => {
-    const nicks = [p.nick, p.nick2].filter(Boolean);
-    const done = nicks.reduce((sum, n) => sum + list.filter((a) => a.attackerNick === n).length, 0);
+    const done = attacksForPlayer(attacks, {
+      playerId: p.id,
+      nicks: [p.nick, p.nick2].filter(Boolean),
+    }).length;
     return done < attacksPerRound;
   }).length;
   return { submitted, total, remainingPlayers, allSubmitted: remainingPlayers === 0 };

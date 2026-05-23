@@ -35,7 +35,7 @@ async function isCodeStringAvailable(db, candidate) {
  * إنشاء كود اشتراك جديد تحت /codes/{codeId}/ بحالة "unused"
  * @param {import('firebase/database').Database} db
  * @param {number} duration عدد أيام الاشتراك (مثلاً 1، 3، 7)
- * @param {number} price السعر بالريال (مثلاً 19، 38، 57)
+ * @param {number} price السعر بالريال (مثلاً 19، 38، 58)
  * @returns {Promise<{ success: boolean, codeId?: string, code?: string, error?: string }>}
  */
 export async function createCode(db, duration, price) {

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth } from "./firebase";
 import Packages from './pages/Packages';
-import { SUPPORT_EMAIL } from './core/constants';
+import { SUPPORT_EMAIL, PLATFORM_NAME } from './core/constants';
 import Home from './pages/Home';
 import AdminCodesPanel from './components/admin/AdminCodesPanel';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
@@ -15,6 +15,7 @@ import Notif from './shared/Notif';
 import CodeActivation from './components/codes/CodeActivation';
 import SubscriptionTimer from './components/codes/SubscriptionTimer';
 import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
+import SiteFooter from './components/layout/SiteFooter';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile } from './firebaseHelpers';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
@@ -123,8 +124,16 @@ export default function App() {
 
   useEffect(() => {
     const handleOpenPackages = () => setTab('pricing');
+    const handleOpenCodeActivation = () => {
+      setTab('account');
+      setShowCodeActivation(true);
+    };
     window.addEventListener('pfcc-open-packages', handleOpenPackages);
-    return () => window.removeEventListener('pfcc-open-packages', handleOpenPackages);
+    window.addEventListener('pfcc-open-code-activation', handleOpenCodeActivation);
+    return () => {
+      window.removeEventListener('pfcc-open-packages', handleOpenPackages);
+      window.removeEventListener('pfcc-open-code-activation', handleOpenCodeActivation);
+    };
   }, []);
 
   const notify = useCallback((text, type = 'info') => {
@@ -180,6 +189,9 @@ export default function App() {
   /** مشرف المنصة يفتح الغرف بدون تفعيل كود اشتراك؛ باقي المستخدمين يحتاجون activeCode صالحاً */
   const canHostRoom = isAdmin || Boolean(activeCode && isCodeValid(activeCode));
 
+  /** التذييل أثناء التصفح فقط — يختفي داخل غرف الألعاب */
+  const showSiteFooter = !selectedGame;
+
   const renderGame = () => {
     if(selectedGame === 'nicknames') return (
       <TitlesGame
@@ -217,9 +229,9 @@ export default function App() {
 
   const renderVoice = () => {
     const typeConfig = {
-      suggest: { icon: '💡', label: 'اقتراح', emailSubject: `اقتراح [${suggForm.cat}] — PFCC Playground`, cats: ['لعبة', 'تصميم', 'إحصائيات', 'أسعار', 'أخرى'] },
-      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — PFCC Playground`, cats: ['لعبة الألقاب', 'صيد القميري', 'تسجيل دخول', 'أخرى'] },
-      ask: { icon: '💬', label: 'استفسار', emailSubject: `استفسار — PFCC Playground`, cats: ['عام', 'الأسعار', 'طريقة اللعب', 'أخرى'] },
+      suggest: { icon: '💡', label: 'اقتراح', emailSubject: `اقتراح [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة', 'تصميم', 'إحصائيات', 'أسعار', 'أخرى'] },
+      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة الألقاب', 'صيد القميري', 'تسجيل دخول', 'أخرى'] },
+      ask: { icon: '💬', label: 'استفسار', emailSubject: `استفسار — ${PLATFORM_NAME}`, cats: ['عام', 'الأسعار', 'طريقة اللعب', 'أخرى'] },
     };
 
     const cfg = typeConfig[voiceType];
@@ -227,7 +239,7 @@ export default function App() {
     return (
       <div className="scr">
         <div className="ptitle" style={{ marginBottom: 4 }}>📣 تحديثات</div>
-        <div className="psub" style={{ marginBottom: 12 }}>آخر ما يصير في PFCC Playground</div>
+        <div className="psub" style={{ marginBottom: 12 }}>آخر ما يصير في {PLATFORM_NAME}</div>
         {[
           { id: 1, date: '2025-03-29', title: '🎉 إطلاق النسخة التجريبية', body: 'تم إطلاق لعبة الألقاب رسمياً مع دعم الغرف الحقيقية عبر Firebase!', isNew: true },
           { id: 2, date: '2025-03-25', title: '⚡ نظام الهجوم المتزامن', body: 'الكل يهاجم في نفس الوقت — سرية تامة ثم كشف مفاجئ.', isNew: true },
@@ -340,7 +352,7 @@ export default function App() {
   }
 
   return(
-    <div className="app">
+    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}`}>
       <Stars/>
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
@@ -427,6 +439,7 @@ export default function App() {
             onActivationSuccess={(codeData) => {
               setActiveCode(codeData);
               setShowCodeActivation(false);
+              notify('✅ تم تفعيل الكود — تابع من اللعبة', 'success');
             }}
             onBack={() => setShowCodeActivation(false)}
           />
@@ -446,8 +459,16 @@ export default function App() {
             onGoPricing={() => setTab('pricing')}
           />
         )}
-        {!showCodeActivation && tab==='pricing'&&<Packages />}
+        {!showCodeActivation && tab==='pricing'&&(
+          <Packages
+            onSubscribe={(pkg) => {
+              notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${pkg.price} ريال)`, 'info');
+            }}
+          />
+        )}
       </div>
+
+      {showSiteFooter && <SiteFooter />}
 
       <nav className="bnav">
         {navItems.map(item=>(
