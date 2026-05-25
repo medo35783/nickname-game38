@@ -50,7 +50,7 @@ export default function Home({ setSelectedGame }) {
       </div>
 
       {/* قريباً — ألعاب أخرى */}
-      <div style={{ background: 'rgba(255,255,255,.03)', border: '1px dashed rgba(255,255,255,.1)', borderRadius: 16, padding: '16px', marginBottom: 12, textAlign: 'center' }}>
+      <div className="card2" style={{ borderStyle: 'dashed', textAlign: 'center', padding: '16px', marginBottom: 12 }}>
         <div style={{ fontSize: 28, marginBottom: 6 }}>🎲</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>المزيد من الألعاب قادمة!</div>
         <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 3 }}>ترقبوا ألعاب جماعية جديدة ومثيرة</div>

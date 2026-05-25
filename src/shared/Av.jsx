@@ -10,7 +10,7 @@ export default function Av({ p, sz = 35, fs = 13 }) {
         ? 'linear-gradient(135deg,#e63950,#a0102a)'
         : 'linear-gradient(135deg,#333,#1a1a1a)';
   return (
-    <div className="pi-av" style={{width: sz, height: sz, fontSize: fs, background: bg, color: '#07070f'}}>
+    <div className="pi-av" style={{width: sz, height: sz, fontSize: fs, background: bg, color: 'var(--on-gold)'}}>
       {p?.initials}
     </div>
   );

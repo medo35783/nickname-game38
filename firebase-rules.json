@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "question-bank": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["status"],
+      "$questionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

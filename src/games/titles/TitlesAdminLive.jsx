@@ -386,7 +386,7 @@ export default function TitlesAdminLive(props) {
                 style={{
                   padding: '5px 8px',
                   marginBottom: 3,
-                  background: '#09091e',
+                  background: 'var(--surface)',
                   borderRadius: 7,
                   borderRight: `3px solid ${a.correct ? 'var(--green)' : 'var(--red)'}`,
                   fontSize: 11,

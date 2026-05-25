@@ -226,7 +226,7 @@ export default function AdminCodesPanel({ notify }) {
         minWidth: 120,
         padding: '12px 10px',
         borderRadius: 12,
-        background: '#09091e',
+        background: 'var(--surface)',
         border: `1px solid rgba(255,255,255,.06)`,
         textAlign: 'center',
       }}

@@ -5,6 +5,7 @@ import Packages from './pages/Packages';
 import { SUPPORT_EMAIL, PLATFORM_NAME } from './core/constants';
 import Home from './pages/Home';
 import AdminCodesPanel from './components/admin/AdminCodesPanel';
+import QBankManager from './question-bank/QBankManager';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
 import AccountPage from './components/account/AccountPage';
 import TitlesGame from './games/titles/TitlesGame';
@@ -16,6 +17,8 @@ import CodeActivation from './components/codes/CodeActivation';
 import SubscriptionTimer from './components/codes/SubscriptionTimer';
 import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
 import SiteFooter from './components/layout/SiteFooter';
+import ThemeToggle from './components/layout/ThemeToggle';
+import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile } from './firebaseHelpers';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
@@ -31,6 +34,7 @@ const COMMUNITY_SUGGESTIONS = [
    MAIN APP
 ══════════════════════════════════════════════════ */
 export default function App() {
+  const { theme, followSystem, setTheme, setFollowSystemMode, toggleTheme } = useTheme();
   const [authReady, setAuthReady] = useState(false);
 
   /* ── NAV ── */
@@ -54,6 +58,7 @@ export default function App() {
   const [endGameData, setEndGameData] = useState(null);
   const [voiceType, setVoiceType] = useState('suggest');
   const [suggForm, setSuggForm] = useState({ cat: 'لعبة', text: '' });
+  const [adminPanelTab, setAdminPanelTab] = useState('codes');
 
   useEffect(() => {
     let done = false;
@@ -360,7 +365,7 @@ export default function App() {
         {tab !== 'game' || selectedGame || gameScreen !== 'home' ? (
           <button
             className="btn bgh bsm"
-            style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid rgba(255,255,255,.1)' }}
+            style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
             onClick={() => {
               if (tab !== 'game') {
                 goToTab('game');
@@ -408,6 +413,7 @@ export default function App() {
         </div>
 
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} variant="compact" />
           {activeCode?.expiresAt && isCodeValid(activeCode) && (
             <SubscriptionTimer
               activeCode={activeCode}
@@ -447,7 +453,31 @@ export default function App() {
         {!showCodeActivation && tab==='voice'&&renderVoice()}
         {!showCodeActivation && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
         {!showCodeActivation && tab === 'codes' && isAdmin && (
-          <AdminCodesPanel notify={notify} />
+          <div className="scr">
+            <div className="tabs">
+              <button
+                type="button"
+                className={`tab ${adminPanelTab === 'codes' ? 'on' : ''}`}
+                onClick={() => setAdminPanelTab('codes')}
+              >
+                الأكواد
+              </button>
+              <button
+                type="button"
+                className={`tab ${adminPanelTab === 'qbank' ? 'on' : ''}`}
+                onClick={() => setAdminPanelTab('qbank')}
+              >
+                بنك الأسئلة
+              </button>
+            </div>
+
+            {adminPanelTab === 'codes' && <AdminCodesPanel notify={notify} />}
+            {adminPanelTab === 'qbank' &&
+              typeof localStorage !== 'undefined' &&
+              localStorage.getItem('pfcc_is_admin') === 'true' && (
+                <QBankManager notify={notify} />
+              )}
+          </div>
         )}
         {!showCodeActivation && tab === 'account' && (
           <AccountPage
@@ -457,6 +487,10 @@ export default function App() {
             isAdmin={isAdmin}
             onActivateCode={() => setShowCodeActivation(true)}
             onGoPricing={() => setTab('pricing')}
+            theme={theme}
+            followSystem={followSystem}
+            onSetTheme={setTheme}
+            onFollowSystem={setFollowSystemMode}
           />
         )}
         {!showCodeActivation && tab==='pricing'&&(

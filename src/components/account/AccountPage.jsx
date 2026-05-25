@@ -8,6 +8,7 @@ import { onValue, ref } from 'firebase/database';
 import { auth, db } from '../../firebase';
 import { formatCodeForDisplay } from '../../firebaseHelpers';
 import PlayerAuthScreen from '../auth/PlayerAuthScreen';
+import ThemeToggle from '../layout/ThemeToggle';
 
 function formatTs(ts) {
   if (!ts) return '—';
@@ -42,6 +43,10 @@ export default function AccountPage({
   isAdmin,
   onActivateCode,
   onGoPricing,
+  theme = 'dark',
+  followSystem = true,
+  onSetTheme,
+  onFollowSystem,
 }) {
   const user = auth.currentUser;
   const [historyList, setHistoryList] = useState([]);
@@ -127,6 +132,17 @@ export default function AccountPage({
           {isGuest ? 'ضيف — يمكنك اللعب وتفعيل الكود بدون بريد' : user.email}
         </p>
       )}
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="ctitle">🌓 المظهر</div>
+        <ThemeToggle
+          variant="account"
+          theme={theme}
+          followSystem={followSystem}
+          onSetTheme={onSetTheme}
+          onFollowSystem={onFollowSystem}
+        />
+      </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="ctitle">{activeOk ? '🎫 اشتراكاتي' : '💎 الاشتراك'}</div>

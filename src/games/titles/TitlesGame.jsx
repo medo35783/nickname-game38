@@ -2199,7 +2199,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                 const rAtk=Object.values(r.attacks||{}).filter(a=>myNicksForStats.includes(a.attackerNick));
                 if(rAtk.length===0) return null;
                 return rAtk.map((a,i)=>(
-                  <div key={i} style={{padding:'8px 12px',marginBottom:5,background:'#09091e',borderRadius:9,borderRight:`3px solid ${a.correct?'var(--green)':'var(--red)'}`,fontSize:12}}>
+                  <div key={i} style={{padding:'8px 12px',marginBottom:5,background:'var(--surface)',borderRadius:9,borderRight:`3px solid ${a.correct?'var(--green)':'var(--red)'}`,fontSize:12}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
                       <span style={{color:'var(--muted)',fontSize:10}}>الجولة {r.round}</span>
                       <span style={{color:a.correct?'var(--green)':'var(--red)',fontWeight:700}}>{a.correct?'✅ إصابة':'❌ خطأ'}</span>
@@ -2219,7 +2219,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             {attackerRank.length===0
               ?<div style={{textAlign:'center',color:'var(--muted)',padding:18,fontSize:12}}>لا هجمات بعد</div>
               :attackerRank.map((p,i)=>(
-              <div key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:'#09091e',borderRadius:9,marginBottom:5,border:`1px solid ${i===0?'rgba(240,192,64,.3)':i===1?'rgba(200,200,220,.15)':i===2?'rgba(230,57,80,.15)':'rgba(255,255,255,.05)'}`}}>
+              <div key={p.id} style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:'var(--surface)',borderRadius:9,marginBottom:5,border:`1px solid ${i===0?'rgba(240,192,64,.3)':i===1?'rgba(200,200,220,.15)':i===2?'rgba(230,57,80,.15)':'var(--border-faint)'}`}}>
                 <div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,width:26,textAlign:'center',color:i===0?'var(--gold)':i===1?'rgba(200,200,220,.8)':i===2?'var(--red)':'var(--muted)'}}>
                   {i===0?'👑':i===1?'🥈':i===2?'🥉':i+1}
                 </div>
@@ -2344,7 +2344,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                               style={{
                                 padding: '8px 10px',
                                 marginBottom: 4,
-                                background: '#09091e',
+                                background: 'var(--surface)',
                                 borderRadius: 8,
                                 borderRight: '3px solid var(--purple)',
                                 fontSize: 11,
@@ -2383,9 +2383,9 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                 style={{
                   marginBottom: 6,
                   padding: '8px 10px',
-                  background: 'rgba(255,255,255,.03)',
+                  background: 'var(--surface)',
                   borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,.06)',
+                  border: '1px solid var(--border-faint)',
                 }}
               >
                 <div className="pi-info" style={{ flex: 1 }}>
@@ -2544,18 +2544,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             '🚫 التعاون ممنوع — عقوبته الإخراج الفوري',
             '👁️ الألقاب لا تُكشف كاملةً إلا في نهاية المسابقة',
           ].map((r, i) => (
-            <div
-              key={i}
-              style={{
-                padding: '7px 11px',
-                marginBottom: 4,
-                background: '#0f0f22',
-                borderRadius: 8,
-                fontSize: 12,
-                color: 'var(--muted)',
-                border: '1px solid rgba(255,255,255,.04)',
-              }}
-            >
+            <div key={i} className="game-rule-row">
               {r}
             </div>
           ))}
