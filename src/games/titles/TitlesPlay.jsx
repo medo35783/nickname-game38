@@ -5,7 +5,7 @@ import TitlesPlayCockpitShell from './play/TitlesPlayCockpitShell';
 import { attacksForPlayer, countAttackProgress, attackableNicksForPlayer } from './titlesRevealHelpers';
 import { roundAlertMessages } from './roundAlertHelpers';
 
-/** شاشة الهجوم للمتسابق — كابينة + ويزارد خطوتين + انتظار حي. */
+/** شاشة الهجوم — ويزارد: (هويتك إن لقبين) → الهدف → التخمين */
 export default function TitlesPlay(props) {
   const {
     role,
@@ -21,7 +21,6 @@ export default function TitlesPlay(props) {
     setProxyFor,
     setIsProxyMode,
     countdown,
-    effectiveNickMode,
     submitAttack,
     notify,
     roomCode,
@@ -31,9 +30,8 @@ export default function TitlesPlay(props) {
     firebaseConnected,
   } = props;
 
-  void effectiveNickMode;
-
   const [attackStep, setAttackStep] = useState(1);
+  const [myAttackerNick, setMyAttackerNick] = useState(null);
   const [waitMsgIdx, setWaitMsgIdx] = useState(0);
 
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
@@ -48,28 +46,25 @@ export default function TitlesPlay(props) {
   const isKioskMode = role === 'admin' && !!proxyFor;
   const proxyPlayer = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
 
-  const playerAttackCounts = {};
-  attacksList.forEach((a) => {
-    if (a.attackerNick) playerAttackCounts[a.attackerNick] = (playerAttackCounts[a.attackerNick] || 0) + 1;
-  });
+  const effectivePlayer = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
+  const myNicksList = effectivePlayer ? [effectivePlayer.nick, effectivePlayer.nick2].filter(Boolean) : [];
+  const pickIdentityFirst = myNicksList.length >= 2;
 
-  const effectiveAttackerNicks = proxyPlayer
-    ? [proxyPlayer.nick, proxyPlayer.nick2].filter(Boolean)
-    : myNickLocal
-      ? [myNickLocal]
-      : [];
+  const myPlayerId =
+    proxyPlayer?.id || myId || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal)?.id;
 
-  const myDoneCount = attacksList.filter((a) => effectiveAttackerNicks.includes(a.attackerNick)).length;
-  const myAttacksDone = effectiveAttackerNicks.length > 0 ? myDoneCount >= attacksPerRound : false;
+  const myAtks = useMemo(
+    () => attacksForPlayer(attacks, { playerId: myPlayerId, nicks: myNicksList }),
+    [attacks, myPlayerId, myNicksList]
+  );
+  const myDoneCount = myAtks.length;
+  const myAttacksDone = myPlayerId ? myDoneCount >= attacksPerRound : false;
 
   const inactiveNicks = playersList.filter((p) => p.status === 'inactive').flatMap((p) => [p.nick, p.nick2].filter(Boolean));
   const activeNicks =
     roundOrder.nicks?.length > 0
       ? roundOrder.nicks
       : playersList.flatMap((p) => attackableNicksForPlayer(p));
-
-  const effectivePlayer = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
-  const myNicksList = effectivePlayer ? [effectivePlayer.nick, effectivePlayer.nick2].filter(Boolean) : [];
 
   const displayNicks = [...new Set([...activeNicks, ...inactiveNicks])];
   const visibleNicks = displayNicks.filter((n) => {
@@ -79,19 +74,11 @@ export default function TitlesPlay(props) {
     return true;
   });
 
-  const myPlayerId =
-    proxyPlayer?.id || myId || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal)?.id;
-
   const displayNames = (
     roundOrder.names?.length > 0
       ? roundOrder.names.map((id) => playersList.find((p) => p.id === id)).filter(Boolean)
       : playersList.filter((p) => p.status === 'active')
   ).filter((p) => p.id !== myPlayerId);
-
-  const myAtks = useMemo(
-    () => attacksForPlayer(attacks, { playerId: myPlayerId, nicks: effectiveAttackerNicks }),
-    [attacks, myPlayerId, effectiveAttackerNicks]
-  );
 
   const progress = countAttackProgress(activePlayers, attacks, attacksPerRound);
 
@@ -102,13 +89,26 @@ export default function TitlesPlay(props) {
     ? effectivePlayer?.name || '—'
     : joinName || effectivePlayer?.name || '—';
 
+  const resetAttackFlow = () => {
+    setAttackStep(pickIdentityFirst ? 0 : 1);
+    setMyAttackerNick(null);
+    setMyNick(null);
+    setMyGuess(null);
+  };
+
   useEffect(() => {
     if (gameState?.phase === 'attacking') {
-      setAttackStep(1);
-      setMyNick(null);
-      setMyGuess(null);
+      resetAttackFlow();
     }
-  }, [gameState?.phase, roundNum, setMyNick, setMyGuess]);
+  }, [gameState?.phase, roundNum]);
+
+  useEffect(() => {
+    if (myAttacksDone || gameState?.phase !== 'attacking') return;
+    if (!myNick && !myGuess) {
+      setAttackStep(pickIdentityFirst ? 0 : 1);
+      setMyAttackerNick(null);
+    }
+  }, [myNick, myGuess, myAttacksDone, gameState?.phase, pickIdentityFirst]);
 
   useEffect(() => {
     if (!myAttacksDone) return;
@@ -139,11 +139,23 @@ export default function TitlesPlay(props) {
   };
   const banner = statusBanner();
 
-  const pickNick = (nick, isElim) => {
+  const pickIdentity = (nick) => {
+    setMyAttackerNick(nick);
+    setMyNick(null);
+    setMyGuess(null);
+    setAttackStep(1);
+  };
+
+  const pickTargetNick = (nick, isElim) => {
     if (isElim) return;
     setMyNick(nick);
     setMyGuess(null);
     setAttackStep(2);
+  };
+
+  const attackerNickForSubmit = () => {
+    if (pickIdentityFirst) return myAttackerNick;
+    return myNicksList[0] || myNickLocal || null;
   };
 
   const copyCode = () => {
@@ -154,10 +166,12 @@ export default function TitlesPlay(props) {
   const returnToHost = () => {
     setProxyFor(null);
     setIsProxyMode(false);
-    setMyNick(null);
-    setMyGuess(null);
+    resetAttackFlow();
     setGameScreen('host');
   };
+
+  const stepTarget = pickIdentityFirst ? 1 : 1;
+  const stepGuess = pickIdentityFirst ? 2 : 2;
 
   return (
     <div className="scr play-attack-scr">
@@ -191,9 +205,28 @@ export default function TitlesPlay(props) {
 
       {!myAttacksDone && (
         <div className="play-wizard-steps">
-          <span className={attackStep === 1 ? 'on' : myNick ? 'done' : ''}>① اللقب</span>
+          {pickIdentityFirst && (
+            <>
+              <span className={attackStep === 0 ? 'on' : myAttackerNick ? 'done' : ''}>① هويتك</span>
+              <span className="play-wizard-line" />
+            </>
+          )}
+          <span
+            className={
+              attackStep === stepTarget ? 'on' : myNick ? 'done' : pickIdentityFirst && attackStep > 0 ? '' : ''
+            }
+          >
+            {pickIdentityFirst ? '②' : '①'} الهدف
+          </span>
           <span className="play-wizard-line" />
-          <span className={attackStep === 2 ? 'on' : ''}>② التخمين</span>
+          <span className={attackStep === stepGuess ? 'on' : ''}>
+            {pickIdentityFirst ? '③' : '②'} التخمين
+          </span>
+          {attacksPerRound > 1 && myDoneCount > 0 && (
+            <span className="play-attack-round-badge">
+              هجوم {myDoneCount + 1}/{attacksPerRound}
+            </span>
+          )}
         </div>
       )}
 
@@ -219,7 +252,7 @@ export default function TitlesPlay(props) {
         <div className="card play-wait-card">
           <div className="waiting-box">
             <div className="waiting-icon">✅</div>
-            <div className="waiting-title">تم إرسال هجومك!</div>
+            <div className="waiting-title">تم إرسال هجماتك!</div>
             {myAtks.map((a, i) => (
               <div key={i} className="play-wait-summary">
                 <div className="play-wait-row">
@@ -230,22 +263,44 @@ export default function TitlesPlay(props) {
                   <span className="lbl">👤 التخمين</span>
                   <strong>{a.guessedName || '—'}</strong>
                 </div>
-                <div className="play-wait-verdict">
-                  ⏳ النتيجة عند الكشف
-                </div>
+                <div className="play-wait-verdict">⏳ النتيجة عند الكشف</div>
               </div>
             ))}
             <p className="play-wait-rotate">{waitMessages[waitMsgIdx % waitMessages.length]}</p>
-            {attacksPerRound > 1 && myDoneCount < attacksPerRound && (
-              <p className="trs-muted">يمكنك إرسال هجمة أخرى</p>
-            )}
           </div>
         </div>
       ) : (
         <>
-          {attackStep === 1 && (
+          {pickIdentityFirst && attackStep === 0 && (
             <div className="bwrap">
-              <div className="blbl">🎭 الخطوة ١ — اختر لقباً للهجوم</div>
+              <div className="blbl">🎭 اختر لقبك للهجوم</div>
+              <div className="bgrid play-bgrid play-identity-grid">
+                {myNicksList.map((nick) => (
+                  <button
+                    key={nick}
+                    type="button"
+                    className={`nt play-nt${myAttackerNick === nick ? ' nsel' : ''}`}
+                    onClick={() => pickIdentity(nick)}
+                  >
+                    <div>{nick}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {attackStep === stepTarget && (!pickIdentityFirst || myAttackerNick) && (
+            <div className="bwrap">
+              {pickIdentityFirst && (
+                <div className="play-attacker-bar">
+                  <span>تهاجم بـ</span>
+                  <strong className="gold">"{myAttackerNick}"</strong>
+                  <button type="button" className="btn bgh bxs" onClick={() => setAttackStep(0)}>
+                    تغيير
+                  </button>
+                </div>
+              )}
+              <div className="blbl">🎯 اختر لقب الهدف</div>
               <div className="bgrid play-bgrid">
                 {(role === 'admin' && !isKioskMode ? displayNicks : visibleNicks).map((nick, i) => {
                   const owner = playersList.find((p) => p.nick === nick || p.nick2 === nick);
@@ -258,7 +313,7 @@ export default function TitlesPlay(props) {
                       type="button"
                       className={`nt play-nt${isElim ? ' nd' : ''}${myNick === nick ? ' nsel' : ''}${showPoisonHint ? ' poisoned' : ''}`}
                       disabled={!!isElim}
-                      onClick={() => pickNick(nick, isElim)}
+                      onClick={() => pickTargetNick(nick, isElim)}
                     >
                       <div>{nick}</div>
                       {isElim && <div className="nt-sub">✕ ج{owner.eliminatedRound}</div>}
@@ -269,17 +324,17 @@ export default function TitlesPlay(props) {
             </div>
           )}
 
-          {attackStep === 2 && (
+          {attackStep === stepGuess && (
             <>
               <div className="play-selected-nick">
                 <span>الهدف:</span>
                 <strong>"{myNick}"</strong>
-                <button type="button" className="btn bgh bxs" onClick={() => setAttackStep(1)}>
-                  تغيير
+                <button type="button" className="btn bgh bxs" onClick={() => setAttackStep(stepTarget)}>
+                  ← هدف آخر
                 </button>
               </div>
               <div className="card">
-                <div className="ctitle">👥 الخطوة ٢ — من صاحب هذا اللقب؟</div>
+                <div className="ctitle">👥 من صاحب هذا اللقب؟</div>
                 <div className="ngrid play-ngrid">
                   {displayNames.map((p) => {
                     const isElim = p.status !== 'active';
@@ -305,7 +360,7 @@ export default function TitlesPlay(props) {
                   <button
                     type="button"
                     className="btn bg mt3 play-confirm-btn"
-                    onClick={() => submitAttack(proxyPlayer?.nick || null)}
+                    onClick={() => submitAttack(attackerNickForSubmit())}
                   >
                     🎯 تأكيد الهجوم على "{myNick}"
                   </button>

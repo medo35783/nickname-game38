@@ -12,10 +12,10 @@ export const PLAYER_NICK2_PLACEHOLDER = 'مثال: النمر';
 export const PLAYER_NICK_HINT_SINGLE = 'لقبك السري — الذي تراهن عليه (مخفي عن الآخرين)';
 
 /** وضع لقبان — اللقب الأول */
-export const PLAYER_NICK_HINT_FIRST = 'لقبك الأول — سري ومخفي (إذا كُشف يبقى لقبك الثاني)';
+export const PLAYER_NICK_HINT_FIRST = 'لقبك الأول';
 
 /** وضع لقبان — اللقب الثاني */
-export const PLAYER_NICK_HINT_SECOND = 'لقبك الثاني — سري أيضاً (تُخرج فقط عند كشف اللقبين معاً)';
+export const PLAYER_NICK_HINT_SECOND = 'لقبك الثاني';
 
 export const GROUP_MEMBER_NAME_PLACEHOLDER = 'اسم العضو';
 

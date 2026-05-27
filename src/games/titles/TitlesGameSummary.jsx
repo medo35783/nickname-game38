@@ -114,9 +114,15 @@ export default function TitlesGameSummary({
         </div>
       )}
 
-      <div className="stats-tab-hint">
-        📊 ابدأ بالرسوم والملخص — ثم تبويب <strong>«مسار اللعبة»</strong> للتفصيل جولة بجولة
-      </div>
+      {isHost ? (
+        <div className="stats-tab-hint">
+          📊 تبويب <strong>«المتبقون»</strong> للحالة الحية — و<strong>«مسار اللعبة»</strong> للتفصيل
+        </div>
+      ) : (
+        <div className="stats-tab-hint">
+          📊 تبويب <strong>«المتبقون»</strong> — قفل 🔒 حتى يُكشف اللقب
+        </div>
+      )}
 
       {renderStatsPanel?.({ embedded: true })}
 

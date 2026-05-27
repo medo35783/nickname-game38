@@ -43,6 +43,53 @@ export function hiddenNickForPlayer(player, roundHits = []) {
   return [player.nick, player.nick2].find((n) => !revealed.includes(n)) || null;
 }
 
+/** ألقاب اللاعب */
+export function playerNicksList(player) {
+  return [player?.nick, player?.nick2].filter(Boolean);
+}
+
+/** الألقاب المكشوفة للاعب (من الحالة + أرشيف الجولات) */
+export function revealedNicksForStats(player, allRoundsList = []) {
+  const nicks = playerNicksList(player);
+  if (!player || !nicks.length) return [];
+  const fromArchive = new Set();
+  (allRoundsList || []).forEach((r) => {
+    Object.values(r.attacks || {}).forEach((a) => {
+      if (a.correct && a.realOwnerId === player.id && nicks.includes(a.targetNick)) {
+        fromArchive.add(a.targetNick);
+      }
+    });
+  });
+  if (player.status !== 'active') {
+    return fromArchive.size ? [...fromArchive] : nicks;
+  }
+  return getRevealedNicks(player, []);
+}
+
+/** تفاصيل خروج لقب معيّن */
+export function nickExitMeta(player, nick, allRoundsList = []) {
+  const nicks = playerNicksList(player);
+  if (!nick || !nicks.includes(nick)) return null;
+  let best = null;
+  (allRoundsList || []).forEach((r) => {
+    Object.values(r.attacks || {}).forEach((a) => {
+      if (a.correct && a.realOwnerId === player.id && a.targetNick === nick) {
+        if (!best || r.round >= best.round) {
+          best = { round: r.round, by: a.attackerNick };
+        }
+      }
+    });
+  });
+  if (best) return best;
+  if (player?.eliminatedRound && (player.eliminatedBy || player.eliminatedByList?.length)) {
+    return {
+      round: player.eliminatedRound,
+      by: player.eliminatedBy || player.eliminatedByList?.join(' + '),
+    };
+  }
+  return null;
+}
+
 /** اللقب الذي كُشف لأول مرة هذه الجولة (للإعلان) */
 export function nickRevealedThisRound(player, roundHits = []) {
   const hitNicks = (roundHits || []).map((h) => h.targetNick).filter(Boolean);
@@ -57,6 +104,21 @@ export function remainingTitlesCount(playersList) {
   return (playersList || [])
     .filter((p) => p.status === 'active')
     .reduce((sum, p) => sum + attackableNicksForPlayer(p).length, 0);
+}
+
+/** ملخص سريع للوحة المتبقون — متسابقون + ألقاب */
+export function remainingBoardStats(playersList, silentExitCount = 0) {
+  const list = playersList || [];
+  const active = list.filter((p) => p.status === 'active');
+  const titlesLeft = remainingTitlesCount(active);
+  const titlesTotal = list.reduce((sum, p) => sum + playerNicksList(p).length, 0);
+
+  return {
+    playersActive: active.length,
+    playersOut: list.filter((p) => p.status !== 'active').length + (silentExitCount || 0),
+    titlesLeft,
+    titlesGone: Math.max(0, titlesTotal - titlesLeft),
+  };
 }
 
 /** هل تنتهي المسابقة؟ — يبقى لقب أو لقبان فقط في الساحة */
@@ -95,6 +157,15 @@ export function attacksForPlayer(attacks, { playerId, nicks }) {
 
 export function uniqueAttackerNicks(attackers) {
   return [...new Set((attackers || []).map((n) => String(n).trim()).filter(Boolean))];
+}
+
+/** أسماء المُكشِفين في سطر واحد — للبطاقة */
+export function formatRevealAttackersLine(attackers) {
+  const list = uniqueAttackerNicks(attackers);
+  if (list.length === 0) return '';
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return `${list[0]} و ${list[1]}`;
+  return `${list[0]} و ${list[1]} و ${list.length - 2} آخرين`;
 }
 
 /** عدد المهاجمين الذين أصابوا اللقب المعروض (شخصان+ على نفس اللقب = سهمان) */

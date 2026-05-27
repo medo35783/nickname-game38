@@ -2,13 +2,11 @@ import { useEffect, useRef } from 'react';
 import Av from '../../shared/Av';
 import {
   attacksForPlayer,
-  arrowCountOnNick,
   attackableNicksForPlayer,
-  multiArrowAnnounce,
   revealAdminQueueHint,
-  revealNickCountPhrase,
   revealPlayerTeaser,
 } from './titlesRevealHelpers';
+import RevealCarousel from './reveal/RevealCarousel';
 
 /** مشهد كشف متزامن — revealStep من Firebase (المشرف يضغط متابعة). */
 export default function TitlesRevealScene(props) {
@@ -52,12 +50,14 @@ export default function TitlesRevealScene(props) {
   const myAtks = attacksForPlayer(attacks, { playerId: myId, nicks: myNicks });
 
   const prevStep = useRef(step);
+  const playSoundRef = useRef(playSound);
+  playSoundRef.current = playSound;
   useEffect(() => {
     if (prevStep.current === step) return;
     prevStep.current = step;
-    if (step === 0) playSound?.('suspense');
-    else if (step >= 1 && step <= queue.length) playSound?.('explosion');
-  }, [step, queue.length, playSound]);
+    if (step === 0) playSoundRef.current?.('suspense');
+    else if (step >= 1 && step <= queue.length) playSoundRef.current?.('explosion');
+  }, [step, queue.length]);
 
   const poisoned = playersList.filter((p) => p.isBannedNextRound && p.isBannedNextRound >= roundNum);
 
@@ -124,107 +124,39 @@ export default function TitlesRevealScene(props) {
           isAdmin={isAdmin}
           hint={
             queue.length
-              ? 'ابدأ إعلان من خرج — مشهد بمشهد'
+              ? '«ابدأ الكشف» — بطاقة ببطاقة ويمكن للجميع الرجوع'
               : endGameAfterReveal
                 ? '«متابعة» — جاهزون لإعلان الفائز'
                 : '«متابعة» لملخص الجولة'
           }
           onContinue={advanceRevealStep}
+          label={queue.length ? '🔓 ابدأ الكشف' : undefined}
         />
         {!isAdmin && queue.length > 0 && step === 0 && (
-          <p className="trs-wait-pulse">الشاشة تتحرك مع كل إعلان — ركّز 👀</p>
+          <p className="trs-wait-pulse">البطاقات تبقى — تنقل بالأسهم حتى يكشف المشرف التالي</p>
         )}
       </div>
     );
   }
 
   if (step >= 1 && step <= queue.length) {
-    const item = queue[step - 1];
-    const isPartial = item.type === 'partial';
-    const fakePlayer = {
-      nick: item.nick,
-      nick2: item.nick2,
-      name: item.name,
-      initials: item.name?.[0] || '?',
-      colorIdx: 0,
-      status: isPartial ? 'active' : 'eliminated',
-    };
+    const unlockedCount = step;
+    const hasMoreToUnlock = step < queue.length;
+    const finishLabel = endGameAfterReveal
+      ? '▶️ متابعة — ثم الفائز'
+      : '▶️ متابعة لملخص الجولة';
 
     return (
-      <div className="trs-scene cinematic">
-        {item.fromSilentRound && (
-          <TrsBanner icon="🤫" color="var(--purple)">
-            الجولة {item.fromSilentRound} — كان {isPartial ? 'كشفه' : 'خروجه'} مخفياً حتى الآن
-          </TrsBanner>
-        )}
-
-        <p className="trs-suspense">... حبس الأنفاس ...</p>
-
-        {(() => {
-          const arrowN = arrowCountOnNick(item);
-          if (arrowN >= 2) {
-            return (
-              <>
-                <ArrowVolley count={arrowN} targetNick={item.nick} />
-                <p className="trs-multi-hit">{multiArrowAnnounce(arrowN, item.nick)}</p>
-              </>
-            );
-          }
-          if (arrowN === 1) {
-            return (
-              <div className="trs-single-arrow" aria-hidden>
-                <span className="trs-arrow-icon solo">🏹</span>
-              </div>
-            );
-          }
-          return null;
-        })()}
-
-        <div className={`trs-nick-hero${isPartial ? ' partial' : ''}${arrowCountOnNick(item) >= 2 ? ' multi-hit' : ''}`}>
-          "{item.nick}"
-        </div>
-
-        <div className="trs-burst">
-          <Av p={fakePlayer} sz={56} fs={18} />
-          <div className="trs-owner-lbl">صاحب اللقب</div>
-          <div className="trs-reveal-name">{item.name || '—'}</div>
-          <div className={`trs-reveal-lbl${isPartial ? ' partial' : ''}`}>
-            {isPartial
-              ? '💥 كُشف هذا اللقب — لم يخرج صاحبه بعد'
-              : arrowCountOnNick(item) >= 2
-                ? '💥 خرج بعد إصابات متعددة على هذا اللقب'
-                : '💥 خرج من اللعبة'}
-          </div>
-        </div>
-
-        {isPartial && (
-          <TrsCard accent="purple">
-            <div className="trs-section-lbl">وضع اللقبين</div>
-            <p className="trs-muted">هذا الإعلان يخص اللقب المعروض فقط. يبقى اللاعب حتى يُكشف لقبه الآخر.</p>
-          </TrsCard>
-        )}
-
-        {item.attackers?.length > 0 && (
-          <TrsCard>
-            <div className="trs-section-lbl">⚔️ كُشف من قِبَل</div>
-            <AttackersChips list={item.attackers} />
-          </TrsCard>
-        )}
-
-        <p className="trs-step-counter">
-          {isAdmin ? `مشهد ${step} من ${queue.length}` : `اللحظة ${step} من ${queue.length} 🔥`}
-        </p>
-
-        <AdminContinue
+      <div className="trs-scene trs-scene-reveal">
+        <h2 className="trs-reveal-head">🎭 كشف الألقاب</h2>
+        <RevealCarousel
+          queue={queue}
+          unlockedCount={unlockedCount}
           isAdmin={isAdmin}
-          hint={
-            step < queue.length
-              ? '«متابعة» للإعلان التالي'
-              : endGameAfterReveal
-                ? '«متابعة» — ثم إعلان الفائز'
-                : '«متابعة» لملخص الجولة'
-          }
-          onContinue={advanceRevealStep}
+          hasMoreToUnlock={hasMoreToUnlock}
+          onUnlockNext={advanceRevealStep}
+          onFinish={advanceRevealStep}
+          onFinishLabel={finishLabel}
         />
       </div>
     );
@@ -405,18 +337,6 @@ function MyAttackRow({ a }) {
   );
 }
 
-function AttackersChips({ list }) {
-  return (
-    <div className="trs-attackers">
-      {list.map((n, i) => (
-        <span key={i} className="trs-attacker-chip">
-          "{n}"
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function TrsCard({ children, accent }) {
   return <div className={`trs-card${accent ? ` accent-${accent}` : ''}`}>{children}</div>;
 }
@@ -425,37 +345,6 @@ function TrsBanner({ children, icon, color }) {
   return (
     <div className="trs-banner" style={{ borderColor: color, color }}>
       <span>{icon}</span> {children}
-    </div>
-  );
-}
-
-/** أسهم متجهة نحو اللقب — بعدد المهاجمين الذين أصابوا نفس اللقب */
-function ArrowVolley({ count, targetNick }) {
-  const angles = [
-    { left: '8%', top: '6%', rot: 35, delay: 0 },
-    { left: '78%', top: '8%', rot: -30, delay: 0.12 },
-    { left: '4%', top: '42%', rot: 10, delay: 0.22 },
-    { left: '82%', top: '38%', rot: -15, delay: 0.08 },
-    { left: '22%', top: '2%', rot: 55, delay: 0.18 },
-    { left: '62%', top: '4%', rot: -45, delay: 0.28 },
-  ];
-  return (
-    <div className="trs-arrow-volley" aria-label={`${count} أسهم أصابت ${targetNick}`}>
-      {angles.slice(0, count).map((a, i) => (
-        <span
-          key={i}
-          className="trs-arrow-fly"
-          style={{
-            left: a.left,
-            top: a.top,
-            '--rot': `${a.rot}deg`,
-            animationDelay: `${a.delay}s`,
-          }}
-        >
-          🏹
-        </span>
-      ))}
-      <div className="trs-arrow-target-ring" />
     </div>
   );
 }
@@ -471,13 +360,13 @@ function PlayerRevealTeaser({ count }) {
   );
 }
 
-function AdminContinue({ isAdmin, hint, onContinue }) {
+function AdminContinue({ isAdmin, hint, onContinue, label }) {
   if (!isAdmin) return null;
   return (
     <div className="trs-admin-bar">
       <p className="trs-admin-hint">{hint}</p>
       <button type="button" className="btn bg trs-continue-btn" onClick={onContinue}>
-        ▶️ متابعة
+        {label || '▶️ متابعة'}
       </button>
     </div>
   );
