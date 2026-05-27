@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import Packages from './pages/Packages';
 import { SUPPORT_EMAIL, PLATFORM_NAME } from './core/constants';
@@ -59,6 +59,9 @@ export default function App() {
   const [voiceType, setVoiceType] = useState('suggest');
   const [suggForm, setSuggForm] = useState({ cat: 'لعبة', text: '' });
   const [adminPanelTab, setAdminPanelTab] = useState('codes');
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [accountAuthMode, setAccountAuthMode] = useState('login');
+  const accountMenuRef = useRef(null);
 
   useEffect(() => {
     let done = false;
@@ -126,6 +129,17 @@ export default function App() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const handleDocClick = (event) => {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     const handleOpenPackages = () => setTab('pricing');
@@ -324,8 +338,35 @@ export default function App() {
     { id: 'voice', icon: '💬', label: 'صوّتك', dot: false },
     ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
     { id: 'pricing', icon: '💎', label: 'الباقات' },
-    { id: 'account', icon: '👤', label: 'حسابي' },
   ];
+
+  const user = auth.currentUser;
+  const isGuest = Boolean(user?.isAnonymous);
+  const accountDisplayName =
+    isGuest
+      ? 'سجّل دخول'
+      : user?.displayName?.trim() ||
+        user?.email?.split('@')?.[0] ||
+        'حسابي';
+
+  const openAccountTab = (mode = 'login') => {
+    setAccountAuthMode(mode);
+    setTab('account');
+    setAccountMenuOpen(false);
+  };
+
+  const handleHeaderSignOut = async () => {
+    try {
+      localStorage.removeItem('pfcc_is_admin');
+      localStorage.removeItem('pfcc_admin_uid');
+      await signOut(auth);
+      notify('تم تسجيل الخروج', 'info');
+      setAccountMenuOpen(false);
+    } catch (e) {
+      console.error(e);
+      notify('تعذّر تسجيل الخروج', 'error');
+    }
+  };
 
   if (!authReady) {
     return (
@@ -362,57 +403,92 @@ export default function App() {
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
       <div className="hdr">
-        {tab !== 'game' || selectedGame || gameScreen !== 'home' ? (
-          <button
-            className="btn bgh bsm"
-            style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
-            onClick={() => {
-              if (tab !== 'game') {
-                goToTab('game');
-                return;
-              }
-              if (selectedGame === 'qumairi') {
-                if (fameeriRef.current?.handleHeaderBack?.()) return;
-                setSelectedGame(null);
-                return;
-              }
-              if (selectedGame === 'nicknames') {
-                if (titlesRef.current?.handleHeaderBack?.()) return;
-                setSelectedGame(null);
-                return;
-              }
-              if (gameScreen !== 'home') setGameScreen('home');
-              else setSelectedGame(null);
-            }}
-          >
-            ← رجوع
-          </button>
-        ) : (
-          <div style={{ width: 60 }} />
-        )}
-
-        <div
-          className="logo"
-          role="presentation"
-          style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', userSelect: 'none' }}
-          onClick={handleLogoSecretTap}
-        >
-          {tab === 'voice'
-            ? '💬 صوّتك'
-            : tab === 'game'
-              ? selectedGame === 'qumairi'
-                ? '🦅 صيد القميري'
-                : '🏟️ ساحة الألعاب'
-              : tab === 'pricing'
-                  ? '💎 الباقات'
-                  : tab === 'codes'
-                    ? '🎫 الأكواد'
-                    : tab === 'account'
-                      ? '👤 حسابي'
-                      : '🏟️ ساحة الألعاب'}
+        <div className="hdr-right">
+          <div className="hdr-account-wrap" ref={accountMenuRef}>
+            <button
+              type="button"
+              className="hdr-account-btn"
+              onClick={() => setAccountMenuOpen((v) => !v)}
+            >
+              👤 {accountDisplayName}
+            </button>
+            {accountMenuOpen ? (
+              <div className="hdr-account-menu">
+                {isGuest ? (
+                  <>
+                    <button type="button" className="hdr-account-item" onClick={() => openAccountTab('login')}>
+                      تسجيل دخول
+                    </button>
+                    <button type="button" className="hdr-account-item" onClick={() => openAccountTab('register')}>
+                      تسجيل جديد
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="hdr-account-item" onClick={() => openAccountTab('login')}>
+                      حسابي
+                    </button>
+                    <button type="button" className="hdr-account-item danger" onClick={handleHeaderSignOut}>
+                      تسجيل خروج
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        <div className="hdr-center">
+          <div
+            className="logo"
+            role="presentation"
+            style={{ userSelect: 'none' }}
+            onClick={handleLogoSecretTap}
+          >
+            {tab === 'voice'
+              ? '💬 صوّتك'
+              : tab === 'game'
+                ? selectedGame === 'qumairi'
+                  ? '🦅 صيد القميري'
+                  : '🏟️ ساحة الألعاب'
+                : tab === 'pricing'
+                    ? '💎 الباقات'
+                    : tab === 'codes'
+                      ? '🎫 الأكواد'
+                      : tab === 'account'
+                        ? '👤 حسابي'
+                        : '🏟️ ساحة الألعاب'}
+          </div>
+        </div>
+
+        <div className="hdr-left">
+          {tab !== 'game' || selectedGame || gameScreen !== 'home' ? (
+            <button
+              className="btn bgh bsm"
+              style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
+              onClick={() => {
+                if (tab !== 'game') {
+                  goToTab('game');
+                  return;
+                }
+                if (selectedGame === 'qumairi') {
+                  if (fameeriRef.current?.handleHeaderBack?.()) return;
+                  setSelectedGame(null);
+                  return;
+                }
+                if (selectedGame === 'nicknames') {
+                  if (titlesRef.current?.handleHeaderBack?.()) return;
+                  setSelectedGame(null);
+                  return;
+                }
+                if (gameScreen !== 'home') setGameScreen('home');
+                else setSelectedGame(null);
+              }}
+            >
+              رجوع →
+            </button>
+          ) : null}
+
           <ThemeToggle theme={theme} onToggle={toggleTheme} variant="compact" />
           {activeCode?.expiresAt && isCodeValid(activeCode) && (
             <SubscriptionTimer
@@ -491,6 +567,7 @@ export default function App() {
             followSystem={followSystem}
             onSetTheme={setTheme}
             onFollowSystem={setFollowSystemMode}
+            initialAuthMode={accountAuthMode}
           />
         )}
         {!showCodeActivation && tab==='pricing'&&(

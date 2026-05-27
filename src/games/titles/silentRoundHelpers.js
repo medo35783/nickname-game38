@@ -1,7 +1,6 @@
 /** مساعدات جولة الصمت — تخزين مؤقت ثم إعلان مجمّع بفصل حسب رقم الجولة. */
 
 import {
-  hiddenNickForPlayer,
   isDualTitleFullyRevealed,
   nickRevealedThisRound,
   playerSubmittedAttack,
@@ -19,28 +18,50 @@ export function sanitizeForFirebase(value) {
   return out;
 }
 
-function silentExitFromPlayer(p, elimAtt, roundNum) {
+function playerNicks(player) {
+  return [player?.nick, player?.nick2].filter(Boolean);
+}
+
+function newlyRevealedNicksFor(player, hits) {
+  const prev = player?.revealedNick ? [player.revealedNick] : [];
+  return [
+    ...new Set(
+      (hits || [])
+        .map((h) => h.targetNick)
+        .filter((nick) => playerNicks(player).includes(nick) && !prev.includes(nick))
+    ),
+  ];
+}
+
+function attackersForNick(hits, nick) {
+  return [
+    ...new Set(
+      (hits || [])
+        .filter((h) => h.targetNick === nick)
+        .map((h) => h.attackerNick)
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function silentExitFromPlayer(p, attackers, roundNum, nick) {
   const rec = {
     playerId: p.id,
-    nick: p.nick || '',
+    nick: nick || p.nick || '',
     name: p.name || '',
-    attackers: elimAtt[p.id] || [],
+    attackers: attackers || [],
     roundNum,
     initials: p.initials ?? null,
     colorIdx: typeof p.colorIdx === 'number' ? p.colorIdx : 0,
   };
-  if (p.nick2) rec.nick2 = p.nick2;
   return rec;
 }
 
 export function buildSilentSnapshot(attacks, playersList, roundNum) {
   const currentAtks = Object.values(attacks || {});
-  const elimAtt = {};
   const seenIds = new Set();
   currentAtks.forEach((a) => {
     if (a.correct && a.realOwnerId) {
-      if (!elimAtt[a.realOwnerId]) elimAtt[a.realOwnerId] = [];
-      elimAtt[a.realOwnerId].push(a.attackerNick);
       seenIds.add(a.realOwnerId);
     }
   });
@@ -51,14 +72,29 @@ export function buildSilentSnapshot(attacks, playersList, roundNum) {
   (playersList || []).forEach((p) => {
     if (!seenIds.has(p.id)) return;
     const hits = currentAtks.filter((a) => a.correct && a.realOwnerId === p.id);
+    const newlyRevealedNicks = newlyRevealedNicksFor(p, hits);
     if (p.nick2 && !isDualTitleFullyRevealed(p, hits)) {
-      const justRevealed = nickRevealedThisRound(p, hits);
+      const justRevealed = newlyRevealedNicks[0] || nickRevealedThisRound(p, hits);
       if (justRevealed) {
-        silentPartialReveals.push({ playerId: p.id, revealedNick: justRevealed, roundNum });
+        silentPartialReveals.push({
+          playerId: p.id,
+          revealedNick: justRevealed,
+          name: p.name || '',
+          attackers: attackersForNick(hits, justRevealed),
+          roundNum,
+          initials: p.initials ?? null,
+          colorIdx: typeof p.colorIdx === 'number' ? p.colorIdx : 0,
+        });
       }
       return;
     }
-    silentExits.push(silentExitFromPlayer(p, elimAtt, roundNum));
+    const finalRevealedNick =
+      (p.nick2 && p.revealedNick && newlyRevealedNicks.find((nick) => nick !== p.revealedNick)) ||
+      (p.nick2 && newlyRevealedNicks[newlyRevealedNicks.length - 1]) ||
+      nickRevealedThisRound(p, hits) ||
+      hits.find((h) => playerNicks(p).includes(h.targetNick))?.targetNick ||
+      p.nick;
+    silentExits.push(silentExitFromPlayer(p, attackersForNick(hits, finalRevealedNick), roundNum, finalRevealedNick));
   });
 
   const silentMissed = (playersList || [])
@@ -105,17 +141,15 @@ export function applySilentPendingToReveal(pendingSilent, playersList, updates, 
     const p = playersList.find((pl) => pl.id === pr.playerId);
     if (p && p.status === 'active' && pr.revealedNick) {
       updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = pr.revealedNick;
-      const patched = { ...p, revealedNick: pr.revealedNick };
       exitList.push({
         nick: pr.revealedNick,
-        nick2: hiddenNickForPlayer(patched, []),
-        name: null,
+        name: pr.name || p.name || null,
         partial: true,
         eliminatedBy: '',
-        attackers: [],
+        attackers: pr.attackers || [],
         hits: [],
-        initials: p.initials,
-        colorIdx: p.colorIdx,
+        initials: pr.initials ?? p.initials,
+        colorIdx: pr.colorIdx ?? p.colorIdx,
         fromSilentRound: pr.roundNum,
       });
     }

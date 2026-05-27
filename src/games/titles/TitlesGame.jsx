@@ -13,7 +13,6 @@ import {
   buildRevealQueue,
   attacksForPlayer,
   attackableNicksForPlayer,
-  hiddenNickForPlayer,
   isDualTitleFullyRevealed,
   isDecoyRequired,
   nickRevealedThisRound,
@@ -760,50 +759,74 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       currentAttacks
         .filter((a) => a.correct && a.realOwnerId === playerId)
         .map((a) => ({ attackerNick: a.attackerNick, targetNick: a.targetNick }));
+    const playerNicksForReveal = (p) => [p.nick, p.nick2].filter(Boolean);
+    const newlyRevealedNicksFor = (p, hits) => {
+      const nicks = playerNicksForReveal(p);
+      const prev = p.revealedNick ? [p.revealedNick] : [];
+      return [
+        ...new Set(
+          hits
+            .map((h) => h.targetNick)
+            .filter((nick) => nicks.includes(nick) && !prev.includes(nick))
+        ),
+      ];
+    };
+    const attackersForNick = (hits, nick) => [
+      ...new Set(
+        hits
+          .filter((h) => h.targetNick === nick)
+          .map((h) => h.attackerNick)
+          .filter(Boolean)
+      ),
+    ];
+    const revealItemForNick = (p, hits, nick, partial = false) => {
+      const attackers = attackersForNick(hits, nick);
+      return {
+        nick,
+        name: p.name,
+        partial,
+        eliminatedBy: attackers.join(' + '),
+        attackers,
+        hits: hits.filter((h) => h.targetNick === nick),
+        initials: p.initials,
+        colorIdx: p.colorIdx,
+      };
+    };
 
     for(const p of playersList){
       if(silentAppliedIds.has(p.id)) continue;
       if(elimIds.has(p.id)){
         const hits = correctHitsFor(p.id);
-        const attackers = [...new Set(hits.map((h) => h.attackerNick).filter(Boolean))];
-        const eliminatedByStr = attackers.join(' + ');
+        const newlyRevealedNicks = newlyRevealedNicksFor(p, hits);
 
         // لقبان: يخرج فقط إذا كُشف اللقبان (هذه الجولة أو جولة سابقة)
         if (p.nick2 && !isDualTitleFullyRevealed(p, hits)) {
-          const justRevealed = nickRevealedThisRound(p, hits);
+          const justRevealed = newlyRevealedNicks[0] || nickRevealedThisRound(p, hits);
           if (!justRevealed) continue;
           updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = justRevealed;
-          const hiddenNick = hiddenNickForPlayer(p, hits);
-          exitList.push({
-            nick: justRevealed,
-            nick2: hiddenNick,
-            name: null,
-            partial: true,
-            eliminatedBy: eliminatedByStr,
-            attackers: [
-              ...new Set(
-                hits
-                  .filter((h) => h.targetNick === justRevealed)
-                  .map((h) => h.attackerNick)
-              ),
-            ],
-            hits,
-            initials: p.initials,
-            colorIdx: p.colorIdx,
-          });
+          exitList.push(revealItemForNick(p, hits, justRevealed, true));
           continue;
         }
 
+        const finalRevealedNick =
+          (p.nick2 && p.revealedNick && newlyRevealedNicks.find((nick) => nick !== p.revealedNick)) ||
+          (p.nick2 && newlyRevealedNicks[newlyRevealedNicks.length - 1]) ||
+          nickRevealedThisRound(p, hits) ||
+          hits.find((h) => playerNicksForReveal(p).includes(h.targetNick))?.targetNick ||
+          p.nick;
+        const finalAttackers = attackersForNick(hits, finalRevealedNick);
+        const eliminatedByStr = finalAttackers.join(' + ');
+        if (p.nick2 && !p.revealedNick && newlyRevealedNicks.length > 1) {
+          newlyRevealedNicks
+            .slice(0, -1)
+            .forEach((nick) => exitList.push(revealItemForNick(p, hits, nick, true)));
+        }
         updates[`rooms/${roomCode}/players/${p.id}/status`] = 'eliminated';
         updates[`rooms/${roomCode}/players/${p.id}/revealedNick`] = null;
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedBy`]=eliminatedByStr;
-        updates[`rooms/${roomCode}/players/${p.id}/eliminatedByList`]=attackers;
+        updates[`rooms/${roomCode}/players/${p.id}/eliminatedByList`]=finalAttackers;
         updates[`rooms/${roomCode}/players/${p.id}/eliminatedRound`]=roundNum;
-        exitList.push({
-          nick:p.nick, nick2:p.nick2, name:p.name,
-          eliminatedBy:eliminatedByStr, attackers, hits,
-          initials:p.initials, colorIdx:p.colorIdx
-        });
+        exitList.push(revealItemForNick(p, hits, finalRevealedNick, false));
       } else if (p.status === 'active') {
         const submitted = playerSubmittedAttack(currentAttacks, p);
         const nm = submitted ? 0 : (p.missedRounds || 0) + 1;
@@ -1038,7 +1061,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             if (a.isDecoy || decoyNicksList.includes(a.targetNick)) {
               note = 'تمويه (لا صاحب حقيقي)';
             } else if (victim) {
-              note = `صاحب اللقب: ${esc(victim.name)} (${esc(victim.nick)})`;
+              note = `صاحب اللقب: ${esc(victim.name)} (${esc(a.targetNick)})`;
             }
             return `<tr><td>${esc(a.attackerNick)}</td><td>${esc(a.targetNick)}</td><td>${esc(
               a.guessedName
@@ -1216,7 +1239,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                       </div>
                       <div style={{fontSize:11,color:'var(--muted)',paddingRight:20}}>
                         خمّن: <strong style={{color:'var(--text)'}}>{a.guessedName}</strong>
-                        {!forEveryone&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{victim?.name} ({victim?.nick})</strong></>}
+                        {!forEveryone&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{victim?.name} ({a.targetNick})</strong></>}
                       </div>
                     </div>
                   );
@@ -1239,7 +1262,7 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                       </div>
                       <div style={{fontSize:11,color:'var(--muted)',paddingRight:20}}>
                         خمّن: <strong style={{color:'var(--red)'}}>{a.guessedName}</strong>
-                        {!forEveryone&&realOwner&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{realOwner.name} ({realOwner.nick})</strong></>}
+                        {!forEveryone&&realOwner&&<> — الحقيقي: <strong style={{color:'var(--gold)'}}>{realOwner.name} ({a.targetNick})</strong></>}
                       </div>
                     </div>
                   );
@@ -1298,14 +1321,14 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
               w.document.write('<div style="font-weight:700;color:#1a7a40;margin-bottom:6px">✅ الإصابات</div>');
               hits.forEach(a=>{
                 const v=playersList.find(p=>p.id===a.realOwnerId);
-                w.document.write(`<div class="attack-row hit">💥 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <strong>${a.guessedName}</strong> — الحقيقي: <strong class="green">${v?.name} (${v?.nick})</strong></div>`);
+                w.document.write(`<div class="attack-row hit">💥 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <strong>${a.guessedName}</strong> — الحقيقي: <strong class="green">${v?.name} (${a.targetNick})</strong></div>`);
               });
             }
             if(misses.length>0){
               w.document.write('<div style="font-weight:700;color:#a82020;margin:8px 0 6px">❌ الهجمات الخاطئة</div>');
               misses.forEach(a=>{
                 const ro=playersList.find(p=>p.id===a.realOwnerId);
-                w.document.write(`<div class="attack-row miss">🎯 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <span class="red">${a.guessedName}</span> — الحقيقي: <strong>${ro?.name} (${ro?.nick})</strong></div>`);
+                w.document.write(`<div class="attack-row miss">🎯 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <span class="red">${a.guessedName}</span> — الحقيقي: <strong>${ro?.name} (${a.targetNick})</strong></div>`);
               });
             }
             w.document.write('</div>');
@@ -1919,13 +1942,13 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                 borderRadius: 14,
                 background:
                   i === 0
-                    ? 'linear-gradient(135deg, rgba(255,107,90,.09), rgba(240,192,64,.06), rgba(79,163,224,.04))'
-                    : 'linear-gradient(135deg, rgba(255,255,255,.035), rgba(79,163,224,.025))',
+                    ? 'linear-gradient(135deg, rgba(240,192,64,.14), var(--card2), rgba(79,163,224,.06))'
+                    : 'var(--surface)',
                 border:
                   i === 0
                     ? '1px solid rgba(255,180,100,.28)'
-                    : '1px solid rgba(255,255,255,.07)',
-                boxShadow: i === 0 ? '0 6px 24px rgba(0,0,0,.22)' : '0 2px 12px rgba(0,0,0,.12)',
+                    : '1px solid var(--border-subtle)',
+                boxShadow: i === 0 ? '0 6px 24px rgba(0,0,0,.16)' : '0 2px 12px rgba(0,0,0,.08)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 10, alignItems: 'baseline' }}>
@@ -1934,22 +1957,23 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                     fontWeight: 800,
                     fontSize: 13,
                     fontFamily: 'Cairo, sans-serif',
-                    color: i === 0 ? 'var(--gold)' : i === 1 ? 'rgba(230,200,120,.95)' : i === 2 ? 'var(--blue)' : 'var(--text)',
+                    color: i === 0 ? 'var(--gold)' : i === 1 ? 'var(--text)' : i === 2 ? 'var(--blue)' : 'var(--text-soft)',
                     flex: 1,
                     minWidth: 0,
                   }}
                 >
-                  <span style={{ opacity: 0.65, marginLeft: 4 }}>{i + 1}</span> {label}
+                  <span style={{ opacity: 0.9, marginLeft: 4, color: 'var(--text)' }}>{i + 1}</span> {label}
                 </span>
                 <span
                   style={{
                     fontSize: 12,
                     fontWeight: 800,
-                    color: 'var(--muted)',
+                    color: 'var(--text)',
                     flexShrink: 0,
                     padding: '2px 8px',
                     borderRadius: 8,
-                    background: 'rgba(255,255,255,.06)',
+                    background: 'var(--card2)',
+                    border: '1px solid var(--border-faint)',
                   }}
                 >
                   {count} هجمة
@@ -1958,10 +1982,10 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
               <div
                 style={{
                   height: 12,
-                  background: 'linear-gradient(180deg, rgba(0,0,0,.25), rgba(255,255,255,.04))',
+                  background: 'var(--divider)',
                   borderRadius: 999,
                   overflow: 'hidden',
-                  border: '1px solid rgba(255,255,255,.08)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
                 <div style={{ height: '100%', ...heatBarFillStyle(count, maxVal) }} />
@@ -2413,10 +2437,16 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
                   <div className="grave-name">{p.name}</div>
                   {p.status==='eliminated'&&<div className="grave-nick">
                     {(()=>{
-                      const targetedNick=allAttacksFlat.find(a=>a.correct&&a.realOwnerId===p.id)?.targetNick;
-                      const shownNick=targetedNick||p.nick;
-                      const otherTargeted=p.nick2&&allAttacksFlat.some(a=>a.correct&&a.realOwnerId===p.id&&a.targetNick===p.nick2);
-                      return <>&quot;{shownNick}&quot;{otherTargeted?` / "${p.nick2}"`:''}</>;
+                      const playerHits = allRoundsList.flatMap((r) =>
+                        Object.values(r.attacks || {})
+                          .filter((a) => a.correct && a.realOwnerId === p.id)
+                          .map((a) => ({ ...a, round: r.round }))
+                      );
+                      const exitHit =
+                        [...playerHits].reverse().find((a) => a.round === p.eliminatedRound) ||
+                        playerHits[playerHits.length - 1];
+                      const shownNick=exitHit?.targetNick||p.nick;
+                      return <>&quot;{shownNick}&quot;</>;
                     })()}
                   </div>}
                   <div className="grave-info">

@@ -47,6 +47,7 @@ export default function AccountPage({
   followSystem = true,
   onSetTheme,
   onFollowSystem,
+  initialAuthMode = 'login',
 }) {
   const user = auth.currentUser;
   const [historyList, setHistoryList] = useState([]);
@@ -199,7 +200,7 @@ export default function AccountPage({
           <div className="ctitle" style={{ marginBottom: 8 }}>
             تسجيل بالبريد (اختياري)
           </div>
-          <PlayerAuthScreen notify={notify} compact />
+          <PlayerAuthScreen notify={notify} compact initialMode={initialAuthMode} />
           {activeOk && !showLinkForm ? (
             <button
               type="button"

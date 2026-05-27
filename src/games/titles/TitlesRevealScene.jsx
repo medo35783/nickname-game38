@@ -154,7 +154,7 @@ export default function TitlesRevealScene(props) {
       <div className="trs-scene cinematic">
         {item.fromSilentRound && (
           <TrsBanner icon="🤫" color="var(--purple)">
-            الجولة {item.fromSilentRound} — كان خروجه مخفياً حتى الآن
+            الجولة {item.fromSilentRound} — كان {isPartial ? 'كشفه' : 'خروجه'} مخفياً حتى الآن
           </TrsBanner>
         )}
 
@@ -184,24 +184,23 @@ export default function TitlesRevealScene(props) {
           "{item.nick}"
         </div>
 
-        {!isPartial && (
-          <div className="trs-burst">
-            <Av p={fakePlayer} sz={56} fs={18} />
-            <div className="trs-reveal-name">{item.name || '—'}</div>
-            <div className="trs-reveal-lbl">
-              {arrowCountOnNick(item) >= 2 ? '💥 أُصيب من عدة جهات — انكشف!' : '💥 انكشف!'}
-            </div>
+        <div className="trs-burst">
+          <Av p={fakePlayer} sz={56} fs={18} />
+          <div className="trs-owner-lbl">صاحب اللقب</div>
+          <div className="trs-reveal-name">{item.name || '—'}</div>
+          <div className={`trs-reveal-lbl${isPartial ? ' partial' : ''}`}>
+            {isPartial
+              ? '💥 كُشف هذا اللقب — لم يخرج صاحبه بعد'
+              : arrowCountOnNick(item) >= 2
+                ? '💥 خرج بعد إصابات متعددة على هذا اللقب'
+                : '💥 خرج من اللعبة'}
           </div>
-        )}
+        </div>
 
         {isPartial && (
           <TrsCard accent="purple">
-            <div className="trs-reveal-lbl">كُشف لقب واحد — ما زال في اللعبة</div>
-            {item.nick2 && (
-              <p className="trs-muted">
-                اللقب <strong style={{ color: 'var(--gold)' }}>"{item.nick2}"</strong> ما زال مخفياً
-              </p>
-            )}
+            <div className="trs-section-lbl">وضع اللقبين</div>
+            <p className="trs-muted">هذا الإعلان يخص اللقب المعروض فقط. يبقى اللاعب حتى يُكشف لقبه الآخر.</p>
           </TrsCard>
         )}
 

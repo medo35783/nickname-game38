@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -28,8 +28,8 @@ function mapAuthError(code) {
 /**
  * تسجيل دخول / حساب جديد بالبريد — اختياري، نفس النموذج للجميع (لاعب أو مشرف).
  */
-export default function PlayerAuthScreen({ notify, compact = false, onSuccess }) {
-  const [mode, setMode] = useState('login');
+export default function PlayerAuthScreen({ notify, compact = false, onSuccess, initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode === 'register' ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -43,6 +43,10 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess })
   const afterAuth = useCallback(() => {
     onSuccess?.();
   }, [onSuccess]);
+
+  useEffect(() => {
+    setMode(initialMode === 'register' ? 'register' : 'login');
+  }, [initialMode]);
 
   const handleRegister = useCallback(
     async (e) => {
