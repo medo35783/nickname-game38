@@ -98,28 +98,18 @@ function renderHeatItems(items) {
 }
 
 function renderHeatColumn(title, allRoundsList, field) {
-  const rounds = [...allRoundsList].sort((a, b) => a.round - b.round);
-  let blocks = '';
-  rounds.forEach((r) => {
-    const ratks = Object.values(r.attacks || {});
-    const items = heatFromAttacks(ratks, field);
-    if (!items.length) return;
-    blocks += `<div class="heat-round-mini">
-      <div class="heat-round-lbl">الجولة ${r.round}${r.silent ? ' 🤫' : ''}</div>
-      ${renderHeatItems(items)}
-    </div>`;
-  });
-  const allAtks = rounds.flatMap((r) => Object.values(r.attacks || {}));
+  const allAtks = [...allRoundsList]
+    .sort((a, b) => a.round - b.round)
+    .flatMap((r) => Object.values(r.attacks || {}));
   const total = heatFromAttacks(allAtks, field);
-  if (total.length) {
-    blocks += `<div class="heat-round-mini total">
-      <div class="heat-round-lbl">المجموع الكلي</div>
-      ${renderHeatItems(total)}
-    </div>`;
-  }
+  const inner = total.length
+    ? `<div class="heat-total-block">${renderHeatItems(total)}</div>`
+    : '<p class="empty-sm">لا بيانات</p>';
+
   return `<div class="heat-col">
     <h3 class="heat-col-title">${esc(title)}</h3>
-    ${blocks || '<p class="empty-sm">لا بيانات</p>'}
+    <p class="heat-col-sub">🏅 المجموع الكلي (كل الجولات) · ${allAtks.length} هجمة</p>
+    ${inner}
   </div>`;
 }
 
@@ -388,10 +378,9 @@ function reportStyles() {
   .exit-line strong{color:${C.red}}
   .split-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .heat-col{background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:10px}
-  .heat-col-title{margin:0 0 10px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;color:${C.gold};text-align:center}
-  .heat-round-mini{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed ${C.border}}
-  .heat-round-mini.total{border-bottom:none;background:rgba(184,134,11,.08);padding:8px;border-radius:8px}
-  .heat-round-lbl{font-size:11px;font-weight:800;color:${C.muted};margin-bottom:6px}
+  .heat-col-title{margin:0 0 4px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;color:${C.gold};text-align:center}
+  .heat-col-sub{margin:0 0 12px;font-size:11px;font-weight:700;color:${C.muted};text-align:center}
+  .heat-total-block{padding:4px 0}
   .heat-item{margin-bottom:6px;padding:6px 8px;border-radius:8px;background:#fff;border:1px solid ${C.border}}
   .heat-item.top{border-color:rgba(184,134,11,.4);background:${C.goldLight}}
   .heat-head{display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;font-size:11px}
@@ -516,7 +505,7 @@ function buildReportHtml({ roomCode, playersList, allRoundsList, allAttacksFlat,
 
   <section class="page page-break heat-page">
     ${pgHead(roomCode, 'الخريطة الحرارية')}
-    <h2 class="sec-title">🔥 الخريطة الحرارية — كل الجولات</h2>
+    <h2 class="sec-title">🔥 الخريطة الحرارية — المجموع الكلي لكل الجولات</h2>
     <div class="split-2">
       ${renderHeatColumn('👥 الأسماء الأكثر تخميناً', allRoundsList, 'guessedName')}
       ${renderHeatColumn('🎭 الألقاب الأكثر استهدافاً', allRoundsList, 'targetNick')}
