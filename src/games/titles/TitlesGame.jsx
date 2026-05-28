@@ -633,6 +633,14 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       notify('❌ لا يمكنك الهجوم — أنت خارج المسابقة','error');
       return;
     }
+    // وضع اللقبين: لا هجوم بلقب مكشوف (خرج من الساحة)
+    if(attackerPlayer){
+      const allowedAttackerNicks = attackableNicksForPlayer(attackerPlayer);
+      if(!allowedAttackerNicks.includes(attackerNick)){
+        notify('❌ لا يمكنك الهجوم بهذا اللقب — اللقب المكشوف خارج الساحة','error');
+        return;
+      }
+    }
 
     // Block self-attack — attacker cannot target their own nick
     const realOwner = playersList.find(p=>p.nick===myNick||p.nick2===myNick);

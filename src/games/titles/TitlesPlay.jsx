@@ -47,7 +47,8 @@ export default function TitlesPlay(props) {
   const proxyPlayer = proxyFor ? playersList.find((p) => p.id === proxyFor) : null;
 
   const effectivePlayer = proxyPlayer || playersList.find((p) => p.nick === myNickLocal || p.nick2 === myNickLocal);
-  const myNicksList = effectivePlayer ? [effectivePlayer.nick, effectivePlayer.nick2].filter(Boolean) : [];
+  /** ألقاب الهجوم فقط — يستثني اللقب المكشوف (خارج الساحة) في وضع اللقبين */
+  const myNicksList = effectivePlayer ? attackableNicksForPlayer(effectivePlayer) : [];
   const pickIdentityFirst = myNicksList.length >= 2;
 
   const myPlayerId =
@@ -109,6 +110,13 @@ export default function TitlesPlay(props) {
       setMyAttackerNick(null);
     }
   }, [myNick, myGuess, myAttacksDone, gameState?.phase, pickIdentityFirst]);
+
+  useEffect(() => {
+    if (myAttackerNick && !myNicksList.includes(myAttackerNick)) {
+      setMyAttackerNick(null);
+      if (!myNick && !myGuess) setAttackStep(pickIdentityFirst ? 0 : 1);
+    }
+  }, [myAttackerNick, myNicksList, pickIdentityFirst, myNick, myGuess]);
 
   useEffect(() => {
     if (!myAttacksDone) return;

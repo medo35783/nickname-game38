@@ -8,23 +8,17 @@ export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
             .filter((a) => a.attackerId === g.id || a.targetId === g.id)
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
           return (
-            <div
-              key={g.id}
-              style={{
-                borderRadius: 12,
-                padding: 10,
-                background: 'linear-gradient(160deg,rgba(240,192,64,.07),#0a0a1c)',
-                border: '1px solid rgba(255,255,255,.09)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 900, color: 'var(--gold)', fontSize: 14 }}>{g.name}</span>
-                <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 800 }}>{g.totalRemaining ?? 0} 🐦</span>
+            <div key={g.id} className="fameeri-battle-group">
+              <div className="fameeri-battle-group__head">
+                <span className="fameeri-group-name" style={{ fontSize: 14 }}>
+                  {g.name}
+                </span>
+                <span className="fameeri-battle-group__score">{g.totalRemaining ?? 0} 🐦</span>
               </div>
               {rows.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>لا أحداث بعد</div>
+                <div className="fameeri-battle-empty">لا أحداث بعد</div>
               ) : (
-                <div className="sc" style={{ maxHeight: 140 }}>
+                <div className="sc fameeri-battle-feed" style={{ maxHeight: 140 }}>
                   {rows.map((a, idx) => {
                     const outgoing = a.attackerId === g.id;
                     const ok = a.result === 'success' || a.result === 'shielded';
@@ -40,8 +34,9 @@ export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
                       >
                         {outgoing ? (
                           <>
-                            <span style={{ color: 'var(--muted)' }}>⚔️ هجوم →</span>{' '}
-                            <strong style={{ color: 'var(--red)' }}>{a.targetName}</strong> · 🌳{a.tree} · {a.weaponName} —{' '}
+                            <span style={{ color: 'var(--fameeri-muted)' }}>⚔️ هجوم →</span>{' '}
+                            <strong style={{ color: 'var(--red)' }}>{a.targetName}</strong> · 🌳{a.tree} ·{' '}
+                            {a.weaponName} —{' '}
                             {a.result === 'success'
                               ? `🎯 ${a.hunted ?? 0}`
                               : a.result === 'shielded'
@@ -50,8 +45,8 @@ export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
                           </>
                         ) : (
                           <>
-                            <span style={{ color: 'var(--muted)' }}>🎯 مِن</span>{' '}
-                            <strong style={{ color: 'var(--gold)' }}>{a.attackerName}</strong> · 🌳{a.tree} —{' '}
+                            <span style={{ color: 'var(--fameeri-muted)' }}>🎯 مِن</span>{' '}
+                            <strong className="fameeri-group-name">{a.attackerName}</strong> · 🌳{a.tree} —{' '}
                             {a.result === 'success'
                               ? `خسارة ${a.hunted ?? 0}`
                               : a.result === 'shielded'

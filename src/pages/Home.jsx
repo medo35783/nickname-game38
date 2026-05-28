@@ -29,23 +29,24 @@ export default function Home({ setSelectedGame }) {
       </div>
 
       {/* بطاقة لعبة القميري */}
-      <div onClick={() => setSelectedGame('qumairi')} style={{ background: 'linear-gradient(135deg,rgba(46,204,113,.1),rgba(26,138,80,.05))', border: '2px solid rgba(46,204,113,.25)', borderRadius: 16, padding: '18px 16px', marginBottom: 12, cursor: 'pointer', transition: 'all .2s' }}
-        onTouchStart={e => { e.currentTarget.style.transform = 'scale(.98)'; }}
-        onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
+      <div
+        className="home-game-card home-game-card--fameeri"
+        onClick={() => setSelectedGame('qumairi')}
+        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
+        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🦅</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--green)' }}>صيد القميري</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.6 }}>وزّع القميري على الأشجار واهجم مجموعات الخصوم</div>
+            <div className="home-game-card__title">صيد القميري</div>
+            <div className="home-game-card__sub">وزّع القميري على الأشجار واهجم مجموعات الخصوم</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
-              {['2-6 مجموعات', '100 قميري', 'استراتيجية'].map(t => (
-                <span key={t} className="tag tv" style={{ fontSize: 10 }}>{t}</span>
+              {['2-6 مجموعات', '100 قميري', 'استراتيجية'].map((t) => (
+                <span key={t} className="tag" style={{ fontSize: 10 }}>{t}</span>
               ))}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-            <div style={{ fontSize: 20, color: 'var(--green)' }}>←</div>
-          </div>
+          <div className="home-game-card__arrow" style={{ fontSize: 20 }}>←</div>
         </div>
       </div>
 

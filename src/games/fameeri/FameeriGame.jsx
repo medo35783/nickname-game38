@@ -23,6 +23,29 @@ function readSavedFameeri() {
   }
 }
 
+function qumairiScreenForPhase(phase) {
+  if (phase === 'playing') return 'qumairi_play';
+  if (phase === 'ended') return 'qumairi_results';
+  return 'qumairi_lobby';
+}
+
+/** يعثر على عضو سابق: بالمعرّف المحفوظ، أو uid، أو الاسم */
+function findExistingQumairiMember(members, { memberId, uid, name }) {
+  if (!members || typeof members !== 'object') return null;
+  if (memberId && members[memberId]) return [memberId, members[memberId]];
+  const entries = Object.entries(members);
+  if (uid) {
+    const byUid = entries.find(([, m]) => m.ownerUid === uid);
+    if (byUid) return byUid;
+  }
+  const trimmed = name?.trim();
+  if (trimmed) {
+    const byName = entries.find(([, m]) => m.name?.trim() === trimmed);
+    if (byName) return byName;
+  }
+  return null;
+}
+
 const FameeriGame = forwardRef(function FameeriGame(
   { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd },
   ref
@@ -33,6 +56,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [showGuide, setShowGuide] = useState(false);
   const pendingOnboardingRef = useRef(null);
+  const sessionRestoredRef = useRef(false);
   const [qExitModal, setQExitModal] = useState(false);
 
   useEffect(() => {
@@ -51,7 +75,36 @@ const FameeriGame = forwardRef(function FameeriGame(
   };
 
   const handlePlayerEntry = () => {
+    const saved = readSavedFameeri();
+    if (saved.qRoom) setQJoinInput(saved.qRoom);
+    if (saved.qMyName) setQMyName(saved.qMyName);
     setShowOnboarding('player');
+  };
+
+  const createQumairiRoom = async () => {
+    if (!canCreateRoom) {
+      notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».', 'error');
+      onRequestActivation();
+      return;
+    }
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+    } catch {
+      /* ignore */
+    }
+    const code = genCode();
+    setQRoom(code);
+    setQRole('admin');
+    await set(dbRef(db, `qrooms/${code}`), {
+      ...(auth.currentUser?.uid ? { adminId: auth.currentUser.uid } : {}),
+      game: { phase: 'lobby', createdAt: Date.now() },
+      groups: {},
+      members: {},
+      attacks: {},
+    });
+    localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
+    setGameScreen('qumairi_lobby');
+    notify(`✅ الغرفة: ${code}`, 'gold');
   };
 
   /* ── QUMAIRI GAME STATE ── */
@@ -72,6 +125,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   const [qAttackTarget, setQAttackTarget] = useState({group:'',tree:'',weapon:''});
   const [qReveal, setQReveal]     = useState(null);
   const [qJoinLoading, setQJoinLoading] = useState(false);
+  const [qDistSubmitting, setQDistSubmitting] = useState(false);
   const [qCustomTimer, setQCustomTimer] = useState('');
   const [qCountdown, setQCountdown] = useState(null); // عداد القميري الحقيقي
   const [qTurnOverlay, setQTurnOverlay] = useState(null); // {groupName, weapon}
@@ -104,22 +158,6 @@ const FameeriGame = forwardRef(function FameeriGame(
     onValue(qmRef, snap=>setQMembers(snap.val()||{}));
     return ()=>{ off(qgRef); off(qpRef); off(qaRef); off(qmRef); };
   }, [qRoom]);
-
-  /* ══ QUMAIRI AUTO-REJOIN ══ */
-  useEffect(()=>{
-    const saved = localStorage.getItem('ng_qumairi');
-    if(!saved) return;
-    try{
-      const s = JSON.parse(saved);
-      if(s.qRoom) setQRoom(s.qRoom);
-      if(s.qRole) setQRole(s.qRole);
-      if(s.qGroupId) setQGroupId(s.qGroupId);
-      if(s.qGroupName) setQGroupName(s.qGroupName);
-      if(s.qMyName) setQMyName(s.qMyName);
-      if(s.qMyId) setQMyId(s.qMyId);
-      if(s.qDistLocked) setQDistLocked(true);
-    }catch(e){localStorage.removeItem('ng_qumairi');}
-  }, []);
 
   /** تصحيح دور المشرف إن كان uid قد تأخر عن القراءة الأولى */
   useEffect(() => {
@@ -176,15 +214,14 @@ const FameeriGame = forwardRef(function FameeriGame(
     return()=>clearInterval(t);
   },[qGameState?.timer?.deadline]);
 
-  // Auto-navigate qumairi based on phase
-  useEffect(()=>{
-    if(!qRoom || !qGameState) return;
-    const ph = qGameState.phase;
-    if(ph==='lobby') setGameScreen('qumairi_lobby');
-    else if(ph==='distributing') setGameScreen('qumairi_lobby');
-    else if(ph==='playing') setGameScreen('qumairi_play');
-    else if(ph==='ended') setGameScreen('qumairi_results');
-  },[qGameState?.phase, qRoom]);
+  // Auto-navigate qumairi based on phase (داخل الغرفة فقط — لا يقطع الشاشة الرئيسية أو الانضمام)
+  useEffect(() => {
+    if (!qRoom || !qGameState) return;
+    const roomScreens = ['qumairi_lobby', 'qumairi_play', 'qumairi_results'];
+    if (!roomScreens.includes(gameScreen)) return;
+    const target = qumairiScreenForPhase(qGameState.phase);
+    if (gameScreen !== target) setGameScreen(target);
+  }, [qGameState?.phase, qRoom, gameScreen]);
 
   // Qumairi — dramatic reveal sequence
   useEffect(()=>{
@@ -261,6 +298,208 @@ const FameeriGame = forwardRef(function FameeriGame(
       })
     );
   };
+
+  const restoreQumairiSession = async (roomCodeOverride) => {
+    const saved = readSavedFameeri();
+    const roomCode = roomCodeOverride || saved.qRoom;
+    if (!roomCode) return false;
+
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const snap = await get(dbRef(db, `qrooms/${roomCode}`));
+      if (!snap.exists()) {
+        localStorage.removeItem('ng_qumairi');
+        setQRoom('');
+        setQRole(null);
+        notify('الغرفة لم تعد موجودة', 'error');
+        return false;
+      }
+      const data = snap.val();
+      const phase = data.game?.phase || 'lobby';
+      if (phase === 'ended') {
+        localStorage.removeItem('ng_qumairi');
+        setQRoom('');
+        setQRole(null);
+        notify('انتهت هذه الجولة', 'info');
+        return false;
+      }
+
+      const uid = auth.currentUser?.uid;
+      if (saved.qRole === 'admin' || (uid && data.adminId === uid)) {
+        setQRoom(roomCode);
+        setQRole('admin');
+        setQMyId(null);
+        setQGroupId(null);
+        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: roomCode, qRole: 'admin' }));
+        setGameScreen(qumairiScreenForPhase(phase));
+        notify('✅ عدت للغرفة كمشرف', 'gold');
+        return true;
+      }
+
+      const existing = findExistingQumairiMember(data.members, {
+        memberId: saved.qRoom === roomCode ? saved.qMyId : null,
+        uid,
+        name: saved.qMyName || qMyName,
+      });
+
+      if (!existing) {
+        if (saved.qMyId && saved.qRoom === roomCode) {
+          localStorage.removeItem('ng_qumairi');
+          setQRoom('');
+          setQRole(null);
+        }
+        return false;
+      }
+
+      const [memberId, memberData] = existing;
+      const role = memberData.role === 'leader' ? 'leader' : 'member';
+      setQRoom(roomCode);
+      setQMyId(memberId);
+      setQRole(role);
+      setQMyName(memberData.name || saved.qMyName || '');
+      if (memberData.groupId) {
+        setQGroupId(memberData.groupId);
+        const grpName = data.groups?.[memberData.groupId]?.name || '';
+        if (grpName) setQGroupName(grpName);
+      } else {
+        setQGroupId(null);
+        setQGroupName('');
+      }
+      localStorage.setItem(
+        'ng_qumairi',
+        JSON.stringify({
+          qRoom: roomCode,
+          qRole: role,
+          qMyId: memberId,
+          qMyName: memberData.name || saved.qMyName || '',
+          qGroupId: memberData.groupId || null,
+          qGroupName: data.groups?.[memberData.groupId]?.name || '',
+        })
+      );
+      setGameScreen(qumairiScreenForPhase(phase));
+      notify('✅ عدت للغرفة!', 'success');
+      return true;
+    } catch {
+      notify('تعذر الاتصال بالغرفة', 'error');
+      return false;
+    }
+  };
+
+  const joinQumairiRoom = async () => {
+    if (qJoinLoading) return;
+    if (qJoinInput.length !== 4) {
+      setQJoinErr('الرمز 4 أرقام');
+      return;
+    }
+    setQJoinLoading(true);
+    setQJoinErr('');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const snap = await get(dbRef(db, `qrooms/${qJoinInput}`));
+      if (!snap.exists()) {
+        setQJoinErr('الغرفة غير موجودة');
+        return;
+      }
+      const data = snap.val();
+      const phase = data.game?.phase || 'lobby';
+      const uid = auth.currentUser?.uid;
+
+      if (uid && data.adminId === uid) {
+        setQRoom(qJoinInput);
+        setQRole('admin');
+        setQMyId(null);
+        setQGroupId(null);
+        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: qJoinInput, qRole: 'admin' }));
+        setGameScreen(qumairiScreenForPhase(phase));
+        notify('✅ دخلت كمشرف — صاحب الغرفة', 'gold');
+        return;
+      }
+
+      const saved = readSavedFameeri();
+      const existing = findExistingQumairiMember(data.members, {
+        memberId: saved.qRoom === qJoinInput ? saved.qMyId : null,
+        uid,
+        name: qMyName,
+      });
+
+      if (existing) {
+        const [memberId, memberData] = existing;
+        const role = memberData.role === 'leader' ? 'leader' : 'member';
+        setQRoom(qJoinInput);
+        setQMyId(memberId);
+        setQRole(role);
+        setQMyName(memberData.name || qMyName.trim());
+        if (memberData.groupId) {
+          setQGroupId(memberData.groupId);
+          const grpName = data.groups?.[memberData.groupId]?.name || '';
+          if (grpName) setQGroupName(grpName);
+        } else {
+          setQGroupId(null);
+          setQGroupName('');
+        }
+        localStorage.setItem(
+          'ng_qumairi',
+          JSON.stringify({
+            qRoom: qJoinInput,
+            qRole: role,
+            qMyId: memberId,
+            qMyName: memberData.name || qMyName.trim(),
+            qGroupId: memberData.groupId || null,
+            qGroupName: data.groups?.[memberData.groupId]?.name || '',
+          })
+        );
+        setGameScreen(qumairiScreenForPhase(phase));
+        notify('✅ عدت للغرفة!', 'success');
+        return;
+      }
+
+      if (phase !== 'lobby') {
+        setQJoinErr('اللعبة بدأت — لا يمكن الانضمام لأول مرة. أدخل نفس اسمك إن كنت مسجّلاً سابقاً');
+        return;
+      }
+
+      if (!qMyName.trim()) {
+        setQJoinErr('أدخل اسمك');
+        return;
+      }
+
+      const mRef = push(dbRef(db, `qrooms/${qJoinInput}/members`));
+      await set(mRef, {
+        name: qMyName.trim(),
+        groupId: null,
+        role: 'member',
+        joinedAt: Date.now(),
+        ...(uid ? { ownerUid: uid } : {}),
+      });
+      setQMyId(mRef.key);
+      setQRoom(qJoinInput);
+      setQRole('member');
+      localStorage.setItem(
+        'ng_qumairi',
+        JSON.stringify({
+          qRoom: qJoinInput,
+          qRole: 'member',
+          qMyName: qMyName.trim(),
+          qMyId: mRef.key,
+        })
+      );
+      setGameScreen('qumairi_lobby');
+      notify('✅ انضممت — انتظر المشرف يضعك في مجموعة', 'success');
+    } catch {
+      setQJoinErr('خطأ في الاتصال');
+    } finally {
+      setQJoinLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    const saved = readSavedFameeri();
+    if (!saved.qRoom) return;
+    sessionRestoredRef.current = true;
+    void restoreQumairiSession(saved.qRoom);
+  }, []);
+
   const qGList = Object.entries(qGroups).map(([id, g]) => ({ ...g, id }));
   const qMList = Object.entries(qMembers).map(([id, m]) => ({ ...m, id }));
   const qMyGroup = qGList.find((g) => g.id === qGroupId);
@@ -271,6 +510,99 @@ const FameeriGame = forwardRef(function FameeriGame(
   const isAdmin = qRole === 'admin';
   const qMyMember = qMyId ? qMList.find((m) => m.id === qMyId) : null;
   const isLeader = !isAdmin && qMyMember?.role === 'leader';
+
+  const assignGroupLeader = async (groupId, member) => {
+    const members = qMList.filter((m) => m.groupId === groupId);
+    const updates = {};
+    members.forEach((mm) => {
+      if (mm.role === 'leader') updates[`qrooms/${qRoom}/members/${mm.id}/role`] = 'member';
+    });
+    updates[`qrooms/${qRoom}/members/${member.id}/role`] = 'leader';
+    updates[`qrooms/${qRoom}/groups/${groupId}/leaderMemberId`] = member.id;
+    updates[`qrooms/${qRoom}/groups/${groupId}/leaderUid`] = member.ownerUid || null;
+    try {
+      await update(dbRef(db), updates);
+      notify('✅ تم تعيين القائد', 'success');
+    } catch {
+      notify('تعذر تعيين القائد', 'error');
+    }
+  };
+
+  const submitQumairiDistribution = async () => {
+    const total = Object.values(qDistribution).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+    if (total !== Q_TOTAL) {
+      notify(`يجب توزيع ${Q_TOTAL} قميري بالضبط`, 'error');
+      return;
+    }
+    if (!qRoom || !qGroupId) {
+      notify('لم تُحدد مجموعتك بعد — انتظر المشرف', 'error');
+      return;
+    }
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+    } catch {
+      /* ignore */
+    }
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      notify('سجّل الدخول من «حسابي» ثم أعد المحاولة', 'error');
+      return;
+    }
+    if (qMyMember?.role !== 'leader') {
+      notify('التأكيد للقائد 👑 فقط', 'error');
+      return;
+    }
+
+    const trees = {};
+    Q_TREES.forEach((t) => {
+      trees[t] = parseInt(qDistribution[t], 10) || 0;
+    });
+
+    setQDistSubmitting(true);
+    try {
+      if (qMyId && !qMyMember?.ownerUid) {
+        await update(dbRef(db, `qrooms/${qRoom}/members/${qMyId}`), { ownerUid: uid });
+      }
+
+      const patch = {
+        trees,
+        distributed: true,
+        totalRemaining: Q_TOTAL,
+        leaderUid: uid,
+        leaderMemberId: qMyId,
+      };
+      await update(dbRef(db, `qrooms/${qRoom}/groups/${qGroupId}`), patch);
+      setQDistLocked(true);
+      qSave({ qDistLocked: true });
+      notify('✅ تم التوزيع', 'success');
+    } catch (err) {
+      console.error('submitQumairiDistribution', err);
+      const denied =
+        err?.code === 'PERMISSION_DENIED' ||
+        String(err?.message || '').toLowerCase().includes('permission');
+      notify(
+        denied
+          ? 'رفض السيرفر الحفظ — اطلب من المشرف إعادة تعيينك قائداً 👑 أو انشر قواعد Firebase المحدّثة'
+          : 'تعذر حفظ التوزيع — تحقق من الاتصال',
+        'error'
+      );
+    } finally {
+      setQDistSubmitting(false);
+    }
+  };
+
+  /** ربط القائد بمجموعته في Firebase (للغرف القديمة قبل leaderUid) */
+  useEffect(() => {
+    if (!isLeader || qPhase !== 'distributing' || !qRoom || !qGroupId || !qMyId) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const g = qGroups[qGroupId];
+    if (g?.leaderUid === uid && g?.leaderMemberId === qMyId) return;
+    update(dbRef(db, `qrooms/${qRoom}/groups/${qGroupId}`), {
+      leaderUid: uid,
+      leaderMemberId: qMyId,
+    }).catch(() => {});
+  }, [isLeader, qPhase, qRoom, qGroupId, qMyId, qGroups]);
 
   useEffect(() => {
     if (!qMyMember || qRole === 'admin') return;
@@ -381,7 +713,7 @@ const FameeriGame = forwardRef(function FameeriGame(
           onDismiss={() => {
             const r = showOnboarding;
             setShowOnboarding(null);
-            if (r === 'admin') setGameScreen('qumairi_admin');
+            if (r === 'admin') void createQumairiRoom();
             else setGameScreen('qumairi_join');
           }}
         />
@@ -396,11 +728,23 @@ const FameeriGame = forwardRef(function FameeriGame(
       return (
         <div className="scr">
           <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setSelectedGame(null)}>← ساحة الألعاب</button>
-          <div style={{textAlign:'center',padding:'10px 0 12px'}}>
-            <div style={{fontSize:46,marginBottom:6}}>🦅</div>
-            <div className="ptitle" style={{fontSize:22}}>صيد القميري</div>
-            <div className="psub">وزّع القميري بخطة • هاجم الأشجار • احمي مجموعتك</div>
+          <div className="fameeri-hero" style={{ textAlign: 'center', padding: '10px 0 12px' }}>
+            <div style={{ fontSize: 46, marginBottom: 6 }}>🦅</div>
+            <div className="ptitle" style={{ fontSize: 22 }}>صيد القميري</div>
+            <div className="psub" style={{ color: 'var(--fameeri-muted)' }}>
+              وزّع القميري على الأشجار واهجم مجموعات الخصوم
+            </div>
           </div>
+          {readSavedFameeri().qRoom && (
+            <button
+              type="button"
+              className="btn bo"
+              style={{ marginBottom: 8 }}
+              onClick={() => void restoreQumairiSession(readSavedFameeri().qRoom)}
+            >
+              🔙 العودة للغرفة ({readSavedFameeri().qRoom})
+            </button>
+          )}
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             <button type="button" className="btn bg" onClick={handleAdminEntry}>👑 إنشاء غرفة كمسؤول</button>
             <button type="button" className="btn bo" onClick={handlePlayerEntry}>🎮 انضمام كمجموعة برمز الغرفة</button>
@@ -417,49 +761,84 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
 
     /* ══ QUMAIRI SCREENS ══ */
-    if(gameScreen==='qumairi_admin') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">إنشاء غرفة — صيد القميري</div><div className="psub">شارك الرمز (4 أرقام) ثم أنشئ الغرفة</div><button type="button" className="btn bg" onClick={async()=>{if(!canCreateRoom){notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».','error');onRequestActivation();return;}try{if(typeof auth.authStateReady==='function')await auth.authStateReady();}catch(z){void z;}const code=genCode();setQRoom(code);setQRole('admin');await set(dbRef(db,`qrooms/${code}`),{...(auth.currentUser?.uid?{adminId:auth.currentUser.uid}:{}),game:{phase:'lobby',createdAt:Date.now()},groups:{},members:{},attacks:{}});localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:code,qRole:'admin'}));setGameScreen('qumairi_lobby');notify(`✅ الغرفة: ${code}`,'gold');}}>🏟️ إنشاء الغرفة</button></div>);
-
-    if(gameScreen==='qumairi_join') return(<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');}}>← رجوع</button><div style={{textAlign:'center',padding:'10px 0'}}><div style={{fontSize:46}}>🦅</div></div><div className="ptitle">انضمام — صيد القميري</div><div className="card"><div className="ig"><label className="lbl">🔢 رمز الغرفة (4 أرقام)</label><input className="inp big" placeholder={ROOM_CODE_PLACEHOLDER} maxLength={4} value={qJoinInput} onChange={e=>{setQJoinInput(e.target.value.replace(/\D/g,''));setQJoinErr('');}}/></div><div className="ig"><label className="lbl">👤 اسمك</label><input className="inp" placeholder={GROUP_MEMBER_NAME_PLACEHOLDER} value={qMyName} onChange={e=>setQMyName(e.target.value)}/></div>{qJoinErr&&<div className="err-msg">⚠️ {qJoinErr}</div>}<button className="btn bg mt2" disabled={qJoinLoading} onClick={async()=>{if(qJoinLoading)return;if(qJoinInput.length!==4){setQJoinErr('الرمز 4 أرقام');return;}setQJoinLoading(true);try{if(typeof auth.authStateReady==='function')await auth.authStateReady();const snap=await get(dbRef(db,`qrooms/${qJoinInput}`));if(!snap.exists()){setQJoinErr('الغرفة غير موجودة');return;}const data=snap.val();if(data.game?.phase!=='lobby'){setQJoinErr('اللعبة بدأت');return;}const uidHm=auth.currentUser?.uid;if(uidHm&&data.adminId===uidHm){setQRoom(qJoinInput);setQRole('admin');setQMyId(null);localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'admin'}));setGameScreen('qumairi_lobby');notify('✅ دخلت كمشرف — صاحب الغرفة','gold');return;}if(!qMyName.trim()){setQJoinErr('أدخل اسمك');return;}const mRef=push(dbRef(db,`qrooms/${qJoinInput}/members`));await set(mRef,{name:qMyName.trim(),groupId:null,role:'member',joinedAt:Date.now(),...(uidHm?{ownerUid:uidHm}:{})});setQMyId(mRef.key);setQRoom(qJoinInput);setQRole('member');localStorage.setItem('ng_qumairi',JSON.stringify({qRoom:qJoinInput,qRole:'member',qMyName:qMyName.trim(),qMyId:mRef.key}));setGameScreen('qumairi_lobby');notify('✅ انضممت','success');}catch(e){setQJoinErr('خطأ');}finally{setQJoinLoading(false);}}}>{qJoinLoading?'⏳':'🚀 انضمام'}</button></div></div>);
+    if (gameScreen === 'qumairi_join') {
+      return (
+        <div className="scr">
+          <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
+            ← رجوع
+          </button>
+          <div className="ptitle">انضمام للغرفة</div>
+          <div className="psub" style={{ marginBottom: 10 }}>
+            مسجّل سابقاً؟ أدخل نفس الاسم والرمز للعودة — حتى أثناء تنظيم المشرف
+          </div>
+          <div className="card">
+            <div className="ig">
+              <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
+              <input
+                className="inp big"
+                placeholder={ROOM_CODE_PLACEHOLDER}
+                maxLength={4}
+                value={qJoinInput}
+                onChange={(e) => {
+                  setQJoinInput(e.target.value.replace(/\D/g, ''));
+                  setQJoinErr('');
+                }}
+              />
+            </div>
+            <div className="ig">
+              <label className="lbl">👤 اسمك</label>
+              <input
+                className="inp"
+                placeholder={GROUP_MEMBER_NAME_PLACEHOLDER}
+                value={qMyName}
+                onChange={(e) => setQMyName(e.target.value)}
+              />
+            </div>
+            {qJoinErr && <div className="err-msg">⚠️ {qJoinErr}</div>}
+            <button type="button" className="btn bg mt2" disabled={qJoinLoading} onClick={() => void joinQumairiRoom()}>
+              {qJoinLoading ? '⏳' : '🚀 انضمام / عودة'}
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     if(gameScreen==='qumairi_lobby'){const unassigned=qMList.filter(m=>!m.groupId);return(
-<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setSelectedGame('qumairi');localStorage.removeItem('ng_qumairi');setQRoom('');setQRole(null);setQGroupId(null);}}>← رجوع</button><div className="ptitle" style={{fontSize:18}}>🦅 صيد القميري</div>{isAdmin&&<div className="card" style={{textAlign:'center',marginBottom:10,background:'linear-gradient(135deg, rgba(240,192,64,.12), rgba(79,163,224,.05))',border:'1px solid rgba(240,192,64,.28)'}}><div style={{fontWeight:900,color:'var(--gold)',fontSize:14}}>👑 أنت مشرف هذه الغرفة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:6,lineHeight:1.55}}>أنشئ المجموعات، عيّن القادة، وزّع اللاعبين، ثم ابدأ التوزيع واللعب — المشاركون يرون واجهة مجموعتهم فقط.</div></div>}<div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div><button className="btn bo bxs" style={{width:'auto',margin:'6px auto 0'}} onClick={()=>void shareRoomInvite({ gameName: 'صيد القميري', roomCode: qRoom, preferWhatsApp: true })}>مشاركة رمز الغرفة عبر <WhatsAppLogoIcon /></button></div>{isAdmin&&<><div className="card"><div className="ctitle">➕ إنشاء مجموعة</div><div style={{display:'flex',gap:6}}><input className="inp" placeholder="اسم المجموعة" value={qGroupName} onChange={e=>setQGroupName(e.target.value)} style={{flex:1}}/><button className="btn bg bsm" onClick={async()=>{if(!qGroupName.trim())return;if(qGList.length>=6)return;const initW={};Q_WEAPONS.forEach(w=>{initW[w.id]=w.qty;});
+<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>{setGameScreen('home');setQRoom('');setQRole(null);setQGroupId(null);}}>← رجوع</button>{isAdmin&&<div className="card fameeri-admin-banner"><div className="fameeri-admin-banner__title">👑 أنت مشرف هذه الغرفة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:6,lineHeight:1.55}}>أنشئ المجموعات، عيّن القادة، وزّع اللاعبين، ثم ابدأ التوزيع واللعب — المشاركون يرون واجهة مجموعتهم فقط.</div></div>}<div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div><button className="btn bo bxs" style={{width:'auto',margin:'6px auto 0'}} onClick={()=>void shareRoomInvite({ gameName: 'صيد القميري', roomCode: qRoom, preferWhatsApp: true })}>مشاركة رمز الغرفة عبر <WhatsAppLogoIcon /></button></div>{isAdmin&&<><div className="card"><div className="ctitle">➕ إنشاء مجموعة</div><div style={{display:'flex',gap:6}}><input className="inp" placeholder="اسم المجموعة" value={qGroupName} onChange={e=>setQGroupName(e.target.value)} style={{flex:1}}/><button className="btn bg bsm" onClick={async()=>{if(!qGroupName.trim())return;if(qGList.length>=6)return;const initW={};Q_WEAPONS.forEach(w=>{initW[w.id]=w.qty;});
 const nRef=push(dbRef(db,`qrooms/${qRoom}/groups`));await set(nRef,{name:qGroupName.trim(),trees:{},weapons:initW,totalRemaining:Q_TOTAL,distributed:false,shieldUsed:false});
 setQGroupName('');notify('✅','success');}}>➕</button></div></div><div className="card"><div className="ctitle">👥 المجموعات ({qGList.length})</div>{qGList.map((g,gi)=>{const members=qMList.filter(m=>m.groupId===g.id);const leader=members.find(m=>m.role==='leader');return(
-<div key={g.id} style={{marginBottom:10,padding:10,background:'var(--surface)',borderRadius:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{fontWeight:900,color:'var(--gold)'}}>{g.name}</span><span style={{fontSize:10,color:'var(--muted)'}}>{members.length} عضو{leader?` · 👑 ${leader.name}`:''}</span></div>{members.map(m=>(<div key={m.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',fontSize:12}}><span>{m.role==='leader'?'👑':'👤'}</span><span style={{flex:1}}>{m.name}</span>{m.role!=='leader'&&<button className="btn bg bxs" onClick={async()=>{const updates={};members.forEach(mm=>{if(mm.role==='leader')updates[`qrooms/${qRoom}/members/${mm.id}/role`]='member';});
-updates[`qrooms/${qRoom}/members/${m.id}/role`]='leader';await update(dbRef(db),updates);}}>👑</button>}</div>))}</div>)})}{unassigned.length>0&&<><div style={{fontSize:11,color:'var(--red)',fontWeight:700,marginTop:10,marginBottom:6}}>⏳ بدون مجموعة ({unassigned.length})</div>{unassigned.map(m=>(<div key={m.id} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 0',fontSize:12}}><span>👤 {m.name}</span><div style={{display:'flex',gap:3}}>{qGList.map(g=>(<button key={g.id} className="btn bg bxs" style={{fontSize:9}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/members/${m.id}`),{groupId:g.id});
+<div key={g.id} style={{marginBottom:10,padding:10,background:'var(--surface)',borderRadius:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span className="fameeri-group-name">{g.name}</span><span style={{fontSize:10,color:'var(--muted)'}}>{members.length} عضو{leader?` · 👑 ${leader.name}`:''}</span></div>{members.map(m=>(<div key={m.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',fontSize:12}}><span>{m.role==='leader'?'👑':'👤'}</span><span style={{flex:1}}>{m.name}</span>{m.role!=='leader'&&<button type="button" className="btn bg bxs" onClick={()=>void assignGroupLeader(g.id,m)}>👑</button>}</div>))}</div>)})}{unassigned.length>0&&<><div style={{fontSize:11,color:'var(--red)',fontWeight:700,marginTop:10,marginBottom:6}}>⏳ بدون مجموعة ({unassigned.length})</div>{unassigned.map(m=>(<div key={m.id} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 0',fontSize:12}}><span>👤 {m.name}</span><div style={{display:'flex',gap:3}}>{qGList.map(g=>(<button key={g.id} className="btn bg bxs" style={{fontSize:9}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/members/${m.id}`),{groupId:g.id});
 }}>{g.name}</button>))}</div></div>))}</>}</div>{qPhase==='lobby'&&(()=>{const distReady=qGList.length>=2&&qGList.every(g=>{const ms=qMList.filter(m=>m.groupId===g.id);return ms.length>0&&ms.some(m=>m.role==='leader');});return(<><button className="btn bg" disabled={!distReady} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{phase:'distributing'});
 notify('🌳 بدء التوزيع','gold');}}>🌳 بدء التوزيع</button>{!distReady&&qGList.length>=2&&<div style={{fontSize:11,color:'var(--muted)',marginTop:8,textAlign:'center'}}>حدّد قائداً 👑 لكل مجموعة (وأضف عضواً على الأقل لكل مجموعة) لتفعيل التوزيع</div>}</>);})()}{qPhase==='distributing'&&(()=>{const allDist=qGList.length>=2&&qGList.every(g=>g.distributed);return allDist?<button className="btn bg" onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{phase:'playing',round:1,roundMax:qGList.length,currentAttack:null,timer:null,turnGroup:qGList[0]?.id,speedClaims:{},speedBatchActive:false,playMode:qGameState?.playMode==='speed'?'speed':'sequential'});
-notify('⚔️ اللعبة بدأت','gold');}}>⚔️ بدء اللعبة</button>:<div className="card"><div className="ctitle">📊 حالة التوزيع لكل مجموعة</div>{qGList.map(g=>(<div key={g.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 10px',marginBottom:6,background:'var(--surface)',borderRadius:10,border:'1px solid var(--border-faint)'}}><span style={{fontWeight:900,color:'var(--gold)'}}>{g.name}</span><span style={{fontSize:12,fontWeight:800,color:g.distributed?'var(--green)':'var(--muted)'}}>{g.distributed?'✅ تم التوزيع':'⏳ بانتظار التوزيع'}</span></div>))}<div style={{textAlign:'center',color:'var(--muted)',fontSize:11,marginTop:8}}>عند اكتمال الجميع يظهر زر بدء اللعبة</div></div>;})()}</>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(
-<div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--gold)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button className="btn bg mt3" disabled={remaining!==0} onClick={async()=>{const trees={};Q_TREES.forEach(t=>{trees[t]=parseInt(qDistribution[t])||0;});
-await update(dbRef(db,`qrooms/${qRoom}/groups/${qGroupId}`),{trees,distributed:true,totalRemaining:Q_TOTAL});
-notify('✅ تم التوزيع','success');}}>{remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div>);})()}{!isAdmin&&qPhase==='lobby'&&<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?`مجموعتك: ${qMyGroup?.name||'—'}`:'انتظر المشرف'}</div></div>}
+notify('⚔️ اللعبة بدأت','gold');}}>⚔️ بدء اللعبة</button>:<div className="card"><div className="ctitle">📊 حالة التوزيع لكل مجموعة</div>{qGList.map(g=>(<div key={g.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 10px',marginBottom:6,background:'var(--surface)',borderRadius:10,border:'1px solid var(--border-faint)'}}><span className="fameeri-group-name">{g.name}</span><span style={{fontSize:12,fontWeight:800,color:g.distributed?'var(--green)':'var(--muted)'}}>{g.distributed?'✅ تم التوزيع':'⏳ بانتظار التوزيع'}</span></div>))}<div style={{textAlign:'center',color:'var(--muted)',fontSize:11,marginTop:8}}>عند اكتمال الجميع يظهر زر بدء اللعبة</div></div>;})()}</>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(
+<div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div>);})()}{!isAdmin&&qPhase==='lobby'&&<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?`مجموعتك: ${qMyGroup?.name||'—'}`:'انتظر المشرف'}</div></div>}
 </div>);}
 
     if(gameScreen==='qumairi_play'){const myAtks=Object.values(qAttacks||{}).filter(a=>a.attackerId===qGroupId||a.targetId===qGroupId).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));if(isAdmin){const turnGroupId=qGameState?.turnGroup;const turnGroup=qGList.find(g=>g.id===turnGroupId);return(
-<div className="scr">{qReveal&&(<FameeriRevealOverlay qReveal={qReveal} showContinue={qReveal.phase==='result'} onContinue={async()=>{const lrSnap=qGameState?.lastResult;setQReveal(null);const patch={lastResult:null,showResult:false};const pm=qGameState?.playMode||'sequential';const anchor=lrSnap?.attackerId||qGameState?.turnGroup;if(pm!=='speed'&&anchor&&qGList.length){const ids=qGList.map(g=>g.id);const ix=ids.indexOf(anchor);const nIx=(ix>=0?ix+1:0)%ids.length;patch.turnGroup=ids[nIx];if(ix>=0&&nIx===0&&ix===ids.length-1)patch.round=(qGameState.round||1)+1;}if(pm!=='speed'&&pm!=='sequential'){patch.playMode='sequential';}await update(dbRef(db,`qrooms/${qRoom}/game`),patch);}}/>)}<div className="ptitle" style={{fontSize:18}}>👑 لوحة المشرف</div><div className="card" style={{padding:'10px 12px',marginBottom:10}}><div style={{fontSize:12,color:'var(--muted)',lineHeight:1.55}}>{qGameState?.playMode==='speed'?'⚡ السرعة: الجميع يُرسل طلب الهجوم — اختر المجموعة الفائزة (إن وُجد أكثر من طلب) ثم مدة المؤقت (5–35ث) ثم ابدأ الحسم.':'📋 تسلسلي: بعد كل هجوم ينتقل الدور تلقائياً للمجموعة التالية حسب ترتيب القائمة.'}</div>{qGameState?.playMode!=='speed'&&<div style={{fontSize:13,fontWeight:800,color:'var(--gold)',marginTop:8}}>الجولة {qGameState?.round||1} · الدور: {turnGroup?.name||'—'}</div>}</div>{!qCurrentAttack&&!qReveal&&<div className="card"><div style={{display:'flex',gap:5,marginBottom:8}}><button className={`btn ${qGameState?.playMode!=='speed'?'bg':'bgh'} bxs`} style={{flex:1}} onClick={async()=>await update(dbRef(db,`qrooms/${qRoom}/game`),{playMode:'sequential',speedBatchActive:false,speedClaims:{}})}>📋 تسلسلي</button><button className={`btn ${qGameState?.playMode==='speed'?'bg':'bgh'} bxs`} style={{flex:1}} onClick={async()=>await update(dbRef(db,`qrooms/${qRoom}/game`),{playMode:'speed',speedBatchActive:false,speedClaims:{}})}>⚡ سرعة</button></div><div className="ctitle" style={{margin:0}}>⚔️ من يهاجم؟</div>{qGameState?.playMode!=='speed'&&<div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{qGList.map(g=>(<button key={g.id} className={`btn ${turnGroupId===g.id?'bg':'bgh'}`} style={{flex:1,minWidth:'30%',padding:'8px'}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{turnGroup:g.id});
+<div className="scr">{qReveal&&(<FameeriRevealOverlay qReveal={qReveal} showContinue={qReveal.phase==='result'} onContinue={async()=>{const lrSnap=qGameState?.lastResult;setQReveal(null);const patch={lastResult:null,showResult:false};const pm=qGameState?.playMode||'sequential';const anchor=lrSnap?.attackerId||qGameState?.turnGroup;if(pm!=='speed'&&anchor&&qGList.length){const ids=qGList.map(g=>g.id);const ix=ids.indexOf(anchor);const nIx=(ix>=0?ix+1:0)%ids.length;patch.turnGroup=ids[nIx];if(ix>=0&&nIx===0&&ix===ids.length-1)patch.round=(qGameState.round||1)+1;}if(pm!=='speed'&&pm!=='sequential'){patch.playMode='sequential';}await update(dbRef(db,`qrooms/${qRoom}/game`),patch);}}/>)}<div className="ptitle" style={{fontSize:18}}>👑 لوحة المشرف</div><div className="card" style={{padding:'10px 12px',marginBottom:10}}><div style={{fontSize:12,color:'var(--muted)',lineHeight:1.55}}>{qGameState?.playMode==='speed'?'⚡ السرعة: الجميع يُرسل طلب الهجوم — اختر المجموعة الفائزة (إن وُجد أكثر من طلب) ثم مدة المؤقت (5–35ث) ثم ابدأ الحسم.':'📋 تسلسلي: بعد كل هجوم ينتقل الدور تلقائياً للمجموعة التالية حسب ترتيب القائمة.'}</div>{qGameState?.playMode!=='speed'&&<div style={{fontSize:13,fontWeight:800,color:'var(--fameeri-primary)',marginTop:8}}>الجولة {qGameState?.round||1} · الدور: {turnGroup?.name||'—'}</div>}</div>{!qCurrentAttack&&!qReveal&&<div className="card"><div style={{display:'flex',gap:5,marginBottom:8}}><button className={`btn ${qGameState?.playMode!=='speed'?'bg':'bgh'} bxs`} style={{flex:1}} onClick={async()=>await update(dbRef(db,`qrooms/${qRoom}/game`),{playMode:'sequential',speedBatchActive:false,speedClaims:{}})}>📋 تسلسلي</button><button className={`btn ${qGameState?.playMode==='speed'?'bg':'bgh'} bxs`} style={{flex:1}} onClick={async()=>await update(dbRef(db,`qrooms/${qRoom}/game`),{playMode:'speed',speedBatchActive:false,speedClaims:{}})}>⚡ سرعة</button></div><div className="ctitle" style={{margin:0}}>⚔️ من يهاجم؟</div>{qGameState?.playMode!=='speed'&&<div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{qGList.map(g=>(<button key={g.id} className={`btn ${turnGroupId===g.id?'bg':'bgh'}`} style={{flex:1,minWidth:'30%',padding:'8px'}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{turnGroup:g.id});
 }}><div style={{fontSize:13,fontWeight:900}}>{g.name}</div><div style={{fontSize:9,opacity:.7}}>{g.totalRemaining} 🐦</div></button>))}</div>}</div>}
-{isAdmin&&qGameState?.playMode==='speed'&&!qReveal&&!qCurrentAttack&&!qGameState?.speedBatchActive&&Object.keys(qGameState?.speedClaims||{}).length>0&&(()=>{const claimIds=Object.keys(qGameState.speedClaims||{});const needPickWinner=claimIds.length>1;const canStartTimer=!needPickWinner||!!speedWinSelect;return(<div className="card"><div className="ctitle">⚡ طلبات السرعة</div>{Object.entries(qGameState.speedClaims||{}).map(([gid,c])=>(<div key={gid} style={{fontSize:12,padding:8,marginBottom:6,background:'var(--surface)',borderRadius:8}}><b style={{color:'var(--gold)'}}>{c.attackerName}</b> → {c.targetName} / {c.tree} / {c.weaponName}</div>))}{needPickWinner&&<div className="ig" style={{marginTop:8}}><label className="lbl">المجموعة الفائزة (تُستخدم عند الضغط على «صح» فقط)</label><select className="inp" style={{fontSize:13}} value={speedWinSelect} onChange={e=>setSpeedWinSelect(e.target.value)}><option value="">— اختر —</option>{claimIds.map(gid=>(<option key={gid} value={gid}>{qGList.find(x=>x.id===gid)?.name||gid}</option>))}</select></div>}<div className="ig" style={{marginTop:8}}><label className="lbl">مدة المؤقت قبل الحسم (بحد أقصى 35 ثانية)</label><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{[10,20,35].map(s=>(<button key={s} type="button" className={`btn ${speedRoundSecs===s?'bg':'bgh'} bsm`} style={{flex:1,minWidth:70}} onClick={()=>setSpeedRoundSecs(s)}>{s}ث</button>))}</div><div style={{display:'flex',gap:6,marginTop:6,alignItems:'center'}}><input type="number" min={5} max={35} className="inp" style={{width:72,textAlign:'center',fontSize:13}} value={speedRoundSecs} onChange={e=>{const v=parseInt(e.target.value,10);if(Number.isNaN(v))return;setSpeedRoundSecs(Math.min(35,Math.max(5,v)));}}/></div></div><button className="btn bg mt2" disabled={!canStartTimer} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{speedBatchActive:true,timer:{deadline:Date.now()+speedRoundSecs*1000}});playSound('suspense');}}>⏱️ بدء المؤقت ({speedRoundSecs}ث)</button></div>);})()}{isAdmin&&qGameState?.playMode==='speed'&&qGameState?.speedBatchActive&&qTimer&&!qCurrentAttack&&(<div className="card" style={{background:'rgba(230,57,80,.1)',border:'1px solid rgba(230,57,80,.35)'}}><div className="ctitle" style={{color:'var(--red)'}}>⚡ حسم السرعة</div><div style={{display:'flex',gap:8,marginTop:10}}><button className="btn bv" style={{flex:1}} disabled={Object.keys(qGameState?.speedClaims||{}).length>1&&!speedWinSelect} onClick={async()=>{const ids=Object.keys(qGameState?.speedClaims||{});if(ids.length>1&&!speedWinSelect)return;const win=ids.length===1?ids[0]:speedWinSelect;await applySpeedRoundCorrect({qRoom,qGameState,qGroups,winnerGroupId:win,Q_WEAPONS});playSound('explosion');}}>✅ صح</button><button className="btn br" style={{flex:1}} onClick={async()=>{await applySpeedRoundWrong({qRoom,qGameState,qGroups});playSound('countdown_last');}}>❌ خطأ</button></div></div>)}{qCurrentAttack&&<div className="card" style={{background:'rgba(230,57,80,.08)',border:'1px solid rgba(230,57,80,.3)'}}><div className="ctitle" style={{color:'var(--red)'}}>⚔️ هجوم</div><div style={{fontSize:13,marginBottom:8}}><strong style={{color:'var(--gold)'}}>{qCurrentAttack.attackerName}</strong> → <strong style={{color:'var(--red)'}}>{qCurrentAttack.targetName}</strong> / 🌳 {qCurrentAttack.tree} / {qCurrentAttack.weaponName}</div>{!qTimer&&<><div style={{display:'flex',gap:4,marginBottom:6}}>{[15,30,45,60].map(s=>(<button key={s} className="btn bg bsm" style={{flex:1}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{timer:{deadline:Date.now()+s*1000}});
+{isAdmin&&qGameState?.playMode==='speed'&&!qReveal&&!qCurrentAttack&&!qGameState?.speedBatchActive&&Object.keys(qGameState?.speedClaims||{}).length>0&&(()=>{const claimIds=Object.keys(qGameState.speedClaims||{});const needPickWinner=claimIds.length>1;const canStartTimer=!needPickWinner||!!speedWinSelect;return(<div className="card"><div className="ctitle">⚡ طلبات السرعة</div>{Object.entries(qGameState.speedClaims||{}).map(([gid,c])=>(<div key={gid} style={{fontSize:12,padding:8,marginBottom:6,background:'var(--surface)',borderRadius:8}}><b style={{color:'var(--fameeri-primary)'}}>{c.attackerName}</b> → {c.targetName} / {c.tree} / {c.weaponName}</div>))}{needPickWinner&&<div className="ig" style={{marginTop:8}}><label className="lbl">المجموعة الفائزة (تُستخدم عند الضغط على «صح» فقط)</label><select className="inp" style={{fontSize:13}} value={speedWinSelect} onChange={e=>setSpeedWinSelect(e.target.value)}><option value="">— اختر —</option>{claimIds.map(gid=>(<option key={gid} value={gid}>{qGList.find(x=>x.id===gid)?.name||gid}</option>))}</select></div>}<div className="ig" style={{marginTop:8}}><label className="lbl">مدة المؤقت قبل الحسم (بحد أقصى 35 ثانية)</label><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{[10,20,35].map(s=>(<button key={s} type="button" className={`btn ${speedRoundSecs===s?'bg':'bgh'} bsm`} style={{flex:1,minWidth:70}} onClick={()=>setSpeedRoundSecs(s)}>{s}ث</button>))}</div><div style={{display:'flex',gap:6,marginTop:6,alignItems:'center'}}><input type="number" min={5} max={35} className="inp" style={{width:72,textAlign:'center',fontSize:13}} value={speedRoundSecs} onChange={e=>{const v=parseInt(e.target.value,10);if(Number.isNaN(v))return;setSpeedRoundSecs(Math.min(35,Math.max(5,v)));}}/></div></div><button className="btn bg mt2" disabled={!canStartTimer} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{speedBatchActive:true,timer:{deadline:Date.now()+speedRoundSecs*1000}});playSound('suspense');}}>⏱️ بدء المؤقت ({speedRoundSecs}ث)</button></div>);})()}{isAdmin&&qGameState?.playMode==='speed'&&qGameState?.speedBatchActive&&qTimer&&!qCurrentAttack&&(<div className="card" style={{background:'rgba(230,57,80,.1)',border:'1px solid rgba(230,57,80,.35)'}}><div className="ctitle" style={{color:'var(--red)'}}>⚡ حسم السرعة</div><div style={{display:'flex',gap:8,marginTop:10}}><button className="btn bv" style={{flex:1}} disabled={Object.keys(qGameState?.speedClaims||{}).length>1&&!speedWinSelect} onClick={async()=>{const ids=Object.keys(qGameState?.speedClaims||{});if(ids.length>1&&!speedWinSelect)return;const win=ids.length===1?ids[0]:speedWinSelect;await applySpeedRoundCorrect({qRoom,qGameState,qGroups,winnerGroupId:win,Q_WEAPONS});playSound('explosion');}}>✅ صح</button><button className="btn br" style={{flex:1}} onClick={async()=>{await applySpeedRoundWrong({qRoom,qGameState,qGroups});playSound('countdown_last');}}>❌ خطأ</button></div></div>)}{qCurrentAttack&&<div className="card" style={{background:'rgba(230,57,80,.08)',border:'1px solid rgba(230,57,80,.3)'}}><div className="ctitle" style={{color:'var(--red)'}}>⚔️ هجوم</div><div style={{fontSize:13,marginBottom:8}}><strong style={{color:'var(--fameeri-primary)'}}>{qCurrentAttack.attackerName}</strong> → <strong style={{color:'var(--red)'}}>{qCurrentAttack.targetName}</strong> / 🌳 {qCurrentAttack.tree} / {qCurrentAttack.weaponName}</div>{!qTimer&&<><div style={{display:'flex',gap:4,marginBottom:6}}>{[15,30,45,60].map(s=>(<button key={s} className="btn bg bsm" style={{flex:1}} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{timer:{deadline:Date.now()+s*1000}});
 playSound('suspense');}}>{s}ث</button>))}</div><div style={{display:'flex',gap:4}}><input type="number" className="inp" style={{flex:1,padding:'5px',textAlign:'center',fontSize:13}} placeholder="مخصص" value={qCustomTimer} onChange={e=>setQCustomTimer(e.target.value)}/><button className="btn bg bsm" onClick={async()=>{const s=parseInt(qCustomTimer)||30;await update(dbRef(db,`qrooms/${qRoom}/game`),{timer:{deadline:Date.now()+s*1000}});
 setQCustomTimer('');playSound('suspense');}}>⏱️</button></div></>}{qTimer&&<><div style={{textAlign:'center',marginBottom:8}}><div className="q-timer-huge" style={{fontSize:56}}>{qCountdown!==null?(qCountdown>0?qCountdown:'⏰'):'...'}</div></div><div style={{display:'flex',gap:8}}><button className="btn bv" style={{flex:1}} onClick={async()=>{const atk=qCurrentAttack;const tg=qGList.find(g=>g.id===atk.targetId);const u={};if(tg?.shield===atk.tree){u[`qrooms/${qRoom}/groups/${atk.attackerId}/weapons/${atk.weapon}`]=(qGroups[atk.attackerId]?.weapons?.[atk.weapon]||1)-1;u[`qrooms/${qRoom}/groups/${atk.targetId}/shield`]=null;const logRef=push(dbRef(db,`qrooms/${qRoom}/attacks`));u[`qrooms/${qRoom}/attacks/${logRef.key}`]={...atk,result:'shielded',hunted:0,timestamp:Date.now()};u[`qrooms/${qRoom}/game/currentAttack`]=null;u[`qrooms/${qRoom}/game/timer`]=null;u[`qrooms/${qRoom}/game/lastResult`]={...atk,result:'success',hunted:0,msg:'🛡️ الدرع صد الهجوم',timestamp:Date.now()};u[`qrooms/${qRoom}/game/showResult`]=true;await update(dbRef(db),u);return;}const treeCount=tg?.trees?.[atk.tree]||0;const wp=Q_WEAPONS.find(w=>w.id===atk.weapon)?.power||0;const hunted=Math.min(treeCount,wp);u[`qrooms/${qRoom}/groups/${atk.targetId}/trees/${atk.tree}`]=treeCount-hunted;u[`qrooms/${qRoom}/groups/${atk.targetId}/totalRemaining`]=(tg?.totalRemaining||0)-hunted;u[`qrooms/${qRoom}/groups/${atk.attackerId}/weapons/${atk.weapon}`]=(qGroups[atk.attackerId]?.weapons?.[atk.weapon]||1)-1;let poisonMsg=null;if(qGameState?.cursedTree===atk.tree){const atkW={...(qGroups[atk.attackerId]?.weapons||{})};atkW[atk.weapon]=(atkW[atk.weapon]||0)-1;const order=['showzel','omsagma','nabeeta'];const startIdx=order.indexOf(atk.weapon);let deducted=null;for(let wi=startIdx;wi<order.length;wi++){if((atkW[order[wi]]||0)>0){u[`qrooms/${qRoom}/groups/${atk.attackerId}/weapons/${order[wi]}`]=atkW[order[wi]]-1;deducted=Q_WEAPONS.find(w=>w.id===order[wi])?.name;break;}}poisonMsg=deducted?`☠️ الشجرة المسمومة — خسرت ${deducted} إضافي`:'☠️ الشجرة المسمومة';}const ts=Date.now();const logRef=push(dbRef(db,`qrooms/${qRoom}/attacks`));u[`qrooms/${qRoom}/attacks/${logRef.key}`]={...atk,result:'success',hunted,timestamp:ts};u[`qrooms/${qRoom}/game/currentAttack`]=null;u[`qrooms/${qRoom}/game/timer`]=null;u[`qrooms/${qRoom}/game/lastResult`]={...atk,result:'success',hunted,msg:hunted>0?`🎯 ${hunted} قميري`:'🌳 الشجرة فارغة',poisonMsg,poisonTarget:'all',timestamp:ts};u[`qrooms/${qRoom}/game/showResult`]=true;await update(dbRef(db),u);playSound('explosion');}}>✅ صح</button><button className="btn br" style={{flex:1}} onClick={async()=>{const atk=qCurrentAttack;const u={};u[`qrooms/${qRoom}/groups/${atk.attackerId}/weapons/${atk.weapon}`]=(qGroups[atk.attackerId]?.weapons?.[atk.weapon]||1)-1;const logRef=push(dbRef(db,`qrooms/${qRoom}/attacks`));u[`qrooms/${qRoom}/attacks/${logRef.key}`]={...atk,result:'fail',hunted:0,timestamp:Date.now()};u[`qrooms/${qRoom}/game/currentAttack`]=null;u[`qrooms/${qRoom}/game/timer`]=null;u[`qrooms/${qRoom}/game/lastResult`]={...atk,result:'fail',hunted:0,msg:'❌ إجابة خاطئة',timestamp:Date.now()};u[`qrooms/${qRoom}/game/showResult`]=true;await update(dbRef(db),u);playSound('countdown_last');}}>❌ خطأ</button></div></>}</div>}
 <div className="card"><div className="ctitle">🎲 أدوات</div><div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--purple)',marginBottom:4}}>☠️ الشجرة المسمومة</div><select className="inp" style={{fontSize:12}} value={qGameState?.cursedTree||''} onChange={async e=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{cursedTree:e.target.value||null});
 }}><option value="">بدون</option>{Q_TREES.map(t=><option key={t} value={t}>{t}</option>)}</select></div><div><button className={`btn ${qGameState?.sandstorm?'bb':'bgh'} bsm`} onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{sandstorm:!qGameState?.sandstorm});
-}}>🌪️ {qGameState?.sandstorm?'إيقاف':'تفعيل'} العاصفة</button></div></div><div className="card"><div className="ctitle">📊 إحصائيات المجموعات</div>{qGList.map(g=>(<div key={g.id} style={{marginBottom:8,padding:8,background:'var(--surface)',borderRadius:8}}><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontWeight:700,color:'var(--gold)'}}>{g.name}</span><span style={{color:'var(--green)',fontWeight:900}}>{g.totalRemaining||0} 🐦</span></div><div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>{Q_TREES.map(t=><span key={t} style={{fontSize:9,padding:'1px 4px',borderRadius:4,background:g.trees?.[t]>0?'rgba(46,204,113,.1)':'var(--border-faint)',color:g.trees?.[t]>0?'var(--green)':'var(--dim)'}}>{t}:{g.trees?.[t]||0}</span>)}</div></div>))}</div><FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} /><button className="btn br mt2" onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{phase:'ended'});
+}}>🌪️ {qGameState?.sandstorm?'إيقاف':'تفعيل'} العاصفة</button></div></div><div className="card"><div className="ctitle">📊 إحصائيات المجموعات</div>{qGList.map(g=>(<div key={g.id} style={{marginBottom:8,padding:8,background:'var(--surface)',borderRadius:8}}><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontWeight:700,color:'var(--fameeri-primary)'}}>{g.name}</span><span style={{color:'var(--green)',fontWeight:900}}>{g.totalRemaining||0} 🐦</span></div><div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>{Q_TREES.map(t=><span key={t} style={{fontSize:9,padding:'1px 4px',borderRadius:4,background:g.trees?.[t]>0?'rgba(46,204,113,.1)':'var(--border-faint)',color:g.trees?.[t]>0?'var(--green)':'var(--dim)'}}>{t}:{g.trees?.[t]||0}</span>)}</div></div>))}</div><FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} /><button className="btn br mt2" onClick={async()=>{await update(dbRef(db,`qrooms/${qRoom}/game`),{phase:'ended'});
 playSound('applause');}}>🏆 إنهاء</button><button className="btn bgh mt2" onClick={()=>{openFameeriPrintableReport({qRoom,qGList,qAttacks});notify('✅ تم فتح التقرير — للحفظ كـ PDF استخدم طباعة ثم «حفظ كـ PDF»','success');}}>📄 تقرير (طباعة / PDF)</button></div>);}return(
-<div className="scr">{qReveal&&(<FameeriRevealOverlay qReveal={qReveal} showContinue={false} />)}{qTurnOverlay&&!qReveal&&qCurrentAttack&&!qTimer&&(<div className="q-turn-overlay"><div style={{fontSize:70,animation:'treeBounce 1s ease infinite'}}>⚔️</div><div style={{fontFamily:'Cairo',fontSize:24,fontWeight:900,color:'var(--gold)',marginTop:12}}>{qTurnOverlay.groupName}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:6}}>اختاروا هدفهم بسلاح {qTurnOverlay.weapon}</div></div>)}{qTimer&&!qReveal&&qCountdown!==null&&(qCurrentAttack||qGameState?.speedBatchActive)&&(<div className="q-turn-overlay"><div className="q-timer-huge">{qCountdown>0?qCountdown:'⏰'}</div><div style={{fontSize:14,color:'var(--gold)',marginTop:8}}>{qGameState?.speedBatchActive&&!qCurrentAttack?'⚡ جولة السرعة — قرار المشرف':`${qCurrentAttack?.attackerName} يهاجم ${qCurrentAttack?.targetName}`}</div></div>)}<div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><div style={{fontSize:15,fontWeight:900,color:'var(--gold)'}}>{qMyGroup?.name||'—'} {isLeader?'👑':''}</div><div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--green)'}}>{qMyGroup?.totalRemaining||0} 🐦</div></div>{qGameState?.phase==='playing'&&<div className="card" style={{padding:'8px 10px',marginBottom:8}}><div style={{fontSize:11,color:'var(--muted)',lineHeight:1.5}}>{qGameState?.playMode==='speed'?'⚡ وضع السرعة — جولة واحدة للجميع.':'📋 وضع تسلسلي — الجولة '+(qGameState?.round||1)}</div></div>}{qGameState?.announcement&&(Date.now()-qGameState.announcement.timestamp<10000)&&(<div className="ann ag" style={{marginBottom:8}}><div style={{fontSize:13,fontWeight:700}}>{qGameState.announcement.msg}</div></div>)}{qCurrentAttack&&<div className="card" style={{background:qCurrentAttack.targetId===qGroupId?'rgba(230,57,80,.12)':'rgba(230,57,80,.06)',border:`1.5px solid ${qCurrentAttack.targetId===qGroupId?'rgba(230,57,80,.5)':'rgba(230,57,80,.2)'}`}}><div style={{fontSize:13,fontWeight:700,color:'var(--red)',marginBottom:4}}>⚔️ هجوم</div><div style={{fontSize:12}}><strong style={{color:'var(--gold)'}}>{qCurrentAttack.attackerName}</strong> يهاجم <strong style={{color:'var(--red)'}}>{qCurrentAttack.targetName}</strong></div>{qCurrentAttack.targetId===qGroupId&&!qMyGroup?.shieldUsed&&isLeader&&(<div style={{marginTop:8,padding:'10px',background:'rgba(155,89,182,.1)',border:'1.5px solid rgba(155,89,182,.4)',borderRadius:8}}><div style={{fontSize:13,fontWeight:900,color:'var(--red)',marginBottom:6}}>⚠️ أنت تتعرض للهجوم</div><button className="btn bp bsm" onClick={async()=>{const tree=qCurrentAttack.tree;await update(dbRef(db,`qrooms/${qRoom}/groups/${qGroupId}`),{shield:tree,shieldUsed:true});
+<div className="scr">{qReveal&&(<FameeriRevealOverlay qReveal={qReveal} showContinue={false} />)}{qTurnOverlay&&!qReveal&&qCurrentAttack&&!qTimer&&(<div className="q-turn-overlay"><div style={{fontSize:70,animation:'treeBounce 1s ease infinite'}}>⚔️</div><div style={{fontFamily:'Cairo',fontSize:24,fontWeight:900,color:'var(--fameeri-primary)',marginTop:12}}>{qTurnOverlay.groupName}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:6}}>اختاروا هدفهم بسلاح {qTurnOverlay.weapon}</div></div>)}{qTimer&&!qReveal&&qCountdown!==null&&(qCurrentAttack||qGameState?.speedBatchActive)&&(<div className="q-turn-overlay"><div className="q-timer-huge">{qCountdown>0?qCountdown:'⏰'}</div><div style={{fontSize:14,color:'var(--fameeri-primary)',marginTop:8}}>{qGameState?.speedBatchActive&&!qCurrentAttack?'⚡ جولة السرعة — قرار المشرف':`${qCurrentAttack?.attackerName} يهاجم ${qCurrentAttack?.targetName}`}</div></div>)}<div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><div style={{fontSize:15,fontWeight:900,color:'var(--fameeri-primary)'}}>{qMyGroup?.name||'—'} {isLeader?'👑':''}</div><div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--green)'}}>{qMyGroup?.totalRemaining||0} 🐦</div></div>{qGameState?.phase==='playing'&&<div className="card" style={{padding:'8px 10px',marginBottom:8}}><div style={{fontSize:11,color:'var(--muted)',lineHeight:1.5}}>{qGameState?.playMode==='speed'?'⚡ وضع السرعة — جولة واحدة للجميع.':'📋 وضع تسلسلي — الجولة '+(qGameState?.round||1)}</div></div>}{qGameState?.announcement&&(Date.now()-qGameState.announcement.timestamp<10000)&&(<div className="ann ag" style={{marginBottom:8}}><div style={{fontSize:13,fontWeight:700}}>{qGameState.announcement.msg}</div></div>)}{qCurrentAttack&&<div className="card" style={{background:qCurrentAttack.targetId===qGroupId?'rgba(230,57,80,.12)':'rgba(230,57,80,.06)',border:`1.5px solid ${qCurrentAttack.targetId===qGroupId?'rgba(230,57,80,.5)':'rgba(230,57,80,.2)'}`}}><div style={{fontSize:13,fontWeight:700,color:'var(--red)',marginBottom:4}}>⚔️ هجوم</div><div style={{fontSize:12}}><strong style={{color:'var(--fameeri-primary)'}}>{qCurrentAttack.attackerName}</strong> يهاجم <strong style={{color:'var(--red)'}}>{qCurrentAttack.targetName}</strong></div>{qCurrentAttack.targetId===qGroupId&&!qMyGroup?.shieldUsed&&isLeader&&(<div style={{marginTop:8,padding:'10px',background:'rgba(155,89,182,.1)',border:'1.5px solid rgba(155,89,182,.4)',borderRadius:8}}><div style={{fontSize:13,fontWeight:900,color:'var(--red)',marginBottom:6}}>⚠️ أنت تتعرض للهجوم</div><button className="btn bp bsm" onClick={async()=>{const tree=qCurrentAttack.tree;await update(dbRef(db,`qrooms/${qRoom}/groups/${qGroupId}`),{shield:tree,shieldUsed:true});
 await update(dbRef(db,`qrooms/${qRoom}/game`),{announcement:{msg:`🛡️ ${qMyGroup?.name} استخدمت الدرع`,timestamp:Date.now()}});
 notify('🛡️ درع','success');}}>🛡️ تفعيل الدرع</button></div>)}</div>}
-<div className="card"><div className="ctitle">🔫 الأسلحة</div><div style={{display:'flex',gap:6}}>{Q_WEAPONS.map(w=>(<div key={w.id} style={{flex:1,textAlign:'center',padding:8,background:'var(--surface)',borderRadius:8}}><div style={{fontSize:18}}>{w.icon}</div><div style={{fontSize:10,fontWeight:700}}>{w.name}</div><div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,color:qMyGroup?.weapons?.[w.id]>0?'var(--gold)':'var(--red)'}}>{qMyGroup?.weapons?.[w.id]||0}</div></div>))}</div></div>{isLeader&&!qCurrentAttack&&!qGameState?.showResult&&!qReveal&&(qGameState?.playMode==='speed'?!qGameState?.speedBatchActive:qGameState?.turnGroup===qGroupId)&&<div className="card" style={{background:'linear-gradient(135deg,rgba(230,57,80,.08),rgba(200,40,60,.04))',border:'1.5px solid rgba(230,57,80,.3)'}}><div style={{textAlign:'center',marginBottom:10}}><div style={{fontSize:36}}>⚔️</div><div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--red)'}}>{qGameState?.playMode==='speed'?'⚡ جولة السرعة — شن هجومك':'دورك — شن هجوم'}</div></div><div className="ig"><label className="lbl">المجموعة</label><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{qOtherGroups.map(g=>(<button key={g.id} className={`btn ${qAttackTarget.group===g.id?'bg':'bgh'} bsm`} onClick={()=>setQAttackTarget(p=>({...p,group:g.id,groupName:g.name}))}>{g.name}</button>))}</div></div>{qAttackTarget.group&&!qGameState?.sandstorm&&<div className="ig"><label className="lbl">الشجرة</label><div className="q-tree-grid">{Q_TREES.map(t=>(<button key={t} type="button" className={`q-tree-cell ${qAttackTarget.tree===t?'on':''}`} onClick={()=>setQAttackTarget(p=>({...p,tree:t}))}><span className="qt-ico">🌳</span><span className="qt-name">{t}</span></button>))}</div></div>}
-{qAttackTarget.group&&qGameState?.sandstorm&&<div style={{padding:8,background:'rgba(240,192,64,.08)',borderRadius:8,marginBottom:6,fontSize:12,color:'var(--gold)'}}>🌪️ العاصفة — الشجرة عشوائية</div>}
+<div className="card"><div className="ctitle">🔫 الأسلحة</div><div style={{display:'flex',gap:6}}>{Q_WEAPONS.map(w=>(<div key={w.id} style={{flex:1,textAlign:'center',padding:8,background:'var(--surface)',borderRadius:8}}><div style={{fontSize:18}}>{w.icon}</div><div style={{fontSize:10,fontWeight:700}}>{w.name}</div><div style={{fontFamily:'Cairo',fontSize:16,fontWeight:900,color:qMyGroup?.weapons?.[w.id]>0?'var(--fameeri-primary)':'var(--red)'}}>{qMyGroup?.weapons?.[w.id]||0}</div></div>))}</div></div>{isLeader&&!qCurrentAttack&&!qGameState?.showResult&&!qReveal&&(qGameState?.playMode==='speed'?!qGameState?.speedBatchActive:qGameState?.turnGroup===qGroupId)&&<div className="card" style={{background:'linear-gradient(135deg,rgba(230,57,80,.08),rgba(200,40,60,.04))',border:'1.5px solid rgba(230,57,80,.3)'}}><div style={{textAlign:'center',marginBottom:10}}><div style={{fontSize:36}}>⚔️</div><div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--red)'}}>{qGameState?.playMode==='speed'?'⚡ جولة السرعة — شن هجومك':'دورك — شن هجوم'}</div></div><div className="ig"><label className="lbl">المجموعة</label><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{qOtherGroups.map(g=>(<button key={g.id} className={`btn ${qAttackTarget.group===g.id?'bg':'bgh'} bsm`} onClick={()=>setQAttackTarget(p=>({...p,group:g.id,groupName:g.name}))}>{g.name}</button>))}</div></div>{qAttackTarget.group&&!qGameState?.sandstorm&&<div className="ig"><label className="lbl">الشجرة</label><div className="q-tree-grid">{Q_TREES.map(t=>(<button key={t} type="button" className={`q-tree-cell ${qAttackTarget.tree===t?'on':''}`} onClick={()=>setQAttackTarget(p=>({...p,tree:t}))}><span className="qt-ico">🌳</span><span className="qt-name">{t}</span></button>))}</div></div>}
+{qAttackTarget.group&&qGameState?.sandstorm&&<div style={{padding:8,background:'rgba(0,105,92,.1)',borderRadius:8,marginBottom:6,fontSize:12,color:'var(--fameeri-primary)'}}>🌪️ العاصفة — الشجرة عشوائية</div>}
 {qAttackTarget.group&&<div className="ig"><label className="lbl">السلاح</label><div style={{display:'flex',gap:5}}>{Q_WEAPONS.filter(w=>(qMyGroup?.weapons?.[w.id]||0)>0).map(w=>(<button key={w.id} className={`btn ${qAttackTarget.weapon===w.id?'bg':'bgh'} bsm`} style={{flex:1}} onClick={()=>setQAttackTarget(p=>({...p,weapon:w.id,weaponName:w.name}))}>{w.icon} {w.name}</button>))}</div></div>}
 {qAttackTarget.group&&qAttackTarget.weapon&&(qAttackTarget.tree||qGameState?.sandstorm)&&(<button className="btn br mt2" onClick={async()=>{const finalTree=qGameState?.sandstorm?Q_TREES[Math.floor(Math.random()*Q_TREES.length)]:qAttackTarget.tree;const base={attackerId:qGroupId,attackerName:qMyGroup?.name,targetId:qAttackTarget.group,targetName:qAttackTarget.groupName,tree:finalTree,weapon:qAttackTarget.weapon,weaponName:qAttackTarget.weaponName,time:Date.now()};if(qGameState?.playMode==='speed'&&!qGameState?.speedBatchActive){await update(dbRef(db),{[`qrooms/${qRoom}/game/speedClaims/${qGroupId}`]:base});}else{await update(dbRef(db,`qrooms/${qRoom}/game`),{currentAttack:base});}setQAttackTarget({group:'',tree:'',weapon:''});notify('⚔️ هجوم','gold');}}>⚔️ هاجم</button>)}</div>}
 {isLeader&&!qCurrentAttack&&!qReveal&&qGameState?.playMode==='speed'&&qGameState?.speedBatchActive&&(<div className="card" style={{textAlign:'center',padding:14}}><div style={{fontSize:36}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:6}}>جاري حسم السرعة — انتظر المشرف</div></div>)}{isLeader&&!qCurrentAttack&&!qReveal&&qGameState?.playMode!=='speed'&&qGameState?.turnGroup!==qGroupId&&(<div className="card" style={{textAlign:'center',padding:14}}><div style={{fontSize:36}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:6}}>ليس دورك — انتظر</div></div>)}<div className="card"><div className="ctitle">📋 سجل مجموعتي</div>{myAtks.length===0?<div style={{textAlign:'center',color:'var(--muted)',fontSize:12,padding:8}}>لا أحداث</div>:myAtks.slice(0,15).map((a,i)=>(<div key={i} className="feed-item" style={{borderColor:a.attackerId===qGroupId?(a.result==='success'?'var(--green)':'var(--red)'):'var(--red)'}}>{a.attackerId===qGroupId?`${a.result==='success'?'🎯':'❌'} هاجمت ${a.targetName} / ${a.tree} — ${a.result==='success'?'نجاح (الصيد سري)':'فشل'}`:`🛡️ هاجمتكم ${a.attackerName}${a.result==='success'?` وخسرتم ${a.hunted??0} قميري`:a.result==='shielded'?' — 🛡️ صد الدرع':' — لم يصب'}`}</div>))}</div></div>);}
 
-    if(gameScreen==='qumairi_results'){const sorted=[...qGList].sort((a,b)=>(b.totalRemaining||0)-(a.totalRemaining||0));return(<div className="scr"><div style={{textAlign:'center',padding:'16px 0'}}><div style={{fontSize:60,animation:'bnc 1s infinite'}}>🏆</div><div className="ptitle" style={{fontSize:24}}>نتائج صيد القميري</div></div><div className="sg sg3" style={{marginBottom:12}}><div className="sbox"><div className="snum">{sorted.length}</div><div className="slbl">مجموعات</div></div><div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{Object.values(qAttacks||{}).filter(a=>a.result==='success').reduce((s,a)=>s+(a.hunted||0),0)}</div><div className="slbl">قميري صيدت</div></div><div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{Object.keys(qAttacks||{}).length}</div><div className="slbl">هجمات</div></div></div>{[...sorted].reverse().map((g,i)=>{const rank=sorted.length-i;const isWinner=rank===1;return(<div key={g.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:isWinner?'linear-gradient(135deg,rgba(240,192,64,.2),rgba(255,140,0,.1))':'var(--surface)',border:isWinner?'2px solid var(--gold)':'1px solid var(--border-faint)',borderRadius:14,marginBottom:8}}><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,width:34,color:isWinner?'var(--gold)':'var(--muted)'}}>{isWinner?'👑':rank}</div><div style={{flex:1}}><div style={{fontWeight:900,fontSize:isWinner?16:14}}>{g.name}</div></div><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,color:isWinner?'var(--gold)':'var(--text)'}}>{g.totalRemaining||0}</div></div>);})}<button className="btn bgh mt3" onClick={()=>{setGameScreen('home');setSelectedGame(null);setQRoom('');setQRole(null);setQGroupId(null);localStorage.removeItem('ng_qumairi');}}>🏟️ ساحة الألعاب</button></div>);}
+    if(gameScreen==='qumairi_results'){const sorted=[...qGList].sort((a,b)=>(b.totalRemaining||0)-(a.totalRemaining||0));return(<div className="scr"><div style={{textAlign:'center',padding:'16px 0'}}><div style={{fontSize:60,animation:'bnc 1s infinite'}}>🏆</div><div className="ptitle" style={{fontSize:24}}>نتائج الجولة</div></div><div className="sg sg3" style={{marginBottom:12}}><div className="sbox"><div className="snum">{sorted.length}</div><div className="slbl">مجموعات</div></div><div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{Object.values(qAttacks||{}).filter(a=>a.result==='success').reduce((s,a)=>s+(a.hunted||0),0)}</div><div className="slbl">قميري صيدت</div></div><div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{Object.keys(qAttacks||{}).length}</div><div className="slbl">هجمات</div></div></div>{[...sorted].reverse().map((g,i)=>{const rank=sorted.length-i;const isWinner=rank===1;return(<div key={g.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:isWinner?'linear-gradient(135deg,rgba(240,192,64,.2),rgba(255,140,0,.1))':'var(--surface)',border:isWinner?'2px solid var(--fameeri-primary)':'1px solid var(--border-faint)',borderRadius:14,marginBottom:8}}><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,width:34,color:isWinner?'var(--fameeri-primary)':'var(--muted)'}}>{isWinner?'👑':rank}</div><div style={{flex:1}}><div style={{fontWeight:900,fontSize:isWinner?16:14}}>{g.name}</div></div><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,color:isWinner?'var(--fameeri-primary)':'var(--text)'}}>{g.totalRemaining||0}</div></div>);})}<button className="btn bgh mt3" onClick={()=>{setGameScreen('home');setSelectedGame(null);setQRoom('');setQRole(null);setQGroupId(null);localStorage.removeItem('ng_qumairi');}}>🏟️ ساحة الألعاب</button></div>);}
     return null;
   };
 
   return (
-    <>
+    <div className="fameeri-theme">
       {qExitModal && (
         <div className="mbg">
           <div className="modal">
@@ -490,7 +869,7 @@ notify('🛡️ درع','success');}}>🛡️ تفعيل الدرع</button></di
         </div>
       )}
       {renderMain()}
-    </>
+    </div>
   );
 });
 

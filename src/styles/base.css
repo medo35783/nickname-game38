@@ -909,3 +909,129 @@ textarea.inp{resize:vertical;min-height:80px}
 }
 [data-theme="dark"] .stats-desc{color:var(--text-soft)}
 [data-theme="dark"] .stats-empty{color:var(--text-soft)}
+
+/* ── صيد القميري — هوية اللون المتفق عليها ── */
+:root{
+  --fameeri-primary:#00695c;
+  --fameeri-primary-light:#00897b;
+  --fameeri-bg:#e0f2f1;
+  --fameeri-tag-bg:#b2dfdb;
+  --fameeri-muted:#546e7a;
+  --fameeri-border:rgba(0,105,92,.28);
+}
+[data-theme="dark"]{
+  --fameeri-primary:#4db6ac;
+  --fameeri-primary-light:#80cbc4;
+  --fameeri-bg:rgba(0,105,92,.12);
+  --fameeri-tag-bg:rgba(0,105,92,.22);
+  --fameeri-muted:#90a4ae;
+  --fameeri-border:rgba(77,182,172,.35);
+}
+
+.home-game-card--fameeri{
+  background:linear-gradient(135deg,var(--fameeri-bg),rgba(178,223,219,.35));
+  border:2px solid var(--fameeri-border);
+  border-radius:16px;
+  padding:18px 16px;
+  margin-bottom:12px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.home-game-card--fameeri .home-game-card__title{
+  font-family:'Cairo',sans-serif;
+  font-size:18px;
+  font-weight:900;
+  color:var(--fameeri-primary);
+}
+.home-game-card--fameeri .home-game-card__sub{
+  font-size:12px;
+  color:var(--fameeri-muted);
+  margin-top:3px;
+  line-height:1.6;
+}
+.home-game-card--fameeri .home-game-card__arrow{color:var(--fameeri-primary)}
+.home-game-card--fameeri .tag{
+  background:var(--fameeri-tag-bg);
+  color:var(--fameeri-primary);
+  border:none;
+}
+
+.fameeri-theme .ptitle{
+  background:linear-gradient(135deg,var(--fameeri-primary),var(--fameeri-primary-light));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.fameeri-theme .ctitle{color:var(--fameeri-primary)}
+.fameeri-theme .room-code-big{
+  color:var(--fameeri-primary);
+  background:rgba(0,105,92,.06);
+  border:2px dashed var(--fameeri-border);
+}
+[data-theme="dark"] .fameeri-theme .room-code-big{background:rgba(77,182,172,.08)}
+.fameeri-theme .btn.bg{
+  background:linear-gradient(135deg,var(--fameeri-primary-light),var(--fameeri-primary));
+  color:#fff;
+}
+.fameeri-theme .btn.bg:hover:not(:disabled){box-shadow:0 4px 18px rgba(0,105,92,.28)}
+.fameeri-theme .btn.bo{
+  color:var(--fameeri-primary);
+  border-color:var(--fameeri-primary);
+}
+.fameeri-theme .btn.bo:hover{background:rgba(0,105,92,.08)}
+[data-theme="dark"] .fameeri-theme .btn.bo:hover{background:rgba(77,182,172,.1)}
+.fameeri-theme .fameeri-admin-banner{
+  text-align:center;
+  margin-bottom:10px;
+  background:linear-gradient(135deg,rgba(0,105,92,.1),rgba(178,223,219,.25));
+  border:1px solid var(--fameeri-border);
+}
+.fameeri-theme .fameeri-admin-banner__title{
+  font-weight:900;
+  color:var(--fameeri-primary);
+  font-size:14px;
+}
+.fameeri-theme .fameeri-group-name{font-weight:900;color:var(--fameeri-primary)}
+.fameeri-theme .fameeri-accent{color:var(--fameeri-primary);font-weight:800}
+.fameeri-theme .q-tree-cell:hover,.fameeri-theme .q-tree-cell:focus-visible{
+  border-color:rgba(0,105,92,.45);
+}
+.fameeri-theme .onb-title{color:var(--fameeri-primary)}
+.fameeri-theme .onb-sub{color:var(--fameeri-muted)}
+
+/* سجل هجمات المشرف — وضع نهاري / ليلي */
+.fameeri-battle-group{
+  border-radius:12px;
+  padding:10px 12px;
+  border:1px solid var(--fameeri-border);
+  background:linear-gradient(135deg,rgba(224,242,241,.95),rgba(178,223,219,.35));
+}
+.fameeri-battle-group__head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+}
+.fameeri-battle-group__score{
+  font-size:12px;
+  color:var(--fameeri-primary);
+  font-weight:800;
+}
+.fameeri-battle-empty{
+  font-size:11px;
+  color:var(--fameeri-muted);
+  line-height:1.5;
+}
+.fameeri-battle-feed .feed-item{
+  background:var(--card);
+  border-color:var(--border-faint);
+  color:var(--text-soft);
+}
+[data-theme="dark"] .fameeri-theme .fameeri-battle-group{
+  background:linear-gradient(160deg,rgba(77,182,172,.12),rgba(10,14,22,.92));
+  border-color:rgba(77,182,172,.22);
+}
+[data-theme="dark"] .fameeri-theme .fameeri-battle-empty{color:var(--muted)}
+[data-theme="dark"] .fameeri-theme .fameeri-battle-feed .feed-item{
+  background:var(--surface);
+}

@@ -4,7 +4,7 @@ export default function FameeriGuideModal({ onClose }) {
   const [guideRole, setGuideRole] = useState('player');
 
   return (
-    <div className="mbg" style={{ alignItems: 'flex-start', paddingTop: 16, overflowY: 'auto' }}>
+    <div className="mbg fameeri-theme" style={{ alignItems: 'flex-start', paddingTop: 16, overflowY: 'auto' }}>
       <div
         style={{
           background: 'var(--card)',
@@ -18,7 +18,7 @@ export default function FameeriGuideModal({ onClose }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--green)' }}>📖 دليل صيد القميري</div>
+          <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--fameeri-primary)' }}>📖 دليل صيد القميري</div>
           <button type="button" className="btn bgh bxs" onClick={onClose}>
             ✕
           </button>
@@ -49,7 +49,7 @@ export default function FameeriGuideModal({ onClose }) {
                 </div>
               </div>
             ))}
-            <div style={{ marginTop: 4, marginBottom: 12, fontSize: 12, color: 'var(--gold)', fontWeight: 700 }}>⚠️ تذكّر</div>
+            <div style={{ marginTop: 4, marginBottom: 12, fontSize: 12, color: 'var(--fameeri-primary)', fontWeight: 700 }}>⚠️ تذكّر</div>
             {[
               ['🔒', 'توزيع مجموعتك سري — لا تكشفه للخصم'],
               ['👑', 'غير القائد ينتظر قرار قائده في الهجوم والتوزيع'],
@@ -78,7 +78,7 @@ export default function FameeriGuideModal({ onClose }) {
                 </div>
               </div>
             ))}
-            <div style={{ marginTop: 4, marginBottom: 12, fontSize: 12, color: 'var(--gold)', fontWeight: 700 }}>🎲 أوضاع اللعب</div>
+            <div style={{ marginTop: 4, marginBottom: 12, fontSize: 12, color: 'var(--fameeri-primary)', fontWeight: 700 }}>🎲 أوضاع اللعب</div>
             {[
               ['🔄', 'تتابعي — دور مجموعة تلو الأخرى'],
               ['⚡', 'سرعة — طلبات متعددة واختيارك للفائز'],
