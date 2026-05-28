@@ -67,14 +67,16 @@ export default function TitlesRevealScene(props) {
         <h1 className="trs-title">🔓 كُشفت النتائج</h1>
         <p className="trs-sub">الجولة {roundNum}</p>
 
-        <TrsCard accent="gold">
-          <div className="trs-section-lbl">🎯 هجمتك هذه الجولة</div>
-          {myAtks.length === 0 ? (
-            <p className="trs-muted">لم ترسل هجوماً هذه الجولة</p>
-          ) : (
-            myAtks.map((a, i) => <MyAttackRow key={i} a={a} />)
-          )}
-        </TrsCard>
+        {!isAdmin && (
+          <TrsCard accent="gold">
+            <div className="trs-section-lbl">🎯 هجمتك هذه الجولة</div>
+            {myAtks.length === 0 ? (
+              <p className="trs-muted">لم ترسل هجوماً هذه الجولة</p>
+            ) : (
+              myAtks.map((a, i) => <MyAttackRow key={i} a={a} />)
+            )}
+          </TrsCard>
+        )}
 
         <div className="sg sg3" style={{ marginBottom: 14 }}>
           <div className="sbox">

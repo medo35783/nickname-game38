@@ -6,6 +6,7 @@ import { silentPendingSummary } from '../silentRoundHelpers';
 import { isDecoyRequired } from '../titlesRevealHelpers';
 import HostSetupPanel from './HostSetupPanel';
 import { PLAYER_DISPLAY_NAME_PLACEHOLDER, PLAYER_NICK_PLACEHOLDER } from '../../../core/formLabels';
+import WhatsAppLogoIcon from '../../../components/icons/WhatsAppLogoIcon';
 
 const HOST_TABS = [
   { id: 'players', icon: '👥', label: 'لاعبون' },
@@ -156,8 +157,51 @@ export default function TitlesHostCockpit(props) {
   };
 
   const copyCode = () => {
-    navigator.clipboard?.writeText(roomCode);
-    notify('تم نسخ الرمز ✓', 'success');
+    void shareRoomInvite();
+  };
+
+  const shareRoomInvite = async (preferWhatsApp = false) => {
+    const roomLink = 'https://nickname-game38.vercel.app/';
+    const gameName = 'الألقاب';
+    const inviteText = [
+      '🎮 ساحة الألعاب',
+      'مسابقات جماعية سريعة وممتعة.',
+      'برمز واحد.. تشتعل اللمة ومرحها يزود',
+      '',
+      `اللعبة: ${gameName}`,
+      `رمز الغرفة: ${roomCode}`,
+      `رابط الدخول: ${roomLink}`,
+    ].join('\n');
+
+    if (!preferWhatsApp && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'ساحة الألعاب',
+          text: inviteText,
+          url: roomLink,
+        });
+        notify('تم فتح المشاركة ✓', 'success');
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
+    if (typeof window !== 'undefined') {
+      const w = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (w) {
+        notify('تم فتح واتساب ✓', 'success');
+        return;
+      }
+    }
+
+    try {
+      await navigator.clipboard?.writeText(inviteText);
+      notify('تم نسخ دعوة الغرفة ✓', 'success');
+    } catch {
+      notify('تعذر فتح المشاركة حالياً', 'error');
+    }
   };
 
   const fab = (() => {
@@ -271,7 +315,13 @@ export default function TitlesHostCockpit(props) {
             [3, '🎭 تمويه (اختياري)'],
             [4, '🚀 ابدأ'],
           ].map(([n, lbl]) => (
-            <div key={n} className={`host-step${setupStep === n ? ' on' : setupStep > n ? ' done' : ''}`}>
+            <div
+              key={n}
+              className={`host-step${setupStep === n ? ' on' : setupStep > n ? ' done' : ''}`}
+              onClick={n === 1 ? () => void shareRoomInvite(true) : undefined}
+              title={n === 1 ? 'مشاركة الدعوة' : undefined}
+              style={n === 1 ? { cursor: 'pointer' } : undefined}
+            >
               <span className="host-step-n">{n}</span>
               <span className="host-step-lbl">{lbl}</span>
             </div>
@@ -284,8 +334,8 @@ export default function TitlesHostCockpit(props) {
           <>
             {phase === 'lobby' && (
               <>
-                <button type="button" className="btn bo bsm host-copy-btn" onClick={copyCode}>
-                  📋 نسخ رمز الغرفة للواتساب
+                <button type="button" className="btn bo bsm host-copy-btn" onClick={() => void shareRoomInvite(true)}>
+                  مشاركة رمز الغرفة عبر <WhatsAppLogoIcon />
                 </button>
                 {playersList.length === 0 && (
                   <div className="card host-empty-card">

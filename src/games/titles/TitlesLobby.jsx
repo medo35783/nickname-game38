@@ -11,6 +11,7 @@ import {
   PLAYER_NICK_HINT_SECOND,
 } from '../../core/formLabels';
 import { isDecoyRequired } from './titlesRevealHelpers';
+import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 
 export default function TitlesLobby(props) {
   const {
@@ -66,6 +67,50 @@ export default function TitlesLobby(props) {
   const sidelinedPlayers = playersList.filter((p) => p.status && p.status !== 'active');
 
   const isAdmin = role === 'admin';
+
+  const shareRoomInvite = async (preferWhatsApp = false) => {
+    const roomLink = 'https://nickname-game38.vercel.app/';
+    const gameName = 'الألقاب';
+    const inviteText = [
+      '🎮 ساحة الألعاب',
+      'مسابقات جماعية سريعة وممتعة.',
+      'برمز واحد.. تشتعل اللمة ومرحها يزود',
+      '',
+      `اللعبة: ${gameName}`,
+      `رمز الغرفة: ${roomCode}`,
+      `رابط الدخول: ${roomLink}`,
+    ].join('\n');
+
+    if (!preferWhatsApp && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'ساحة الألعاب',
+          text: inviteText,
+          url: roomLink,
+        });
+        notify('تم فتح المشاركة ✓', 'success');
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
+    if (typeof window !== 'undefined') {
+      const w = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (w) {
+        notify('تم فتح واتساب ✓', 'success');
+        return;
+      }
+    }
+
+    try {
+      await navigator.clipboard?.writeText(inviteText);
+      notify('تم نسخ دعوة الغرفة ✓', 'success');
+    } catch {
+      notify('تعذر فتح المشاركة حالياً', 'error');
+    }
+  };
 
   /* ── شاشة انتظار المتسابق (لا تكشف ألقاب اللاعبين الآخرين) ── */
   if (!isAdmin) {
@@ -172,12 +217,9 @@ export default function TitlesLobby(props) {
           type="button"
           className="btn bo bsm"
           style={{ width: 'auto', margin: '0 auto' }}
-          onClick={() => {
-            navigator.clipboard?.writeText(roomCode);
-            notify('تم النسخ ✓', 'success');
-          }}
+          onClick={() => void shareRoomInvite(true)}
         >
-          📋 نسخ الرمز
+          مشاركة رمز الغرفة عبر <WhatsAppLogoIcon />
         </button>
       </div>
 

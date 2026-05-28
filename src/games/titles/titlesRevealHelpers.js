@@ -149,8 +149,9 @@ export function attacksForPlayer(attacks, { playerId, nicks }) {
   const nk = (nicks || []).filter(Boolean);
   return Object.values(attacks || {})
     .filter((a) => {
-      if (playerId && a.attackerPlayerId) return a.attackerPlayerId === playerId;
-      return nk.includes(a.attackerNick);
+      const byPlayerId = Boolean(playerId && a.attackerPlayerId && a.attackerPlayerId === playerId);
+      const byNick = nk.includes(a.attackerNick);
+      return byPlayerId || byNick;
     })
     .sort((a, b) => (a.time || 0) - (b.time || 0));
 }
