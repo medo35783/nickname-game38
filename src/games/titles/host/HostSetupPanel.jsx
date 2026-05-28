@@ -1,4 +1,3 @@
-import { update, gameRef } from '../../../core/firebaseHelpers';
 import { fmtMs } from '../../../core/helpers';
 import { silentPendingSummary } from '../silentRoundHelpers';
 import HostToolsPanel from './HostToolsPanel';
@@ -12,7 +11,7 @@ export default function HostSetupPanel({
   roundNum,
   roomCode,
   nickMode,
-  setNickMode,
+  onNickModeChange,
   attackDur,
   setAttackDur,
   playersList,
@@ -70,10 +69,7 @@ export default function HostSetupPanel({
                 type="button"
                 className={`btn ${nickMode === n ? 'bg' : 'bgh'}`}
                 style={{ flex: 1 }}
-                onClick={async () => {
-                  setNickMode(n);
-                  if (roomCode) await update(gameRef(roomCode), { nickMode: n });
-                }}
+                onClick={() => void onNickModeChange?.(n)}
               >
                 {n === 1 ? 'لقب واحد' : 'لقبان'}
               </button>

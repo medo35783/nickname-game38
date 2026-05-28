@@ -370,6 +370,24 @@ textarea.inp{resize:vertical;min-height:80px}
 .sc{overflow-y:auto;max-height:260px}
 .sc::-webkit-scrollbar{width:3px}
 .sc::-webkit-scrollbar-thumb{background:rgba(240,192,64,.18);border-radius:2px}
+.host-atk-table-wrap{max-height:200px;border-radius:10px;border:1px solid var(--border-faint);background:var(--surface)}
+.host-atk-table-wrap.sc{max-height:200px}
+.host-atk-empty{text-align:center;color:var(--muted);font-size:11px;padding:14px 10px}
+.host-atk-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.host-atk-table thead{position:sticky;top:0;z-index:1;background:linear-gradient(180deg,var(--card2),var(--surface))}
+.host-atk-table th{padding:8px 6px;font-size:9px;font-weight:800;color:var(--gold);text-align:center;border-bottom:1px solid rgba(240,192,64,.22);line-height:1.35;white-space:nowrap}
+.host-atk-table td{padding:7px 6px;text-align:center;vertical-align:middle;border-bottom:1px solid var(--border-faint);color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.host-atk-table tbody tr:last-child td{border-bottom:none}
+.host-atk-row--ok td:first-child{border-right:3px solid var(--green)}
+.host-atk-row--fail td:first-child{border-right:3px solid var(--red)}
+.host-atk-nick,.host-atk-attacker{font-family:'Cairo',sans-serif;font-weight:800;color:var(--text)}
+.host-atk-name{font-weight:700;color:var(--text-soft)}
+.host-atk-status{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:52px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:900;line-height:1}
+.host-atk-status-ico{font-size:11px;line-height:1;font-weight:900}
+.host-atk-status--ok{color:var(--green);background:rgba(62,224,138,.12);border:1px solid rgba(62,224,138,.35)}
+.host-atk-status--fail{color:var(--red);background:rgba(255,92,114,.1);border:1px solid rgba(255,92,114,.32)}
+.host-atk-table tbody tr{transition:background .15s}
+.host-atk-table tbody tr:hover{background:rgba(240,192,64,.04)}
 .plan-card{border-radius:14px;padding:16px;margin-bottom:10px;position:relative;overflow:hidden}
 .plan-gold{background:linear-gradient(135deg,rgba(240,192,64,.15),rgba(255,140,0,.08));border:2px solid var(--gold)}
 .plan-silver{background:linear-gradient(135deg,rgba(200,200,220,.1),rgba(150,150,180,.05));border:1.5px solid rgba(200,200,220,.3)}
@@ -628,7 +646,7 @@ textarea.inp{resize:vertical;min-height:80px}
 .trs-winner-btn{width:100%;font-size:16px;padding:16px;border-radius:14px;box-shadow:0 10px 32px rgba(240,192,64,.25)}
 .trs-scene-reveal{display:flex;flex-direction:column;align-items:center;padding-top:4px}
 .trs-reveal-head{font-family:'Cairo',sans-serif;font-size:18px;font-weight:900;color:var(--gold);text-align:center;margin:0 0 12px}
-.trs-silent-tag{text-align:center;font-size:11px;color:var(--purple);margin:0 0 10px;font-weight:700}
+.trs-silent-tag{text-align:center;font-size:14px;color:var(--purple);margin:0 0 10px;font-weight:800}
 
 /* كاروسيل الكشف */
 .trs-carousel{width:100%;max-width:360px;margin:0 auto}
@@ -665,7 +683,16 @@ textarea.inp{resize:vertical;min-height:80px}
   border-radius:999px;background:var(--gold);color:var(--on-gold,#1a1200);
   font-family:'Cairo',sans-serif;font-size:12px;font-weight:900;line-height:26px;
 }
-.trs-flash-silent{position:absolute;top:10px;right:10px;font-size:10px;color:var(--blue);font-weight:700}
+.trs-flash-silent{
+  position:absolute;top:8px;right:8px;z-index:2;
+  display:inline-flex;align-items:center;gap:5px;max-width:calc(100% - 52px);
+  padding:5px 11px;border-radius:999px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;line-height:1.2;
+  color:var(--blue);background:rgba(110,184,240,.16);border:1.5px solid rgba(110,184,240,.45);
+  box-shadow:0 2px 10px rgba(110,184,240,.15);white-space:nowrap;
+}
+.trs-flash-silent-ico{font-size:16px;line-height:1}
+.trs-flash-silent-num{letter-spacing:.01em}
 .trs-flash-elim-tag{
   display:inline-block;margin-bottom:6px;font-size:11px;font-weight:800;color:var(--red);
   padding:2px 8px;border-radius:6px;background:rgba(230,57,80,.1);

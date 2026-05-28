@@ -20,7 +20,7 @@ export default function TitlesLobby(props) {
     players,
     gameState,
     nickMode,
-    setNickMode,
+    onNickModeChange,
     attackDur,
     setAttackDur,
     specialRound,
@@ -112,6 +112,8 @@ export default function TitlesLobby(props) {
     }
   };
 
+  const roomNickMode = Number(gameState?.nickMode) === 2 ? 2 : 1;
+
   /* ── شاشة انتظار المتسابق (لا تكشف ألقاب اللاعبين الآخرين) ── */
   if (!isAdmin) {
     const me = playersList.find((p) => p.id === myId);
@@ -134,6 +136,16 @@ export default function TitlesLobby(props) {
           <div className="room-code-big">{roomCode}</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
             <span className="online-dot" /> {activePlayers.length} لاعب في الغرفة الآن
+          </div>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              color: roomNickMode === 2 ? 'var(--blue)' : 'var(--muted)',
+              fontWeight: 700,
+            }}
+          >
+            {roomNickMode === 2 ? '🎭 وضع الغرفة: لقبان' : '🎭 وضع الغرفة: لقب واحد'}
           </div>
         </div>
 
@@ -234,10 +246,7 @@ export default function TitlesLobby(props) {
                 type="button"
                 className={`btn ${nickMode === n ? 'bg' : 'bgh'}`}
                 style={{ flex: 1 }}
-                onClick={async () => {
-                  setNickMode(n);
-                  if (roomCode) await update(gameRef(roomCode), { nickMode: n });
-                }}
+                onClick={() => void onNickModeChange?.(n)}
               >
                 {n === 1 ? 'لقب واحد' : 'لقبان'}
               </button>

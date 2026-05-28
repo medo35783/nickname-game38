@@ -5,6 +5,7 @@ import { ref, set, update, db, gameRef } from '../../../core/firebaseHelpers';
 import { silentPendingSummary } from '../silentRoundHelpers';
 import { isDecoyRequired } from '../titlesRevealHelpers';
 import HostSetupPanel from './HostSetupPanel';
+import HostAttacksTable from './HostAttacksTable';
 import { PLAYER_DISPLAY_NAME_PLACEHOLDER, PLAYER_NICK_PLACEHOLDER } from '../../../core/formLabels';
 import WhatsAppLogoIcon from '../../../components/icons/WhatsAppLogoIcon';
 
@@ -27,7 +28,7 @@ export default function TitlesHostCockpit(props) {
     attacks,
     countdown,
     nickMode,
-    setNickMode,
+    onNickModeChange,
     attackDur,
     setAttackDur,
     specialRound,
@@ -510,27 +511,10 @@ export default function TitlesHostCockpit(props) {
               </div>
             )}
 
-            {phase === 'attacking' && attacksList.length > 0 && (
+            {phase === 'attacking' && (
               <div className="card">
                 <div className="ctitle">🕵️ آخر الهجمات</div>
-                <div className="sc" style={{ maxHeight: 140 }}>
-                  {attacksList.slice(-12).map((a, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        padding: '5px 8px',
-                        marginBottom: 3,
-                        background: 'var(--surface)',
-                        borderRadius: 7,
-                        borderRight: `3px solid ${a.correct ? 'var(--green)' : 'var(--red)'}`,
-                        fontSize: 11,
-                      }}
-                    >
-                      &quot;{a.attackerNick}&quot; → &quot;{a.targetNick}&quot;{' '}
-                      <span style={{ color: a.correct ? 'var(--green)' : 'var(--red)' }}>{a.correct ? '✅' : '❌'}</span>
-                    </div>
-                  ))}
-                </div>
+                <HostAttacksTable attacks={attacksList} maxRows={12} emptyText="بانتظار أول هجمة…" />
               </div>
             )}
           </>
@@ -542,7 +526,7 @@ export default function TitlesHostCockpit(props) {
             roundNum={roundNum}
             roomCode={roomCode}
             nickMode={nickMode}
-            setNickMode={setNickMode}
+            onNickModeChange={onNickModeChange}
             attackDur={attackDur}
             setAttackDur={setAttackDur}
             playersList={playersList}

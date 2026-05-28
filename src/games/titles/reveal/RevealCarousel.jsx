@@ -121,7 +121,14 @@ function RevealFlashCard({ item, index }) {
       className={`trs-flash-card${isElim ? ' is-elim' : ''}${multiHit ? ' is-multi' : ''}`}
     >
       <span className="trs-flash-badge">{index + 1}</span>
-      {item.fromSilentRound && <span className="trs-flash-silent">🤫 ج{item.fromSilentRound}</span>}
+      {item.fromSilentRound != null && (
+        <span className="trs-flash-silent" title={`جولة صامتة ${item.fromSilentRound}`}>
+          <span className="trs-flash-silent-ico" aria-hidden>
+            🤫
+          </span>
+          <span className="trs-flash-silent-num">الجولة {item.fromSilentRound}</span>
+        </span>
+      )}
       {isElim && <span className="trs-flash-elim-tag">💥 خرج</span>}
 
       <div className="trs-flash-nick">&quot;{item.nick}&quot;</div>

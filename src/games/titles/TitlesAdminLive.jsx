@@ -3,6 +3,7 @@ import Av from '../../shared/Av';
 import { fmtMs, shuffle } from '../../core/helpers';
 import { db, ref, set, update, gameRef } from '../../core/firebaseHelpers';
 import { attackableNicksForPlayer, remainingTitlesCount } from '../titlesRevealHelpers';
+import HostAttacksTable from './host/HostAttacksTable';
 
 /**
  * شاشة تحكم المشرف أثناء اللعب (مكافئ gameScreen === 'admin_live' في App).
@@ -376,29 +377,7 @@ export default function TitlesAdminLive(props) {
 
       <div className="card">
         <div className="ctitle">🕵️ سجل الهجمات</div>
-        {attacksList.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11, padding: 10 }}>لا هجمات بعد</div>
-        ) : (
-          <div className="sc" style={{ maxHeight: 180 }}>
-            {attacksList.map((a, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: '5px 8px',
-                  marginBottom: 3,
-                  background: 'var(--surface)',
-                  borderRadius: 7,
-                  borderRight: `3px solid ${a.correct ? 'var(--green)' : 'var(--red)'}`,
-                  fontSize: 11,
-                }}
-              >
-                <span style={{ fontWeight: 700 }}>"{a.attackerNick}"</span> → <span>"{a.targetNick}"</span>
-                <span style={{ marginRight: 6 }}> خمّن: {a.guessedName}</span>
-                <span style={{ color: a.correct ? 'var(--green)' : 'var(--red)' }}>{a.correct ? '✅' : '❌'}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <HostAttacksTable attacks={attacksList} maxRows={20} />
       </div>
 
       <div

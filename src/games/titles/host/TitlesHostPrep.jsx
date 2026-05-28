@@ -8,7 +8,7 @@ export default function TitlesHostPrep({
   gameState,
   roomCode,
   nickMode,
-  setNickMode,
+  onNickModeChange,
   attackDur,
   setAttackDur,
   specialRound,
@@ -46,7 +46,7 @@ export default function TitlesHostPrep({
           roundNum={roundNum}
           roomCode={roomCode}
           nickMode={nickMode}
-          setNickMode={setNickMode}
+          onNickModeChange={onNickModeChange}
           attackDur={attackDur}
           setAttackDur={setAttackDur}
           playersList={playersList}

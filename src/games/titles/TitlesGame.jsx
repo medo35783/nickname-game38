@@ -27,6 +27,8 @@ import {
   applySilentPendingToReveal,
   sanitizeForFirebase,
 } from './silentRoundHelpers';
+import { normalizeNickMode } from './titlesNickMode';
+import { openTitlesPrintableReport } from './titlesPrintReport';
 import TitlesHostCockpit from './host/TitlesHostCockpit';
 import TitlesHostPrep from './host/TitlesHostPrep';
 import TitlesGameSummary from './TitlesGameSummary';
@@ -109,6 +111,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [flipCards, setFlipCards] = useState({});
   const titlesPhaseRef = useRef(null);
   const titlesEndGamePromptSentRef = useRef(false);
+  const nickModeWriteAtRef = useRef(0);
+  const joinNickModeCacheRef = useRef({});
 
   useEffect(() => {
     titlesPhaseRef.current = null;
@@ -126,7 +130,27 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const effectiveRole = isKioskMode ? 'player' : role;
   const effectiveMyNick = isKioskMode ? proxiedPlayer?.nick || '' : myNickLocal;
   const effectiveMyId = isKioskMode ? proxiedPlayer?.id || null : myId;
-  const effectiveNickMode = role === 'admin' ? nickMode : gameState?.nickMode || 1;
+  const effectiveNickMode =
+    role === 'admin' ? nickMode : normalizeNickMode(gameState?.nickMode);
+
+  const updateRoomNickMode = useCallback(
+    async (nextMode) => {
+      const mode = normalizeNickMode(nextMode);
+      setNickMode(mode);
+      nickModeWriteAtRef.current = Date.now();
+      if (mode === 1) {
+        setForm((f) => ({ ...f, nick2: '' }));
+      }
+      if (!roomCode) return;
+      joinNickModeCacheRef.current[roomCode] = mode;
+      try {
+        await update(gameRef(roomCode), { nickMode: mode });
+      } catch {
+        notify('تعذّر حفظ وضع الألقاب — أعد المحاولة', 'error');
+      }
+    },
+    [roomCode, notify]
+  );
   const activePoisonNick = gameState?.poisonNick || poisonNick;
   const activeSpecialRound = gameState?.specialRound || specialRound;
   const phase = gameState?.phase || 'lobby';
@@ -311,7 +335,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         lastWasCollision = false;
         await update(ref(db), {
           [`rooms/${tryCode}/adminId`]: hostUid,
-          [`rooms/${tryCode}/game`]: { phase: 'lobby', roundNum: 0, createdAt: Date.now() },
+          [`rooms/${tryCode}/game`]: {
+            phase: 'lobby',
+            roundNum: 0,
+            createdAt: Date.now(),
+            nickMode: normalizeNickMode(nickMode),
+          },
           [`rooms/${tryCode}/players`]: {},
         });
         savedCode = tryCode;
@@ -473,7 +502,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       const normalizedExisting = existingNicks.map(normalizeName);
       if(normalizedExisting.includes(normalizeName(joinNick))){setJoinErr(`⚠️ اللقب "${joinNick.trim()}" سبقك أحد عليه — اختر لقباً مختلفاً`);return;}
       // Validate nick2 if nickMode=2
-      const roomNickMode = Number(data.game?.nickMode) || 1;
+      const roomNickMode = normalizeNickMode(data.game?.nickMode);
       if (roomNickMode === 2) {
         if (!joinNick2.trim()) {
           setJoinErr('أدخل لقبك الثاني');
@@ -977,184 +1006,21 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     notify(`🚫 أُخرج ${p?.name}`, 'error');
   };
 
-  /* ══ تقرير كامل — طباعة / حفظ PDF من المتصفح + نسخة HTML ══ */
   const downloadPDFReport = () => {
-    const esc = (v) =>
-      String(v ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-
-    const decoyNicksList = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
-    const decoyAtks = allAttacksFlat.filter((a) => a.isDecoy || decoyNicksList.includes(a.targetNick));
-    const nickH = nickHeatmap();
-    const nameH = nameHeatmap();
-
-    const playersRows = playersList
-      .map(
-        (p) =>
-          `<tr><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${esc(p.nick2 || '—')}</td><td>${esc(
-            p.status
-          )}</td><td>${esc(p.eliminatedBy || '—')}</td><td>${esc(p.eliminatedRound ?? '—')}</td></tr>`
-      )
-      .join('');
-
-    const maxNickHeat = nickH[0]?.[1] || 1;
-    const maxNameHeat = nameH[0]?.[1] || 1;
-    const pdfHeatBar = (count, maxVal) => {
-      const r = maxVal > 0 ? count / maxVal : 0;
-      const pct = Math.round(r * 100);
-      const h = Math.round(215 - r * 168);
-      return `<div class="heat-track"><div class="heat-fill" style="width:${pct}%;--hue:${h}"></div></div>`;
-    };
-    const nickHeatRows = nickH
-      .map(
-        ([label, count], i) =>
-          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td><td>${pdfHeatBar(
-            count,
-            maxNickHeat
-          )}</td></tr>`
-      )
-      .join('');
-    const nameHeatRows = nameH
-      .map(
-        ([label, count], i) =>
-          `<tr><td>${i + 1}</td><td>${esc(label)}</td><td>${count}</td><td>${pdfHeatBar(
-            count,
-            maxNameHeat
-          )}</td></tr>`
-      )
-      .join('');
-
-    const fierceRows = attackerRankGlobal
-      .map(
-        (p, i) =>
-          `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${p.count}</td><td>${p.hits}</td></tr>`
-      )
-      .join('');
-
-    const poisoned = playersList.filter((p) => p.isBannedNextRound);
-    const poisonRows = poisoned
-      .map(
-        (p) =>
-          `<tr><td>${esc(p.name)}</td><td>${esc(p.nick)}</td><td>${esc(p.isBannedNextRound)}</td></tr>`
-      )
-      .join('');
-
-    const decoyListRows = decoyNicksList
-      .map((n) => {
-        const hits = decoyAtks.filter((a) => a.targetNick === n).length;
-        return `<tr><td>${esc(n)}</td><td>${hits}</td></tr>`;
-      })
-      .join('');
-    const decoyAtkRows = decoyAtks
-      .map(
-        (a) =>
-          `<tr><td>${esc(a.attackerNick)}</td><td>${esc(a.targetNick)}</td><td>${esc(
-            a.guessedName
-          )}</td><td>فشل (تمويه)</td></tr>`
-      )
-      .join('');
-
-    const roundsHtml = allRoundsList
-      .map((r) => {
-        const ratks = Object.values(r.attacks || {}).sort((a, b) => (a.time || 0) - (b.time || 0));
-        const rows = ratks
-          .map((a) => {
-            const victim = playersList.find((pl) => pl.id === a.realOwnerId);
-            let note = '';
-            if (a.isDecoy || decoyNicksList.includes(a.targetNick)) {
-              note = 'تمويه (لا صاحب حقيقي)';
-            } else if (victim) {
-              note = `صاحب اللقب: ${esc(victim.name)} (${esc(a.targetNick)})`;
-            }
-            return `<tr><td>${esc(a.attackerNick)}</td><td>${esc(a.targetNick)}</td><td>${esc(
-              a.guessedName
-            )}</td><td>${a.correct ? '✅' : '❌'}</td><td style="font-size:11px">${note}</td></tr>`;
-          })
-          .join('');
-        return `<section class="sec"><h2>الجولة ${r.round}${r.silent ? ' (صمت)' : ''}</h2><p>عدد الهجمات: ${ratks.length}</p><table><thead><tr><th>المهاجم</th><th>الهدف</th><th>التخمين</th><th>النتيجة</th><th>ملاحظات</th></tr></thead><tbody>${rows || '<tr><td colspan="5">لا هجمات</td></tr>'}</tbody></table></section>`;
-      })
-      .join('');
-
-    const summary = `<div class="sec"><h2>ملخص</h2><p>الجولات: ${allRoundsList.length} — إجمالي الهجمات: ${allAttacksFlat.length} — إصابات: ${allAttacksFlat.filter((a) => a.correct).length} — فشل: ${allAttacksFlat.filter((a) => !a.correct).length}</p><p>الفائز (النشطون عند الإنهاء): ${esc(activePlayers.map((p) => p.name).join('، ') || '—')}</p></div>`;
-
-    const html = `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="utf-8" />
-<title>${esc(`تقرير الألقاب ${roomCode}`)}</title>
-<style>
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background:#0f0f18; color:#eaeaf0; padding:20px; line-height:1.5; }
-  h1 { color:#e6c84d; font-size:22px; }
-  h2 { color:#c9a227; font-size:16px; margin-top:0; }
-  .sec { margin-bottom:20px; padding:14px 16px; border:1px solid #2a2a3a; border-radius:12px; background:#161622; }
-  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
-  th, td { border:1px solid #333; padding:8px; text-align:right; }
-  th { background:#252536; color:#e6c84d; }
-  .heat-track { height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.12); min-width:100px; }
-  .heat-fill { height:100%; border-radius:999px; background:linear-gradient(90deg, hsl(calc(var(--hue) + 18),72%,38%), hsl(var(--hue),84%,52%), hsl(calc(var(--hue) - 22),90%,62%)); box-shadow:0 0 12px hsla(var(--hue),90%,55%,.35); }
-  .hint { font-size:12px; color:#9a9aaf; margin-top:16px; }
-  @media print {
-    body { background:white; color:#111; }
-    .sec { border-color:#ccc; background:#fafafa; page-break-inside: avoid; }
-    th { background:#eee; color:#111; }
-    .no-print { display:none; }
-  }
-</style>
-</head>
-<body>
-<h1>لعبة الألقاب — تقرير كامل</h1>
-<p><strong>رمز الغرفة:</strong> ${esc(roomCode)} &nbsp;|&nbsp; <strong>التاريخ:</strong> ${esc(new Date().toLocaleString('ar-SA'))}</p>
-<p class="no-print hint">لحفظ PDF: اضغط Ctrl+P (أو قائمة الطباعة) واختر «Save as PDF» / «Microsoft Print to PDF».</p>
-${summary}
-<div class="sec"><h2>المتسابقون</h2>
-<table><thead><tr><th>الاسم</th><th>اللقب</th><th>الثاني</th><th>الحالة</th><th>خرج بـ</th><th>جولة</th></tr></thead><tbody>${playersRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table></div>
-<div class="sec"><h2>الألقاب الأكثر استهدافاً</h2>
-<table><thead><tr><th>#</th><th>اللقب</th><th>هجمات</th><th>الشدة</th></tr></thead><tbody>${nickHeatRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
-<div class="sec"><h2>الأسماء الأكثر تخميناً</h2>
-<table><thead><tr><th>#</th><th>الاسم</th><th>مرات</th><th>الشدة</th></tr></thead><tbody>${nameHeatRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table></div>
-<div class="sec"><h2>الأشرس هجوماً</h2>
-<table><thead><tr><th>#</th><th>الاسم</th><th>اللقب</th><th>هجمات</th><th>إصابات</th></tr></thead><tbody>${fierceRows || '<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
-<div class="sec"><h2>ضحايا المسموم (إن وجد)</h2>
-<table><thead><tr><th>الاسم</th><th>اللقب</th><th>ممنوع جولة</th></tr></thead><tbody>${poisonRows || '<tr><td colspan="3">لا يوجد</td></tr>'}</tbody></table></div>
-<div class="sec"><h2>ألقاب التمويه</h2>
-<table><thead><tr><th>اللقب</th><th>عدد الهجمات</th></tr></thead><tbody>${decoyListRows || '<tr><td colspan="2">لا تمويه</td></tr>'}</tbody></table>
-${decoyAtks.length ? `<h2 style="margin-top:14px;font-size:15px">هجمات على التمويه</h2><table><thead><tr><th>المهاجم</th><th>الهدف</th><th>التخمين</th><th>النتيجة</th></tr></thead><tbody>${decoyAtkRows}</tbody></table>` : ''}
-</div>
-<h1 style="margin-top:28px;font-size:18px">مسار الجولات — تفصيلي</h1>
-${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
-</body></html>`;
-
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = `تقرير_الألقاب_${roomCode}.html`;
-    a.click();
-    URL.revokeObjectURL(blobUrl);
-
-    try {
-      const w = window.open('', '_blank');
-      if (w) {
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
-        setTimeout(() => {
-          try {
-            w.focus();
-            w.print();
-          } catch (e) {
-            /* ignore */
-          }
-        }, 400);
-        notify('تم فتح نافذة الطباعة — للـ PDF اختر «حفظ كـ PDF». وتم تنزيل نسخة HTML أيضاً.', 'success');
-      } else {
-        notify('تم تنزيل التقرير كملف HTML — افتحه ثم اطبعه واحفظ كـ PDF.', 'gold');
-      }
-    } catch (e) {
-      notify('تم تنزيل التقرير كملف HTML — افتحه ثم اطبعه واحفظ كـ PDF.', 'gold');
+    const ok = openTitlesPrintableReport({
+      roomCode,
+      playersList,
+      allRoundsList,
+      allAttacksFlat,
+      gameState,
+    });
+    if (ok) {
+      notify('تم فتح التقرير — اضغط «طباعة / حفظ PDF» ثم اختر حفظ كـ PDF', 'success');
+    } else {
+      notify(
+        'تعذّر فتح نافذة جديدة (حظر النوافذ المنبثقة). سُنزّل ملف HTML — افتحه واطبعه.',
+        'error'
+      );
     }
   };
 
@@ -1301,50 +1167,16 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           );
         })}
 
-        {/* زر الطباعة */}
-        <button className="btn bo no-print" style={{marginTop:8}} onClick={()=>{
-          const el=document.getElementById('full-log');
-          if(!el) return;
-          const w=window.open('','_blank');
-          w.document.write(`<html dir="rtl"><head><title>تقرير لعبة الألقاب</title>
-          <style>body{font-family:Arial,sans-serif;direction:rtl;padding:20px;color:#111}
-          .round-block{border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:14px;page-break-inside:avoid}
-          .round-header{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:10px}
-          .attack-row{display:flex;gap:8px;padding:6px 10px;border-radius:6px;margin-bottom:4px;font-size:13px;border-right:3px solid #ccc}
-          .hit{background:#f0fff4;border-color:#2ecc71}.miss{background:#fff5f5;border-color:#e63950}
-          .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin:0 2px}
-          .gold{color:#b8860b;font-weight:700}.green{color:#1a7a40;font-weight:700}.red{color:#a82020;font-weight:700}
-          h2{color:#b8860b;margin:0 0 4px}</style></head><body>`);
-          allRoundsList.forEach(r=>{
-            const ratks=Object.values(r.attacks||{});
-            const hits=ratks.filter(a=>a.correct);
-            const misses=ratks.filter(a=>!a.correct);
-            const missMap={};misses.forEach(a=>{missMap[a.targetNick]=(missMap[a.targetNick]||0)+1;});
-            w.document.write(`<div class="round-block">
-              <div class="round-header"><h2>الجولة ${r.round}${r.silent?' 🤫':''}</h2>
-              <span>${ratks.length} هجمة | ${hits.length} ✅ | ${misses.length} ❌</span></div>`);
-            if(hits.length>0){
-              w.document.write('<div style="font-weight:700;color:#1a7a40;margin-bottom:6px">✅ الإصابات</div>');
-              hits.forEach(a=>{
-                const v=playersList.find(p=>p.id===a.realOwnerId);
-                w.document.write(`<div class="attack-row hit">💥 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <strong>${a.guessedName}</strong> — الحقيقي: <strong class="green">${v?.name} (${a.targetNick})</strong></div>`);
-              });
-            }
-            if(misses.length>0){
-              w.document.write('<div style="font-weight:700;color:#a82020;margin:8px 0 6px">❌ الهجمات الخاطئة</div>');
-              misses.forEach(a=>{
-                const ro=playersList.find(p=>p.id===a.realOwnerId);
-                w.document.write(`<div class="attack-row miss">🎯 <span class="gold">"${a.attackerNick}"</span> هاجم <span class="gold">"${a.targetNick}"</span> — خمّن: <span class="red">${a.guessedName}</span> — الحقيقي: <strong>${ro?.name} (${a.targetNick})</strong></div>`);
-              });
-            }
-            w.document.write('</div>');
-          });
-          w.document.write('</body></html>');
-          w.document.close();
-          w.print();
-        }}>
-          🖨️ طباعة / حفظ كـ PDF
-        </button>
+        {role === 'admin' && (
+          <button
+            type="button"
+            className="btn bo no-print"
+            style={{ marginTop: 8 }}
+            onClick={downloadPDFReport}
+          >
+            🖨️ طباعة / حفظ كـ PDF
+          </button>
+        )}
       </div>
     );
   };
@@ -1546,25 +1378,42 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
 
   useEffect(() => {
     if (gameScreen !== 'join' || joinInput.length !== 4) {
-      setJoinPreviewNickMode(1);
       setJoinPreviewLoading(false);
+      if (joinInput.length < 4) {
+        setJoinPreviewNickMode(1);
+      }
       return undefined;
     }
+
+    const cached = joinNickModeCacheRef.current[joinInput];
+    if (cached) {
+      setJoinPreviewNickMode(cached);
+    }
     setJoinPreviewLoading(true);
+
     const gRef = gameRef(joinInput);
     const unsub = onValue(
       gRef,
       (snap) => {
-        setJoinPreviewNickMode(Number(snap.val()?.nickMode) || 1);
+        const mode = normalizeNickMode(snap.val()?.nickMode);
+        joinNickModeCacheRef.current[joinInput] = mode;
+        setJoinPreviewNickMode(mode);
         setJoinPreviewLoading(false);
       },
       () => {
-        setJoinPreviewNickMode(1);
+        setJoinPreviewNickMode(cached || 1);
         setJoinPreviewLoading(false);
       }
     );
     return () => off(gRef);
   }, [gameScreen, joinInput]);
+
+  useEffect(() => {
+    if (!roomCode || !gameState) return;
+    const serverMode = normalizeNickMode(gameState.nickMode);
+    if (Date.now() - nickModeWriteAtRef.current < 1500) return;
+    setNickMode((prev) => (prev === serverMode ? prev : serverMode));
+  }, [roomCode, gameState?.nickMode]);
 
   useEffect(() => {
     if (joinPreviewNickMode !== 2) setJoinNick2('');
@@ -2481,8 +2330,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
           activePlayers={activePlayers}
           gameState={gameState}
           roomCode={roomCode}
-          nickMode={nickMode}
-          setNickMode={setNickMode}
+          nickMode={effectiveNickMode}
+          onNickModeChange={updateRoomNickMode}
           attackDur={attackDur}
           setAttackDur={setAttackDur}
           specialRound={specialRound}
@@ -2519,8 +2368,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             gameState={gameState}
             attacks={attacks}
             countdown={countdown}
-            nickMode={nickMode}
-            setNickMode={setNickMode}
+            nickMode={effectiveNickMode}
+            onNickModeChange={updateRoomNickMode}
             attackDur={attackDur}
             setAttackDur={setAttackDur}
             specialRound={specialRound}
@@ -2569,8 +2418,8 @@ ${roundsHtml || '<div class="sec">لا جولات مسجّلة</div>'}
             role={role}
             players={players}
             gameState={gameState}
-            nickMode={nickMode}
-            setNickMode={setNickMode}
+            nickMode={effectiveNickMode}
+            onNickModeChange={updateRoomNickMode}
             attackDur={attackDur}
             setAttackDur={setAttackDur}
             specialRound={specialRound}

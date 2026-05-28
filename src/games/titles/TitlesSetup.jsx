@@ -29,7 +29,8 @@ export default function TitlesSetup(props) {
   } = props;
 
   const isDualMode = joinRoomNickMode === 2;
-  const roomReady = joinInput.length === 4 && !joinRoomModeLoading;
+  const roomCodeComplete = joinInput.length === 4;
+  const roomReady = roomCodeComplete && !joinRoomModeLoading;
 
   if (gameScreen !== 'join') return null;
 
@@ -57,10 +58,10 @@ export default function TitlesSetup(props) {
               setJoinErr('');
             }}
           />
-          {joinInput.length === 4 && joinRoomModeLoading && (
+          {roomCodeComplete && joinRoomModeLoading && (
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>⏳ جاري التحقق من إعدادات الغرفة…</div>
           )}
-          {roomReady && isDualMode && (
+          {roomCodeComplete && isDualMode && (
             <div
               style={{
                 marginTop: 8,
@@ -101,7 +102,7 @@ export default function TitlesSetup(props) {
             {isDualMode ? PLAYER_NICK_HINT_FIRST : PLAYER_NICK_HINT_SINGLE}
           </div>
         </div>
-        {isDualMode && roomReady && (
+        {isDualMode && roomCodeComplete && (
           <div className="ig">
             <label className="lbl">🎭 لقبك الثاني</label>
             <input
@@ -109,6 +110,7 @@ export default function TitlesSetup(props) {
               placeholder={PLAYER_NICK2_PLACEHOLDER}
               value={joinNick2}
               onChange={(e) => setJoinNick2(e.target.value)}
+              disabled={joinRoomModeLoading}
             />
             <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
               {PLAYER_NICK_HINT_SECOND}
