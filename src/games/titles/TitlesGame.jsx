@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { db, ref, set, get, update, onValue, off, push, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
+import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
 import { genCode, fmtMs, shuffle, mkInitials } from '../../core/helpers';
 import { AV_COLORS } from '../../core/constants';
 import Av from '../../shared/Av';
@@ -264,8 +265,15 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       .replace(/ى/g, 'ي');      // ألف مقصورة → ياء
   };
 
+  const trackTitlesRoundDone = () => {
+    if (roomCode) recordRoundCompleted('titles', roomCode).catch(() => {});
+  };
+
   /** مسح جلسة الألقاب من الجهاز والعودة للشاشة الرئيسية (مفيد بعد auto-rejoin أو جلسة قديمة) */
   const clearTitlesSessionAndGoHome = () => {
+    if (role === 'admin' && roomCode) {
+      recordSessionEnd('titles', roomCode, false).catch(() => {});
+    }
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
     setModal(null);
@@ -340,6 +348,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             roundNum: 0,
             createdAt: Date.now(),
             nickMode: normalizeNickMode(nickMode),
+            ...buildGameSessionTracking('titles'),
           },
           [`rooms/${tryCode}/players`]: {},
         });
@@ -943,6 +952,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   /** جولة صمت: احفظ النتائج مخفية وابدأ الجولة التالية دون إعلان */
   const declareWinner = async () => {
     if (role !== 'admin' || !roomCode) return;
+    trackTitlesRoundDone();
+    recordSessionEnd('titles', roomCode, true).catch(() => {});
     await update(gameRef(roomCode), {
       phase: 'ended',
       endGameAfterReveal: null,
@@ -970,6 +981,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       updates[`rooms/${roomCode}/game/silentActive`] = false;
       await update(ref(db), sanitizeForFirebase(updates));
       await set(ref(db, `rooms/${roomCode}/currentRound`), { attacks: {} });
+      trackTitlesRoundDone();
       await launchRound(roundNum + 1);
       const summary = merged.silentExits?.length
         ? `${merged.silentExits.length} خروج مخزّن`
@@ -991,9 +1003,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           : `🏁 بقي ${titlesLeft === 1 ? 'لقب واحد' : 'لقبان'} فقط — انتهت المسابقة حسب القواعد`,
         'gold'
       );
+      trackTitlesRoundDone();
+      recordSessionEnd('titles', roomCode, true).catch(() => {});
       await update(gameRef(roomCode), { phase: 'ended' });
       return;
     }
+    trackTitlesRoundDone();
     await launchRound(roundNum + 1);
   };
 
@@ -1003,6 +1018,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     notify(`⏱️ تمديد ${fmtMs(ms)}`,'gold');
   };
   const endGame = async () => {
+    if (gameState?.phase === 'attacking' || gameState?.phase === 'revealing') {
+      await recordRoundCompleted('titles', roomCode).catch(() => {});
+    }
+    if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
     await update(gameRef(roomCode),{phase:'ended'});
     // Clear ALL sessions so no one auto-rejoins a finished game
     localStorage.removeItem('ng_session');

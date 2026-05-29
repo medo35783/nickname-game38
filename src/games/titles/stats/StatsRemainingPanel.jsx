@@ -1,5 +1,6 @@
 import Av from '../../../shared/Av';
 import {
+  attackableNicksForPlayer,
   nickExitMeta,
   playerNicksList,
   remainingBoardStats,
@@ -89,7 +90,7 @@ export default function StatsRemainingPanel({
 
 function ActivePlayerRow({ player, isAdmin, allRoundsList }) {
   const nicks = playerNicksList(player);
-  const revealed = revealedNicksForStats(player, allRoundsList);
+  const surviving = attackableNicksForPlayer(player);
 
   return (
     <div className="stats-rem-row pi">
@@ -98,17 +99,19 @@ function ActivePlayerRow({ player, isAdmin, allRoundsList }) {
         <div className="pi-name">{player.name}</div>
         <div className="stats-rem-nicks">
           {nicks.map((n) => {
-            const isRev = revealed.includes(n);
+            const isWinner = surviving.includes(n);
             if (isAdmin) {
               return (
-                <span key={n} className={`stats-nick-chip${isRev ? ' is-revealed' : ''}`}>
-                  &quot;{n}&quot;
+                <span key={n} className={`stats-nick-chip ${isWinner ? 'is-winner' : 'is-out'}`}>
+                  {isWinner ? '👑 ' : '✕ '}&quot;{n}&quot;
                 </span>
               );
             }
-            return (
-              <span key={n} className={`stats-nick-chip${isRev ? ' is-revealed' : ' is-locked'}`}>
-                {isRev ? `"${n}"` : '🔒'}
+            return isWinner ? (
+              <span key={n} className="stats-nick-chip is-locked">🔒</span>
+            ) : (
+              <span key={n} className="stats-nick-chip is-out">
+                ✕ &quot;{n}&quot;
               </span>
             );
           })}

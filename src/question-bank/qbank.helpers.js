@@ -122,3 +122,37 @@ export async function fetchGameQuestions({
 
   return shuffleArray(questions).slice(0, count);
 }
+
+/**
+ * نسخة موسّعة تدعم اختيار عدة تصنيفات دفعة واحدة (لجلسات اللعب التي تجمع تصنيفات متعددة).
+ * تُرجع الأسئلة المعتمدة المطابقة للعبة والتصنيفات/الصعوبة/الفئة بعد خلطها.
+ */
+export async function fetchGameQuestionsAdvanced({
+  gameType,
+  categories = [],
+  difficulty_level,
+  audience,
+  count = 40,
+} = {}) {
+  const approvedQuestionsQuery = query(
+    ref(db, QUESTION_BANK_PATH),
+    orderByChild('status'),
+    equalTo('approved')
+  );
+  const snapshot = await get(approvedQuestionsQuery);
+  const activeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
+
+  const questions = toQuestionsArray(snapshot).filter((question) => {
+    if (difficulty_level && question.difficulty_level !== difficulty_level) return false;
+    if (audience && (question.audience || 'general') !== audience) return false;
+
+    const gameTypes = Array.isArray(question.gameTypes) ? question.gameTypes : [];
+    const gameOk = gameType === 'all' ? true : gameTypes.includes(gameType) || gameTypes.includes('all');
+    if (!gameOk) return false;
+
+    if (activeCategories.length) return activeCategories.includes(question.category);
+    return true;
+  });
+
+  return shuffleArray(questions).slice(0, count);
+}

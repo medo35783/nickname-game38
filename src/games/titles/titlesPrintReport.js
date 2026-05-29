@@ -3,6 +3,7 @@
  */
 import { AV_COLORS } from '../../core/constants';
 import {
+  attackableNicksForPlayer,
   nickExitMeta,
   playerNicksList,
   remainingBoardStats,
@@ -132,9 +133,13 @@ function renderRosterVisual(playersList, allRoundsList) {
   const activeRows = active
     .map((p) => {
       const nicks = playerNicksList(p);
-      const revealed = revealedNicksForStats(p, allRoundsList);
+      const surviving = attackableNicksForPlayer(p);
       const chips = nicks
-        .map((n, i) => nickChip(n, revealed.includes(n) || p.status !== 'active' || i === 0))
+        .map((n) =>
+          surviving.includes(n)
+            ? `<span class="chip chip-winner">👑 &quot;${esc(n)}&quot;</span>`
+            : `<span class="chip chip-out">✕ &quot;${esc(n)}&quot; <small>كُشف</small></span>`
+        )
         .join('');
       return `<div class="prow active">
         ${avHtml(p)}
@@ -346,7 +351,12 @@ function reportStyles() {
   .winner-line{padding:6px 0;border-bottom:1px dashed ${C.border};font-size:13px}
   .winner-line:last-child{border:none}
   .winner-line strong{color:${C.text}}
-  .winner-nicks{color:${C.muted};font-size:12px;margin-top:2px}
+  .winner-nicks{color:${C.muted};font-size:12px;margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+  .wchip{display:inline-block;padding:2px 9px;border-radius:8px;font-size:12px;font-weight:900}
+  .wchip.win{background:linear-gradient(135deg,#fbe9b0,#f3cf5e);color:#5a3d00;border:1.5px solid ${C.gold};box-shadow:0 1px 4px rgba(184,134,11,.35)}
+  .wchip.out{background:#eceaf3;color:#9a93b5;border:1px dashed #cfc9de;text-decoration:line-through;font-weight:700}
+  .wchip.dim{color:${C.muted}}
+  .winner-sep{color:${C.muted}}
   .print-hint{font-size:11px;color:${C.muted};margin:12px 0 6px}
   .print-btn{font-family:'Cairo',sans-serif;padding:11px 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#f0c040,#c9a030);color:#1a1020;font-weight:900;font-size:14px;cursor:pointer}
   .hud{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
@@ -368,6 +378,9 @@ function reportStyles() {
   .chip{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:800}
   .chip-gold{background:rgba(184,134,11,.15);color:${C.gold};border:1px solid rgba(184,134,11,.35)}
   .chip-muted{background:#f0eef8;color:${C.muted};border:1px solid ${C.border}}
+  .chip-winner{background:linear-gradient(135deg,#fbe9b0,#f3cf5e);color:#5a3d00;border:1.5px solid ${C.gold};font-weight:900;box-shadow:0 1px 4px rgba(184,134,11,.35)}
+  .chip-out{background:#eceaf3;color:#9a93b5;border:1px dashed #cfc9de;text-decoration:line-through;font-weight:700}
+  .chip-out small{font-size:9px;text-decoration:none;font-weight:800}
   .badge{font-size:10px;font-weight:900;padding:3px 8px;border-radius:999px;flex-shrink:0}
   .badge.ok{color:${C.green};background:${C.greenBg};border:1px solid rgba(26,138,80,.3)}
   .psub{font-size:11px;color:${C.muted};margin-top:4px}
@@ -446,12 +459,17 @@ function buildReportHtml({ roomCode, playersList, allRoundsList, allAttacksFlat,
   const winnerHtml = winners.length
     ? winners
         .map((p) => {
-          const nicks = playerNicksList(p)
-            .map((n) => `"${n}"`)
-            .join(' · ');
+          const surviving = attackableNicksForPlayer(p);
+          const revealed = playerNicksList(p).filter((n) => !surviving.includes(n));
+          const winChips = surviving.length
+            ? surviving.map((n) => `<span class="wchip win">👑 &quot;${esc(n)}&quot;</span>`).join('')
+            : '<span class="wchip dim">—</span>';
+          const outChips = revealed
+            .map((n) => `<span class="wchip out">✕ &quot;${esc(n)}&quot;</span>`)
+            .join('');
           return `<div class="winner-line">
             <strong>${esc(p.name)}</strong>
-            <div class="winner-nicks">اللقب: ${esc(nicks || '—')}</div>
+            <div class="winner-nicks">اللقب الفائز: ${winChips}${outChips ? ` <span class="winner-sep">·</span> ${outChips}` : ''}</div>
           </div>`;
         })
         .join('')

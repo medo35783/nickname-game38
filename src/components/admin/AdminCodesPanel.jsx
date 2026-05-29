@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { onValue } from 'firebase/database';
-import { auth, db } from '../../firebase';
-import { ref, onValue as onDbValue } from 'firebase/database';
-import { adminProfileExistsForUid, createCode, codesRef, ensureCodeIndexesFromRows, formatCodeForDisplay } from '../../firebaseHelpers';
+import { auth } from '../../firebase';
+import {
+  db,
+  ref,
+  get,
+  onValue,
+  off,
+  codesRef,
+  adminProfileExistsForUid,
+  createCode,
+  ensureCodeIndexesFromRows,
+  formatCodeForDisplay,
+} from '../../core/firebaseHelpers';
 
 import { ADMIN_PACKAGE_OPTIONS } from '../../core/subscriptionPackages';
+import CodeStatsDetailPanel from './CodeStatsDetailPanel';
+import CodeActivityBadge from './CodeActivityBadge';
+import { formatCodeMiniStats, getCodeActivityInfo } from './codeActivityHelpers';
 
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
 const PACKAGES = ADMIN_PACKAGE_OPTIONS;
@@ -60,6 +72,18 @@ export default function AdminCodesPanel({ notify }) {
   const [generatedLines, setGeneratedLines] = useState([]);
   /** رسالة نجاح بعد التوليد */
   const [successMsg, setSuccessMsg] = useState('');
+  /** كود مُوسَّع لعرض إحصائيات الجلسات */
+  const [expandedCodeId, setExpandedCodeId] = useState(null);
+  /** إحصائيات مختصرة للجدول (get عند التحميل / التحديث اليدوي) */
+  const [codeStatsById, setCodeStatsById] = useState({});
+  /** تحميل الإحصائيات المختصرة */
+  const [statsBulkLoading, setStatsBulkLoading] = useState(false);
+  /** بيانات لوحة التفاصيل الموسّعة (onValue مباشر) */
+  const [expandedStats, setExpandedStats] = useState(null);
+  const [expandedStatsLoading, setExpandedStatsLoading] = useState(false);
+  const [expandedStatsError, setExpandedStatsError] = useState(false);
+  const expandedStatsRef = useRef(null);
+  const expandedUnsubRef = useRef(null);
 
   // الاشتراك في codes بعد تأكيد جلسة مشرف (تجنّب قراءة أثناء auth مجهول)
   useEffect(() => {
@@ -113,6 +137,98 @@ export default function AdminCodesPanel({ notify }) {
     });
   }, [rows]);
 
+  const loadAllMiniStats = useCallback(async () => {
+    if (!rows.length) {
+      setCodeStatsById({});
+      setStatsBulkLoading(false);
+      return;
+    }
+
+    setStatsBulkLoading(true);
+    try {
+      const results = await Promise.all(
+        rows.map(async (row) => {
+          try {
+            const snap = await get(ref(db, `codes/${row.id}/stats`));
+            return {
+              id: row.id,
+              data: snap.exists() ? snap.val() : null,
+              error: false,
+            };
+          } catch (err) {
+            console.error('[stats]', err);
+            return { id: row.id, data: null, error: true };
+          }
+        })
+      );
+      const map = {};
+      results.forEach(({ id, data, error }) => {
+        map[id] = { loading: false, data, error };
+      });
+      setCodeStatsById(map);
+    } finally {
+      setStatsBulkLoading(false);
+    }
+  }, [rows]);
+
+  /** تحميل الإحصائيات المختصرة مرة عند توفر قائمة الأكواد */
+  useEffect(() => {
+    void loadAllMiniStats();
+  }, [loadAllMiniStats]);
+
+  const reloadAllStats = () => {
+    void loadAllMiniStats();
+  };
+
+  /** اشتراك مباشر لإحصائيات الكود الموسّع فقط */
+  useEffect(() => {
+    if (expandedUnsubRef.current) {
+      expandedUnsubRef.current();
+      expandedUnsubRef.current = null;
+    }
+    if (expandedStatsRef.current) {
+      off(expandedStatsRef.current);
+      expandedStatsRef.current = null;
+    }
+
+    if (!expandedCodeId) {
+      setExpandedStats(null);
+      setExpandedStatsLoading(false);
+      setExpandedStatsError(false);
+      return undefined;
+    }
+
+    const statsRefPath = ref(db, `codes/${expandedCodeId}/stats`);
+    expandedStatsRef.current = statsRefPath;
+    setExpandedStatsLoading(true);
+    setExpandedStatsError(false);
+
+    const unsub = onValue(
+      statsRefPath,
+      (snap) => {
+        setExpandedStats(snap.exists() ? snap.val() : null);
+        setExpandedStatsLoading(false);
+      },
+      (err) => {
+        console.error('[stats]', err);
+        setExpandedStatsError(true);
+        setExpandedStatsLoading(false);
+      }
+    );
+    expandedUnsubRef.current = unsub;
+
+    return () => {
+      if (expandedUnsubRef.current) {
+        expandedUnsubRef.current();
+        expandedUnsubRef.current = null;
+      }
+      if (expandedStatsRef.current) {
+        off(expandedStatsRef.current);
+        expandedStatsRef.current = null;
+      }
+    };
+  }, [expandedCodeId]);
+
   useEffect(() => {
     let unsub = null;
     const authUnsub = onAuthStateChanged(auth, async (user) => {
@@ -122,7 +238,7 @@ export default function AdminCodesPanel({ notify }) {
       if (!user) return;
       const isAdmin = await adminProfileExistsForUid(user.uid);
       if (!isAdmin) return;
-      unsub = onDbValue(ref(db, 'codeIndex'), (snap) => {
+      unsub = onValue(ref(db, 'codeIndex'), (snap) => {
         setIndexByCode(snap.val() || {});
       });
     });
@@ -218,6 +334,10 @@ export default function AdminCodesPanel({ notify }) {
     URL.revokeObjectURL(url);
     notify('تم تصدير CSV', 'success');
   };
+
+  const toggleCodeStats = useCallback((codeId) => {
+    setExpandedCodeId((prev) => (prev === codeId ? null : codeId));
+  }, []);
 
   const statBox = (label, value, colorVar) => (
     <div
@@ -346,9 +466,20 @@ export default function AdminCodesPanel({ notify }) {
           <div className="ctitle" style={{ marginBottom: 0 }}>
             📋 جميع الأكواد ({rows.length})
           </div>
-          <button type="button" className="btn bgh bsm" style={{ width: 'auto' }} onClick={handleExportCsv}>
-            📤 تصدير CSV
-          </button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn bgh bsm"
+              style={{ width: 'auto', fontSize: 11, color: 'var(--muted)' }}
+              disabled={statsBulkLoading || rows.length === 0}
+              onClick={reloadAllStats}
+            >
+              🔄 تحديث الإحصائيات
+            </button>
+            <button type="button" className="btn bgh bsm" style={{ width: 'auto' }} onClick={handleExportCsv}>
+              📤 تصدير CSV
+            </button>
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -360,12 +491,13 @@ export default function AdminCodesPanel({ notify }) {
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>المدة</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>السعر</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>تاريخ الإنشاء</th>
+                <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)', width: 72 }} />
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>
+                  <td colSpan={6} style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>
                     لا توجد أكواد بعد
                   </td>
                 </tr>
@@ -383,14 +515,89 @@ export default function AdminCodesPanel({ notify }) {
                         : eff === 'expired'
                           ? 'rgba(230,57,80,.07)'
                           : 'rgba(255,255,255,.03)';
+                  const isExpanded = expandedCodeId === row.id;
+                  const statsEntry = codeStatsById[row.id];
+                  const rowStats = statsEntry?.data ?? null;
+                  const rowStatsLoading = statsBulkLoading && !statsEntry;
+                  const activity = getCodeActivityInfo(rowStats);
+                  const miniStats = rowStatsLoading ? '—' : formatCodeMiniStats(rowStats);
                   return (
-                    <tr key={row.id} style={{ background: bg, borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                      <td style={{ padding: '10px 6px', fontWeight: 800, fontFamily: 'monospace', color: 'var(--gold)' }}>{formatCodeForDisplay(row.code)}</td>
-                      <td style={{ padding: '10px 6px', fontWeight: 800, color: rowColor }}>{statusLabel(eff)}</td>
-                      <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.duration ?? '—'} يوم</td>
-                      <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.price ?? '—'} ر.س</td>
-                      <td style={{ padding: '10px 6px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(row.createdAt)}</td>
-                    </tr>
+                    <Fragment key={row.id}>
+                      <tr
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleCodeStats(row.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleCodeStats(row.id);
+                          }
+                        }}
+                        style={{
+                          background: isExpanded ? 'rgba(240,192,64,.08)' : bg,
+                          borderBottom: '1px solid rgba(255,255,255,.05)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <td style={{ padding: '10px 6px', verticalAlign: 'top' }}>
+                          <div
+                            style={{
+                              fontWeight: 800,
+                              fontFamily: 'monospace',
+                              color: 'var(--gold)',
+                              fontSize: 13,
+                              marginBottom: 5,
+                            }}
+                          >
+                            {formatCodeForDisplay(row.code)}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              alignItems: 'center',
+                              gap: '6px 10px',
+                            }}
+                          >
+                            <CodeActivityBadge activity={activity} loading={rowStatsLoading} />
+                            <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>{miniStats}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 6px', fontWeight: 800, color: rowColor }}>{statusLabel(eff)}</td>
+                        <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.duration ?? '—'} يوم</td>
+                        <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.price ?? '—'} ر.س</td>
+                        <td style={{ padding: '10px 6px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(row.createdAt)}</td>
+                        <td style={{ padding: '10px 6px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className={`btn bgh bxs ${isExpanded ? 'bo' : ''}`}
+                            style={{ width: 'auto', fontSize: 10, padding: '4px 8px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCodeStats(row.id);
+                            }}
+                          >
+                            📊 {isExpanded ? 'إخفاء' : 'تفاصيل'}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr style={{ background: 'rgba(0,0,0,.25)' }}>
+                          <td colSpan={6} style={{ padding: '8px 10px 14px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                            {expandedStatsError ? (
+                              <div style={{ fontSize: 12, color: 'var(--red)', textAlign: 'center', padding: 8 }}>
+                                تعذّر تحميل الإحصائيات
+                              </div>
+                            ) : (
+                              <CodeStatsDetailPanel
+                                loading={expandedStatsLoading}
+                                stats={expandedStats}
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })
               )}

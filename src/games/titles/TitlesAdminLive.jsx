@@ -8,6 +8,8 @@ import HostAttacksTable from './host/HostAttacksTable';
 /**
  * شاشة تحكم المشرف أثناء اللعب (مكافئ gameScreen === 'admin_live' في App).
  * Props الأساسية من App؛ يمكن تمرير setMyNick / setMyGuess / setMySubmitted و attackDur عند الربط.
+ *
+ * TODO: wire sessionStats when TitlesAdminLive is activated (nextRound / endGame from props).
  */
 export default function TitlesAdminLive(props) {
   const {

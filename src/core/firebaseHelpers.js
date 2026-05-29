@@ -16,6 +16,13 @@ export const qMembersRef= code => ref(db, `qrooms/${code}/members`);
 
 export { ref, set, get, update, onValue, off, push, db };
 
+export {
+  resolveUserId,
+  resolveCodeId,
+  buildGameSessionTracking,
+  persistActiveCodeLocal,
+} from './sessionStats';
+
 // ═══════════════════════════════════════════
 // نظام الأكواد والاشتراكات
 // ═══════════════════════════════════════════
@@ -230,6 +237,11 @@ export async function activateCode(code, userId, deviceInfo) {
     const updates = {
       [`codeIndex/${storedCode}`]: indexUpdate,
       [`users/${userId}/activeCode`]: activeSummary,
+      [`codes/${foundCodeId}/status`]: 'active',
+      [`codes/${foundCodeId}/activatedAt`]: activeSummary.activatedAt,
+      [`codes/${foundCodeId}/expiresAt`]: expiresAt,
+      [`codes/${foundCodeId}/userId`]: userId,
+      [`codes/${foundCodeId}/devices`]: devices,
     };
 
     if (isFirstActivation) {

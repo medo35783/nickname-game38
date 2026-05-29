@@ -19,7 +19,7 @@ import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
 import SiteFooter from './components/layout/SiteFooter';
 import ThemeToggle from './components/layout/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
-import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile } from './firebaseHelpers';
+import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
 const ADMIN_LOGO_TAPS = 7;
@@ -79,6 +79,7 @@ export default function App() {
       if (!user) {
         setIsAdmin(false);
         setActiveCode(null);
+        persistActiveCodeLocal(null);
         try {
           await signInAnonymously(auth);
         } catch (e) {
@@ -107,7 +108,9 @@ export default function App() {
         }
 
         const code = await getActiveUserCode(user.uid);
-        setActiveCode(code && isCodeValid(code) ? code : null);
+        const validCode = code && isCodeValid(code) ? code : null;
+        setActiveCode(validCode);
+        persistActiveCodeLocal(validCode);
 
         if (hashAdmin) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -493,6 +496,7 @@ export default function App() {
               activeCode={activeCode}
               onExpired={() => {
                 setActiveCode(null);
+                persistActiveCodeLocal(null);
                 setShowCodeActivation(true);
                 notify('⏰ انتهى اشتراكك! جدّد الآن', 'error');
               }}
@@ -518,6 +522,7 @@ export default function App() {
             notify={notify}
             onActivationSuccess={(codeData) => {
               setActiveCode(codeData);
+              persistActiveCodeLocal(codeData);
               setShowCodeActivation(false);
               notify('✅ تم تفعيل الكود — تابع من اللعبة', 'success');
             }}

@@ -1,5 +1,10 @@
 import { ref as dbRef, push, update } from 'firebase/database';
 import { db } from '../../core/firebase';
+import { recordRoundCompleted } from '../../core/sessionStats';
+
+function trackSpeedRoundCompleted(qRoom) {
+  if (qRoom) recordRoundCompleted('fameeri', qRoom).catch(() => {});
+}
 
 /**
  * حسم جولة السرعة — إجابة صحيحة: يُفعّل هجوم مجموعة واحدة، الباقون يخسرون السلاح المعلن فقط.
@@ -34,7 +39,10 @@ export async function applySpeedRoundCorrect({ qRoom, qGameState, qGroups, winne
     u[`qrooms/${qRoom}/game/speedClaims`] = {};
     u[`qrooms/${qRoom}/game/speedBatchActive`] = false;
     u[`qrooms/${qRoom}/game/timer`] = null;
+    u[`qrooms/${qRoom}/game/currentQuestion`] = null;
+    u[`qrooms/${qRoom}/game/shieldWindow`] = null;
     await update(dbRef(db), u);
+    trackSpeedRoundCompleted(qRoom);
     return;
   }
 
@@ -95,8 +103,11 @@ export async function applySpeedRoundCorrect({ qRoom, qGameState, qGroups, winne
   u[`qrooms/${qRoom}/game/speedClaims`] = {};
   u[`qrooms/${qRoom}/game/speedBatchActive`] = false;
   u[`qrooms/${qRoom}/game/timer`] = null;
+  u[`qrooms/${qRoom}/game/currentQuestion`] = null;
+  u[`qrooms/${qRoom}/game/shieldWindow`] = null;
 
   await update(dbRef(db), u);
+  trackSpeedRoundCompleted(qRoom);
 }
 
 /** إجابة خاطئة: كل من أرسل طلباً يخسر سلاحه المعلن */
@@ -129,6 +140,8 @@ export async function applySpeedRoundWrong({ qRoom, qGameState, qGroups }) {
   u[`qrooms/${qRoom}/game/speedClaims`] = {};
   u[`qrooms/${qRoom}/game/speedBatchActive`] = false;
   u[`qrooms/${qRoom}/game/timer`] = null;
+  u[`qrooms/${qRoom}/game/currentQuestion`] = null;
 
   await update(dbRef(db), u);
+  trackSpeedRoundCompleted(qRoom);
 }
