@@ -5,6 +5,7 @@ import {
   isAnswerCorrect,
   optionLabel,
 } from './questionSession';
+import AdminQuestionRevealControls from './AdminQuestionRevealControls';
 
 /**
  * بطاقة السؤال عند المشرف أثناء اللعب — مكوّن مشترك.
@@ -15,10 +16,13 @@ export default function AdminQuestionView({
   answer,
   onToggleRevealQuestion,
   onToggleRevealOptions,
+  onHideAll,
   onDrawNext,
   groupAnswers = [],
   pendingGroups = [],
   accent = 'var(--gold)',
+  /** مؤقت الهجوم بجانب بنك الأسئلة — setup | run | shield */
+  attackTimer = null,
 }) {
   if (!current) return null;
 
@@ -42,6 +46,11 @@ export default function AdminQuestionView({
         <div className="admin-q-card__tags">
           <span className="admin-q-tag">{QB_CATEGORY_LABELS[current.category] || current.category || '—'}</span>
           <span className="admin-q-tag">{QB_TYPE_LABELS[current.type] || current.type}</span>
+          {current.matchedDifficulty && (
+            <span className="admin-q-tag" style={{ color: 'var(--gold)' }}>
+              🔗 {current.matchedDifficulty === 'hard' ? 'شوزل' : current.matchedDifficulty === 'easy' ? 'نبيطة' : 'أم صتمة'}
+            </span>
+          )}
         </div>
       </div>
 
@@ -130,26 +139,88 @@ export default function AdminQuestionView({
 
       {adminOnly ? (
         <div className="admin-q-admin-only">
-          🎭 سؤال للمشرف فقط — لا يظهر للمتسابقين. أعطه لعضو من المجموعة ليمثّله لزملائه.
+          🎭 سؤال للمشرف فقط (تمثيل / أمثال) — لا يظهر على جوالات المتسابقين. اقرأه شفهياً أو مثّله.
         </div>
       ) : (
-        <div className="admin-q-reveal-btns">
-          <button
-            type="button"
-            className={`btn ${current.revealToPlayers ? 'bg' : 'bgh'} bsm`}
-            onClick={onToggleRevealQuestion}
-          >
-            {current.revealToPlayers ? '🙈 إخفاء السؤال' : '👁️ إظهار السؤال'}
-          </button>
-          {hasOptions && current.revealToPlayers && (
+        <AdminQuestionRevealControls
+          current={current}
+          onToggleRevealQuestion={onToggleRevealQuestion}
+          onToggleRevealOptions={onToggleRevealOptions}
+          onHideAll={onHideAll}
+        />
+      )}
+
+      {attackTimer?.mode === 'setup' && (
+        <div className="admin-q-timer-block">
+          <div className="lbl">⏱️ 2 — شغّل المؤقت بعد إظهار السؤال</div>
+          <p className="admin-q-timer-block__hint">
+            السؤال مخفي عن المجموعات حتى تضغط «إظهار» — ثم اختر المدة وابدأ
+          </p>
+          <div className="fameeri-admin-pills">
+            {(attackTimer.presets || [15, 30, 45, 60]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="btn bg bsm"
+                disabled={attackTimer.disabled}
+                onClick={() => attackTimer.onStart?.(s)}
+              >
+                {s}ث
+              </button>
+            ))}
+          </div>
+          <div className="fameeri-admin-inline-form" style={{ marginTop: 8 }}>
+            <input
+              type="number"
+              className="inp"
+              placeholder="مخصص (ث)"
+              value={attackTimer.customValue ?? ''}
+              disabled={attackTimer.disabled}
+              onChange={(e) => attackTimer.onCustomChange?.(e.target.value)}
+            />
             <button
               type="button"
-              className={`btn ${current.revealOptions ? 'bg' : 'bgh'} bsm`}
-              onClick={onToggleRevealOptions}
+              className="btn bg bsm"
+              disabled={attackTimer.disabled}
+              onClick={() => {
+                const s = parseInt(attackTimer.customValue, 10) || 30;
+                attackTimer.onStart?.(s);
+              }}
             >
-              {current.revealOptions ? '🙈 إخفاء الخيارات' : '👁️ إظهار الخيارات'}
+              ⏱️
             </button>
-          )}
+          </div>
+        </div>
+      )}
+
+      {attackTimer?.mode === 'run' && (
+        <div className="admin-q-timer-block admin-q-timer-block--live">
+          <div className="lbl">⏱️ المؤقت يعمل</div>
+          <div className="admin-q-timer-block__count">
+            {attackTimer.countdown !== null
+              ? attackTimer.countdown > 0
+                ? attackTimer.countdown
+                : '⏰'
+              : '...'}
+          </div>
+          <p className="admin-q-timer-block__hint">اضغط ✅ صح أو ❌ خطأ في بطاقة الهجوم أسفل</p>
+        </div>
+      )}
+
+      {attackTimer?.mode === 'shield' && (
+        <div className="admin-q-timer-block admin-q-timer-block--shield">
+          <div className="lbl">🛡️ نافذة الدرع</div>
+          <div className="admin-q-timer-block__count admin-q-timer-block__count--shield">
+            {attackTimer.countdown !== null
+              ? attackTimer.countdown > 0
+                ? attackTimer.countdown
+                : '⏰'
+              : '...'}
+          </div>
+          <p className="admin-q-timer-block__hint">
+            {attackTimer.targetName ? `${attackTimer.targetName} — ` : ''}
+            فرصة تفعيل الدرع (مرة واحدة)
+          </p>
         </div>
       )}
 

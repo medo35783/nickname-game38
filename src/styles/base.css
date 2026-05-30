@@ -524,11 +524,12 @@ textarea.inp{resize:vertical;min-height:80px}
 /* ── LEADERBOARD ── */
 
 /* ── QUMAIRI ANIMATIONS ── */
-.q-reveal{position:fixed;inset:0;z-index:350;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+.q-reveal{position:fixed;inset:0;z-index:350;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));text-align:center;overflow-y:auto}
 .q-reveal-bg-success{background:linear-gradient(180deg,rgba(0,20,0,.97),rgba(0,50,10,.95))}
 .q-reveal-bg-empty{background:linear-gradient(180deg,rgba(30,20,0,.97),rgba(50,30,0,.95))}
 .q-reveal-bg-fail{background:linear-gradient(180deg,rgba(30,0,0,.97),rgba(50,0,0,.95))}
 .q-reveal-bg-pending{background:linear-gradient(180deg,rgba(10,10,30,.97),rgba(15,15,40,.95))}
+.q-reveal-bg-shield{background:linear-gradient(180deg,rgba(20,0,40,.97),rgba(50,10,80,.95))}
 .q-scene{animation:fadeInFull .5s ease}
 .q-tree-big{font-size:100px;filter:drop-shadow(0 0 30px rgba(46,204,113,.3));animation:treeGrow .6s ease}
 @keyframes treeGrow{0%{transform:scale(0) rotate(-10deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
@@ -592,8 +593,23 @@ textarea.inp{resize:vertical;min-height:80px}
 .admin-q-pending__names{color:var(--text);font-weight:700}
 .admin-q-groups__hint{margin:8px 0 0;font-size:10px;color:var(--muted);text-align:center;line-height:1.55}
 .admin-q-admin-only{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(155,89,182,.1);border:1px solid rgba(155,89,182,.3);font-size:11px;color:var(--purple);line-height:1.55}
+.admin-q-reveal-status{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.admin-q-reveal-pill{
+  font-size:10px;font-weight:800;padding:4px 10px;border-radius:999px;
+  background:var(--surface);color:var(--muted);border:1px solid var(--border-faint);
+}
+.admin-q-reveal-pill.on{background:rgba(46,204,113,.12);color:var(--green);border-color:rgba(46,204,113,.4)}
+.admin-q-reveal-hint{margin:8px 0 0;font-size:10px;color:var(--muted);line-height:1.55;text-align:center}
+.admin-q-reveal-hint strong{color:var(--text);font-weight:800}
+.admin-q-reveal-hint--compact{margin:0 0 8px;text-align:start}
+.admin-q-reveal-controls--compact .admin-q-reveal-btns{margin-top:0}
+.fameeri-admin-pre-timer-reveal{
+  margin-bottom:14px;padding:12px!important;
+  border:1.5px dashed rgba(240,192,64,.45)!important;
+  background:rgba(240,192,64,.05)!important;
+}
 .admin-q-reveal-btns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.admin-q-reveal-btns .btn{flex:1;min-width:120px}
+.admin-q-reveal-btns .btn{flex:1;min-width:100px}
 .admin-q-draw{margin-top:8px;width:auto}
 .q-weapon-flash{animation:weaponFlash .3s ease}
 @keyframes weaponFlash{0%{transform:scale(2);opacity:0}100%{transform:scale(1);opacity:1}}
@@ -2099,11 +2115,111 @@ button.fameeri-admin-ribbon__item:active{transform:scale(.98)}
 [data-theme="dark"] .fameeri-tree-cell.on .qt-name{color:#b9f6ca}
 
 /* ── أزرار الهدف والسلاح ── */
-.fameeri-attack-panel__hero{text-align:center;margin-bottom:14px}
-.fameeri-attack-panel__emoji{font-size:40px;display:block}
-.fameeri-attack-panel__steps{font-size:11px;margin-top:4px;font-weight:700}
-[data-theme="light"] .fameeri-attack-panel__steps{color:#546e7a}
-[data-theme="dark"] .fameeri-attack-panel__steps{color:#90a4ae}
+.fameeri-attack-panel--active{position:relative;overflow:hidden}
+.fameeri-attack-turn-banner{
+  position:relative;display:flex;align-items:center;gap:12px;
+  padding:14px 12px;margin:-4px -4px 14px;border-radius:14px;
+  overflow:hidden;
+}
+[data-theme="light"] .fameeri-attack-turn-banner{
+  background:linear-gradient(135deg,#ffebee,#ffcdd2);
+  border:2px solid #c62828;
+  box-shadow:0 0 20px rgba(198,40,40,.2);
+}
+[data-theme="dark"] .fameeri-attack-turn-banner{
+  background:linear-gradient(135deg,rgba(198,40,40,.35),rgba(80,20,30,.5));
+  border:2px solid rgba(255,92,114,.6);
+  box-shadow:0 0 28px rgba(255,92,114,.25);
+}
+.fameeri-attack-turn-banner__pulse{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 30% 50%,rgba(255,255,255,.15),transparent 60%);
+  animation:attackTurnGlow 2s ease-in-out infinite;
+}
+@keyframes attackTurnGlow{0%,100%{opacity:.5}50%{opacity:1}}
+.fameeri-attack-turn-banner__icon{
+  flex-shrink:0;font-size:32px;line-height:1;
+  animation:attackTurnBounce 1.2s ease-in-out infinite;
+}
+@keyframes attackTurnBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.fameeri-attack-turn-banner__text{flex:1;min-width:0;text-align:start}
+.fameeri-attack-turn-banner__title{
+  font-family:'Cairo',sans-serif;font-size:17px;font-weight:900;line-height:1.3;
+}
+[data-theme="light"] .fameeri-attack-turn-banner__title{color:#b71c1c}
+[data-theme="dark"] .fameeri-attack-turn-banner__title{color:#ff8a9a}
+.fameeri-attack-turn-banner__sub{font-size:11px;font-weight:700;margin-top:4px;line-height:1.45;color:var(--muted)}
+
+.fameeri-attack-stepper{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:4px;margin-bottom:16px;padding:10px 8px;border-radius:12px;
+}
+[data-theme="light"] .fameeri-attack-stepper{background:#f5f5f5;border:1px solid rgba(0,0,0,.08)}
+[data-theme="dark"] .fameeri-attack-stepper{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08)}
+.fameeri-attack-stepper__item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;
+  position:relative;min-width:0;
+}
+.fameeri-attack-stepper__node{
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cairo',sans-serif;font-size:16px;font-weight:900;
+  border:2px solid var(--border-faint);
+  background:var(--surface);color:var(--muted);
+  transition:all .2s;
+}
+.fameeri-attack-stepper__item.active .fameeri-attack-stepper__node{
+  border-color:var(--red);color:#fff;
+  background:linear-gradient(135deg,#e53935,#c62828);
+  box-shadow:0 0 16px rgba(229,57,53,.45);
+  transform:scale(1.08);
+}
+.fameeri-attack-stepper__item.done .fameeri-attack-stepper__node{
+  border-color:var(--green);background:var(--green);color:#fff;
+}
+.fameeri-attack-stepper__labels{text-align:center;min-width:0}
+.fameeri-attack-stepper__label{display:block;font-size:11px;font-weight:900;color:var(--text)}
+.fameeri-attack-stepper__short{display:block;font-size:9px;color:var(--muted);font-weight:700}
+.fameeri-attack-stepper__item.active .fameeri-attack-stepper__label{color:var(--red)}
+[data-theme="dark"] .fameeri-attack-stepper__item.active .fameeri-attack-stepper__label{color:#ff8a9a}
+.fameeri-attack-stepper__line{
+  position:absolute;top:18px;inset-inline-start:calc(50% + 22px);
+  width:calc(100% - 44px);height:3px;border-radius:2px;
+  background:var(--border-faint);z-index:0;
+}
+.fameeri-attack-stepper__item.done .fameeri-attack-stepper__line{background:var(--green)}
+
+.fameeri-attack-step{
+  margin-bottom:14px;padding:10px;border-radius:12px;
+  border:1.5px solid transparent;transition:border-color .2s,background .2s;
+}
+.fameeri-attack-step--focus{
+  border-color:rgba(229,57,53,.45)!important;
+}
+[data-theme="light"] .fameeri-attack-step--focus{background:rgba(255,235,238,.6)}
+[data-theme="dark"] .fameeri-attack-step--focus{background:rgba(255,92,114,.08)}
+.fameeri-attack-step--done{opacity:.92}
+.fameeri-attack-step__head{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
+  margin-bottom:10px;
+}
+.fameeri-attack-step__num{
+  font-family:'Cairo',sans-serif;font-size:18px;font-weight:900;
+  color:var(--red);line-height:1;
+}
+[data-theme="dark"] .fameeri-attack-step__num{color:#ff8a9a}
+.fameeri-attack-step__title{font-size:13px;font-weight:900;color:var(--text);flex:1;min-width:120px}
+.fameeri-attack-step__picked{
+  font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;
+  background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.4);
+}
+.fameeri-attack-next-hint{
+  text-align:center;font-size:11px;font-weight:800;color:var(--gold);
+  margin:8px 0 0;line-height:1.5;
+}
+.fameeri-weapon-pick__diff{
+  font-size:9px;font-weight:800;color:var(--muted);margin-top:2px;
+}
 .fameeri-attack-step{margin-bottom:12px}
 .fameeri-target-row{display:flex;gap:8px;flex-wrap:wrap}
 .fameeri-target-btn{
@@ -2363,6 +2479,22 @@ button.fameeri-admin-ribbon__item:active{transform:scale(.98)}
 [data-theme="dark"] .fameeri-attack-banner__tree-qty{background:rgba(255,152,0,.12);color:#ffb74d}
 .fameeri-attack-banner__tree-qty strong{font-family:'Cairo',sans-serif;font-size:16px}
 
+.fameeri-player-your-turn{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;margin-bottom:8px;border-radius:12px;
+  font-size:12px;font-weight:900;line-height:1.4;
+  animation:attackTurnGlow 2s ease-in-out infinite;
+}
+[data-theme="light"] .fameeri-player-your-turn{
+  background:linear-gradient(90deg,#ffebee,#fff3e0);
+  border:2px solid #e65100;color:#bf360c;
+}
+[data-theme="dark"] .fameeri-player-your-turn{
+  background:linear-gradient(90deg,rgba(198,40,40,.25),rgba(255,152,0,.12));
+  border:2px solid rgba(255,152,0,.5);color:#ffb74d;
+}
+.fameeri-player-your-turn__icon{font-size:20px}
+
 /* ── تبويبات اللاعب ── */
 .fameeri-player-sticky{
   position:sticky;top:0;z-index:50;
@@ -2452,3 +2584,159 @@ button.fameeri-admin-ribbon__item:active{transform:scale(.98)}
 .fameeri-player-tab-pane .fameeri-forest-cell{min-height:70px;padding:6px 3px 5px}
 .fameeri-player-tab-pane .fameeri-forest-cell__count{font-size:16px}
 .fameeri-player-tab-pane .fameeri-player-log .feed-item{font-size:11px;padding:8px 10px}
+
+/* ── حكم المشرف (صح/خطأ) للجميع ── */
+.fameeri-verdict-banner{
+  position:relative;margin:0 0 10px;padding:14px 12px 12px;
+  border-radius:14px;text-align:center;overflow:hidden;
+  animation:verdictPop .45s cubic-bezier(.2,.9,.3,1) both;
+}
+@keyframes verdictPop{0%{transform:scale(.92);opacity:0}100%{transform:scale(1);opacity:1}}
+.fameeri-verdict-banner--ok{
+  background:linear-gradient(135deg,rgba(46,204,113,.22),rgba(0,80,40,.12));
+  border:2px solid rgba(46,204,113,.55);
+  box-shadow:0 0 24px rgba(46,204,113,.2);
+}
+.fameeri-verdict-banner--fail{
+  background:linear-gradient(135deg,rgba(230,57,80,.2),rgba(60,0,10,.1));
+  border:2px solid rgba(230,57,80,.5);
+  box-shadow:0 0 20px rgba(230,57,80,.15);
+}
+.fameeri-verdict-banner__glow{
+  position:absolute;inset:-40% -20%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.12),transparent 65%);
+}
+.fameeri-verdict-banner__icon{font-size:36px;line-height:1}
+.fameeri-verdict-banner__title{
+  font-family:'Cairo',sans-serif;font-size:20px;font-weight:900;margin-top:6px;
+}
+.fameeri-verdict-banner--ok .fameeri-verdict-banner__title{color:var(--green)}
+.fameeri-verdict-banner--fail .fameeri-verdict-banner__title{color:var(--red)}
+.fameeri-verdict-banner__msg{font-size:12px;font-weight:700;color:var(--text);margin-top:4px}
+.fameeri-verdict-banner__duel{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin-top:10px;font-size:14px;font-weight:900;
+}
+.fameeri-verdict-banner__attacker{color:var(--gold)}
+.fameeri-verdict-banner__target{color:var(--red)}
+.fameeri-verdict-banner__hint{
+  margin-top:8px;font-size:10px;font-weight:700;color:var(--muted);line-height:1.45;
+}
+
+/* ── مقدمة هجوم غير حاجبة ── */
+.fameeri-attack-intro{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  margin-bottom:8px;border-radius:10px;font-size:11px;font-weight:700;
+}
+[data-theme="light"] .fameeri-attack-intro{background:#f3e5f5;border:1px solid rgba(106,27,154,.25)}
+[data-theme="dark"] .fameeri-attack-intro{background:rgba(155,89,182,.12);border:1px solid rgba(155,89,182,.35)}
+.fameeri-attack-intro__icon{font-size:18px}
+
+/* ── كشف الهجوم الأسطوري ── */
+.q-reveal-legend{width:100%;max-width:360px;margin-bottom:16px}
+.q-reveal-legend__ribbon{
+  font-size:11px;font-weight:900;letter-spacing:.04em;
+  color:var(--gold);margin-bottom:10px;
+}
+.q-reveal-legend__duel{
+  display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;
+  padding:12px;border-radius:14px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+}
+.q-reveal-legend__side{display:flex;flex-direction:column;gap:4px;min-width:0}
+.q-reveal-legend__label{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.q-reveal-legend__name{
+  font-family:'Cairo',sans-serif;font-size:15px;font-weight:900;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.q-reveal-legend__side--atk .q-reveal-legend__name{color:var(--gold)}
+.q-reveal-legend__side--def .q-reveal-legend__name{color:var(--red)}
+.q-reveal-legend__vs{font-size:22px}
+.q-reveal-legend__meta{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+  margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);
+}
+.q-reveal-legend__dot{opacity:.5}
+.q-reveal-phase-title{
+  font-family:'Cairo',sans-serif;font-size:22px;font-weight:900;color:var(--gold);margin-top:12px;
+}
+.q-reveal-phase-sub{font-size:14px;color:var(--muted);margin-top:6px}
+.q-reveal-result-head{
+  font-family:'Cairo',sans-serif;font-size:26px;font-weight:900;color:var(--green);margin-top:8px;
+}
+.q-reveal-result-head--fail{color:var(--red)}
+.q-reveal-hunt-num{color:var(--green)!important;font-size:64px!important}
+.q-reveal-result-line{
+  font-size:15px;font-weight:800;line-height:1.55;color:var(--text);margin-top:10px;padding:0 8px;
+}
+.q-reveal-hunt-count{color:var(--gold);font-size:20px}
+.q-reveal-result-sub{font-size:12px;color:var(--muted);margin-top:6px}
+.q-reveal-fail-icon{font-size:64px}
+.q-reveal-poison{
+  margin-top:12px;padding:10px 14px;border-radius:10px;
+  background:rgba(155,89,182,.18);border:1px solid rgba(155,89,182,.45);
+  font-size:13px;font-weight:800;color:var(--purple);
+}
+.q-reveal-continue{z-index:360;position:relative;min-width:min(100%,280px);padding:14px 24px;font-size:16px}
+.q-reveal-pop{animation:revealPop .55s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes revealPop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.q-reveal-shield-scene{position:relative;width:120px;height:120px;margin:8px auto 4px}
+.q-reveal-shield-icon{font-size:72px;line-height:1;position:relative;z-index:2;filter:drop-shadow(0 0 24px rgba(156,39,176,.6))}
+.q-reveal-shield-burst{
+  position:absolute;inset:-20px;border-radius:50%;
+  background:radial-gradient(circle,rgba(156,39,176,.45) 0%,transparent 70%);
+  animation:shieldBurst 1.2s ease infinite alternate;
+}
+.q-reveal-shield-spark{position:absolute;top:0;right:0;font-size:28px;animation:shieldSpark 1s ease infinite}
+@keyframes shieldBurst{0%{transform:scale(.85);opacity:.6}100%{transform:scale(1.15);opacity:1}}
+@keyframes shieldSpark{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.3) rotate(20deg)}}
+.q-reveal-result-head--shield{color:#ce93d8!important;text-shadow:0 0 20px rgba(206,147,216,.4)}
+@media(max-width:480px){
+  .q-reveal-legend__name{font-size:13px}
+  .q-reveal-result-head{font-size:22px}
+  .q-reveal-hunt-num{font-size:48px!important}
+  .q-reveal-result-line{font-size:13px}
+  .q-tree-big{font-size:72px}
+}
+.admin-q-timer-block{
+  margin-top:12px;padding:12px 14px;border-radius:12px;
+  border:1.5px dashed rgba(0,105,92,.35);background:rgba(0,105,92,.06);
+}
+.admin-q-timer-block--live{border-color:rgba(230,57,80,.4);background:rgba(230,57,80,.06)}
+.admin-q-timer-block--shield{border-color:rgba(156,39,176,.4);background:rgba(156,39,176,.08)}
+.admin-q-timer-block__hint{margin:6px 0 0;font-size:10px;color:var(--muted);line-height:1.5}
+.admin-q-timer-block__count{
+  font-family:'Cairo',sans-serif;font-size:48px;font-weight:900;color:var(--red);
+  text-align:center;line-height:1;margin:6px 0;
+}
+.admin-q-timer-block__count--shield{color:var(--purple)}
+.fameeri-admin-attack-forest-hint{
+  font-size:11px;color:var(--muted);text-align:center;margin:8px 0 0;line-height:1.5;
+}
+.fameeri-admin-stats-banner{
+  margin-bottom:10px;padding:10px 12px;font-size:12px;font-weight:700;
+  text-align:center;line-height:1.55;border-color:rgba(230,57,80,.35)!important;
+  background:rgba(230,57,80,.08)!important;
+}
+.fameeri-admin-action-card__tag.shield{background:rgba(156,39,176,.15);color:var(--purple)}
+
+/* ── سؤال اللاعب + اعتماد القائد ── */
+.player-q-view__grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.player-q-view__opt{
+  position:relative;padding:12px 8px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border-faint);
+  text-align:center;font-size:13px;font-weight:700;color:var(--text);
+  width:100%;cursor:default;
+}
+button.player-q-view__opt{cursor:pointer}
+.player-q-view__opt--final{background:rgba(46,204,113,.16);border:2px solid var(--green)}
+.player-q-view__opt--pick{border:2px solid var(--gold)}
+.player-q-view__votes{
+  position:absolute;inset-inline-end:6px;top:6px;font-size:10px;font-weight:800;
+  color:var(--gold);background:var(--bg);border-radius:999px;padding:1px 6px;
+}
+.player-q-view__submit{width:100%;margin-top:12px;font-size:14px;font-weight:900}
+.player-q-view__hint{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6}
+.player-q-view__hint--ok{color:var(--green);font-weight:800}
+.player-q-view__sent{color:var(--green);font-size:11px}
+.player-q-view__draft{color:var(--gold);font-size:11px}

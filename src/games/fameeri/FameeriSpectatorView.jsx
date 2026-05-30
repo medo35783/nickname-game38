@@ -1,4 +1,5 @@
 import FameeriRevealOverlay from './FameeriRevealOverlay';
+import FameeriVerdictBanner from './FameeriVerdictBanner';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
 
 /**
@@ -170,6 +171,11 @@ export default function FameeriSpectatorView({
     <div className="scr" style={{ maxWidth: 760, margin: '0 auto' }}>
       {header}
       <div className="card" style={{ minHeight: 320, display: 'flex', flexDirection: 'column', justifyContent: 'center', border: `1.5px solid ${accent}` }}>
+        {gameState?.answerVerdict && !reveal && (
+          <div style={{ padding: '0 0 12px' }}>
+            <FameeriVerdictBanner verdict={gameState.answerVerdict} />
+          </div>
+        )}
         {stage}
       </div>
       {phase !== 'ended' && groupChips}

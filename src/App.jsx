@@ -238,6 +238,7 @@ export default function App() {
           canCreateRoom={canHostRoom}
           onRequestActivation={() => setShowCodeActivation(true)}
           onGameEnd={onGameEnd}
+          onGoAccount={() => setTab('account')}
         />
       );
     }

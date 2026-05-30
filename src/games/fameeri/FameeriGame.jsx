@@ -13,7 +13,16 @@ import FameeriGuideModal from './FameeriGuideModal';
 import { ROOM_CODE_PLACEHOLDER, GROUP_MEMBER_NAME_PLACEHOLDER } from '../../core/formLabels';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
-import { QSOURCE, toPublicQuestion, loadSession, saveSession, clearSession } from '../../question-bank/questionSession';
+import { QSOURCE, toPublicQuestion } from '../../question-bank/questionSession';
+import { markQuestionAsUsed } from './fameeriBankProgress';
+import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
+import {
+  drawQuestionForWeapon,
+  findInStructuredPool,
+  normalizePoolToStructured,
+  poolStats,
+  difficultyLabelAr,
+} from './fameeriQuestionPool';
 import FameeriSpectatorView from './FameeriSpectatorView';
 import FameeriGroupChat from './FameeriGroupChat';
 import FameeriAdminLobby from './FameeriAdminLobby';
@@ -58,7 +67,7 @@ function findExistingQumairiMember(members, { memberId, uid, name }) {
 }
 
 const FameeriGame = forwardRef(function FameeriGame(
-  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd },
+  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd, onGoAccount },
   ref
 ) {
   void setTab;
@@ -157,10 +166,11 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   /* ── جلسة الأسئلة (المرحلة 1: الربط بالبنك) ── */
   const [qSource, setQSource] = useState(null);   // مصدر الأسئلة المختار محليًا
-  const [qPool, setQPool] = useState([]);          // مخزون الأسئلة (يبقى عند المشرف فقط)
+  const [qPool, setQPool] = useState({ hard: [], medium: [], easy: [] });
+  const [qBankMeta, setQBankMeta] = useState(null);
   const [qSetupOpen, setQSetupOpen] = useState(false);
-  const qCursorRef = useRef(0);                    // مؤشر السؤال التالي
-  const qDrawingRef = useRef(false);               // منع السحب المزدوج
+  const qPoolCursorsRef = useRef({ hard: 0, medium: 0, easy: 0 });
+  const qDrawingRef = useRef(false);
 
   const lastResultRef = useRef(null);
   const fameeriEndGamePromptSentRef = useRef(false);
@@ -274,8 +284,15 @@ const FameeriGame = forwardRef(function FameeriGame(
     lastResultRef.current = lr.timestamp;
 
     // مرحلة 1: صمت — ثانيتين
-    setQReveal({phase:'suspense',tree:lr.tree,weapon:lr.weaponName,attackerName:lr.attackerName,targetName:lr.targetName,
-      poisonMsg:lr.poisonMsg});
+    setQReveal({
+      phase: 'suspense',
+      tree: lr.tree,
+      weapon: lr.weapon,
+      weaponName: lr.weaponName,
+      attackerName: lr.attackerName,
+      targetName: lr.targetName,
+      poisonMsg: lr.poisonMsg,
+    });
 
     // مرحلة 2: صوت السلاح — بعد ثانيتين
     setTimeout(()=>{
@@ -288,7 +305,10 @@ const FameeriGame = forwardRef(function FameeriGame(
     // مرحلة 3: النتيجة — بعد 3.5 ثواني
     setTimeout(()=>{
       if(!qGameState?.showResult) return;
-      if(lr.result==='success' && lr.hunted>0){
+      if(lr.result==='shielded'){
+        playSound('explosion');
+        setQReveal(prev=>prev?{...prev,phase:'result',type:'shielded'}:null);
+      } else if(lr.result==='success' && lr.hunted>0){
         playSound('applause');
         setQReveal(prev=>prev?{...prev,phase:'result',type:'success',hunted:lr.hunted}:null);
       } else if(lr.result==='success' && lr.hunted===0){
@@ -595,18 +615,21 @@ const FameeriGame = forwardRef(function FameeriGame(
   const qActiveQuestion = qGameState?.currentQuestion || null;
   const qEffectiveSource = qGameState?.questionSource || qSource || null;
   const qActiveAnswer = qActiveQuestion?.id
-    ? qPool.find((q) => q.id === qActiveQuestion.id)?.correct_answer || ''
+    ? findInStructuredPool(qPool, qActiveQuestion.id)?.correct_answer || ''
     : '';
 
-  // مفتاح السؤال الحالي + حالة اختيار الإجابة (الأعضاء يقترحون، القائد يعتمد)
   const qKey = qActiveQuestion ? qActiveQuestion.id || qActiveQuestion.text || null : null;
-  const qIsAttacker = qGameState?.playMode === 'speed' ? true : qGameState?.turnGroup === qGroupId;
+  const qPlayMode = qGameState?.playMode || 'sequential';
+  const qIsSpeedRound = qPlayMode === 'speed' && !!qGameState?.speedBatchActive;
+  const qIsSequentialAttack = qPlayMode !== 'speed' && !!qCurrentAttack;
+  const qCanAnswerGroup =
+    qIsSpeedRound || (qIsSequentialAttack && qCurrentAttack?.attackerId === qGroupId);
   const qCanAnswer =
     !!qActiveQuestion &&
     !!qActiveQuestion.revealOptions &&
     !qActiveQuestion.adminOnly &&
     !!qGroupId &&
-    qIsAttacker &&
+    qCanAnswerGroup &&
     Array.isArray(qActiveQuestion.options) &&
     qActiveQuestion.options.length > 0;
   /** سؤال مفتوح أثناء المؤقت — لا نستخدم overlay كاملًا حتى لا يُحجب النقر */
@@ -633,41 +656,89 @@ const FameeriGame = forwardRef(function FameeriGame(
       ? qGList.filter((g) => g.finalAnswer?.q !== qKey).map((g) => g.name)
       : [];
 
-  // استرجاع مخزون المشرف من التخزين المحلي عند العودة للغرفة
+  // استرجاع مخزون المشرف (محلي + Firebase للمسجّلين) عند العودة للغرفة
   useEffect(() => {
-    if (!qRoom || !isAdmin) return;
-    const saved = loadSession(qRoom);
-    if (!saved) return;
-    if (Array.isArray(saved.pool)) setQPool(saved.pool);
-    if (saved.source) setQSource(saved.source);
-    qCursorRef.current = saved.cursor || 0;
+    if (!qRoom || !isAdmin) return undefined;
+    let cancelled = false;
+
+    void loadAdminSession(qRoom).then((saved) => {
+      if (cancelled || !saved) return;
+      if (saved.poolStructured) {
+        setQPool(saved.poolStructured);
+      }
+      if (saved.source) setQSource(saved.source);
+      if (saved.bankMeta) setQBankMeta(saved.bankMeta);
+      qPoolCursorsRef.current = saved.poolCursors || { hard: 0, medium: 0, easy: 0 };
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [qRoom, isAdmin]);
 
-  const applyQuestionSetup = async ({ source, pool }) => {
+  const applyQuestionSetup = async ({ source, pool, poolStructured, bankMeta }) => {
     setQSource(source);
-    setQPool(pool || []);
-    qCursorRef.current = 0;
-    saveSession(qRoom, { source, pool: pool || [], cursor: 0 });
+    const structured = normalizePoolToStructured(poolStructured || pool);
+    setQPool(structured);
+    setQBankMeta(bankMeta || null);
+    qPoolCursorsRef.current = { hard: 0, medium: 0, easy: 0 };
+    saveAdminSession(qRoom, {
+      source,
+      poolStructured: structured,
+      bankMeta: bankMeta || null,
+      poolCursors: qPoolCursorsRef.current,
+    });
     try {
       await update(dbRef(db, `qrooms/${qRoom}/game`), { questionSource: source, currentQuestion: null });
     } catch {
       /* ignore */
     }
     setQSetupOpen(false);
+    const stats = poolStats(structured);
+    if (stats.total) notify(`✅ مخزون: ${stats.hard.total} صعب · ${stats.medium.total} متوسط · ${stats.easy.total} سهل`, 'success');
   };
 
-  const drawNextQuestion = async () => {
-    if (!isAdmin || qDrawingRef.current || !qPool.length) return;
+  const drawNextQuestion = async (weaponId) => {
+    const structured = normalizePoolToStructured(qPool);
+    const total = structured.hard.length + structured.medium.length + structured.easy.length;
+    if (!isAdmin || qDrawingRef.current || !total) return;
+    if (!weaponId) {
+      notify('حدّد الهجوم أولاً لربط السؤال بالسلاح', 'info');
+      return;
+    }
     qDrawingRef.current = true;
     try {
-      let idx = qCursorRef.current;
-      if (idx >= qPool.length) idx = 0; // التفاف عند نفاد الأسئلة
-      const next = qPool[idx];
-      qCursorRef.current = idx + 1;
-      saveSession(qRoom, { source: qSource, pool: qPool, cursor: qCursorRef.current });
-      await update(dbRef(db, `qrooms/${qRoom}/game`), { currentQuestion: toPublicQuestion(next) });
+      const { question, cursors, diff, exhausted } = drawQuestionForWeapon(
+        structured,
+        qPoolCursorsRef.current,
+        weaponId
+      );
+      if (!question || exhausted) {
+        notify(`⚠️ نفدت أسئلة ${difficultyLabelAr(diff)} في هذه المجموعة`, 'error');
+        return;
+      }
+      qPoolCursorsRef.current = cursors;
+      saveAdminSession(qRoom, {
+        source: qSource,
+        poolStructured: structured,
+        bankMeta: qBankMeta,
+        poolCursors: cursors,
+      });
+      if (qSource === QSOURCE.BANK && qBankMeta?.filterKey && question.id) {
+        void markQuestionAsUsed(qBankMeta.filterKey, question.id);
+      }
+      await update(dbRef(db, `qrooms/${qRoom}/game`), {
+        currentQuestion: {
+          ...toPublicQuestion(question),
+          revealToPlayers: false,
+          revealOptions: false,
+          matchedWeapon: weaponId,
+          matchedDifficulty: diff,
+        },
+        answerVerdict: null,
+      });
     } catch {
-      /* ignore */
+      notify('تعذر سحب السؤال', 'error');
     } finally {
       qDrawingRef.current = false;
     }
@@ -681,6 +752,20 @@ const FameeriGame = forwardRef(function FameeriGame(
       await update(dbRef(db, `qrooms/${qRoom}/game/currentQuestion`), patch);
     } catch {
       /* ignore */
+    }
+  };
+
+  /** إخفاء السؤال والخيارات عن المتسابقين دفعة واحدة */
+  const hideQuestionFromPlayers = async () => {
+    if (!qActiveQuestion || qActiveQuestion.adminOnly) return;
+    try {
+      await update(dbRef(db, `qrooms/${qRoom}/game/currentQuestion`), {
+        revealToPlayers: false,
+        revealOptions: false,
+      });
+      notify('🔒 تم إخفاء السؤال والخيارات عن المجموعات', 'success');
+    } catch {
+      notify('تعذر الإخفاء', 'error');
     }
   };
 
@@ -723,7 +808,7 @@ const FameeriGame = forwardRef(function FameeriGame(
         [`${groupBase}/leaderMemberId`]: qMyId,
         ...patchLeaderByUid(qRoom, uid, qGroupId),
       });
-      notify('✅ تم إرسال إجابة المجموعة للمشرف', 'success');
+      notify('📤 تم إرسال واعتماد إجابة مجموعتك للمشرف', 'success');
     } catch (err) {
       const denied =
         err?.code === 'PERMISSION_DENIED' ||
@@ -737,16 +822,42 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
   };
 
-  // سحب تلقائي للسؤال عند الحاجة (المشرف فقط) — تسلسلي: عند إعلان الهجوم / سرعة: عند بدء المؤقت
+  const resolveDrawWeapon = () => {
+    if (qCurrentAttack?.weapon) return qCurrentAttack.weapon;
+    const claims = qGameState?.speedClaims || {};
+    const ids = Object.keys(claims);
+    if (!ids.length) return null;
+    const winId =
+      qGameState?.speedBatchActive && ids.length === 1
+        ? ids[0]
+        : speedWinSelect && claims[speedWinSelect]
+          ? speedWinSelect
+          : ids[0];
+    return claims[winId]?.weapon || null;
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     if (!qEffectiveSource || qEffectiveSource === QSOURCE.EXTERNAL) return;
     if (qActiveQuestion) return;
-    if (!qPool.length) return;
+    const structured = normalizePoolToStructured(qPool);
+    const total = structured.hard.length + structured.medium.length + structured.easy.length;
+    if (!total) return;
     const speed = qGameState?.playMode === 'speed';
     const needs = speed ? !!qGameState?.speedBatchActive : !!qCurrentAttack;
-    if (needs) void drawNextQuestion();
-  }, [isAdmin, qEffectiveSource, qActiveQuestion, qGameState?.playMode, qGameState?.speedBatchActive, qCurrentAttack, qPool]);
+    if (!needs) return;
+    const weapon = resolveDrawWeapon();
+    if (weapon) void drawNextQuestion(weapon);
+  }, [
+    isAdmin,
+    qEffectiveSource,
+    qActiveQuestion,
+    qGameState?.playMode,
+    qGameState?.speedBatchActive,
+    qCurrentAttack,
+    qPool,
+    speedWinSelect,
+  ]);
 
   const assignGroupLeader = async (groupId, member) => {
     const members = qMList.filter((m) => m.groupId === groupId);
@@ -1131,7 +1242,7 @@ const FameeriGame = forwardRef(function FameeriGame(
           reveal={qReveal}
           countdown={qCountdown}
           accent={FAMEERI_ACCENT}
-          onExit={() => { clearSession(qRoom); localStorage.removeItem('ng_qumairi'); setQRoom(''); setQRole(null); setGameScreen('home'); }}
+          onExit={() => { clearAdminSessionLocal(qRoom); localStorage.removeItem('ng_qumairi'); setQRoom(''); setQRole(null); setGameScreen('home'); }}
         />
       );
     }
@@ -1179,7 +1290,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
 
     if(gameScreen==='qumairi_lobby'){return(
-<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setQExitModal(true)}>← رجوع</button>{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(
+<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setQExitModal(true)}>← رجوع</button>{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(
 <div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div>);})()}{!isAdmin&&qPhase==='lobby'&&<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?`مجموعتك: ${qMyGroup?.name||'—'}`:'انتظر المشرف'}</div></div>}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}
 </div>);}
 
@@ -1212,6 +1323,7 @@ const FameeriGame = forwardRef(function FameeriGame(
               qAdminGroupAnswers={qAdminGroupAnswers}
               qAdminPendingGroups={qAdminPendingGroups}
               toggleQuestionReveal={toggleQuestionReveal}
+              hideQuestionFromPlayers={hideQuestionFromPlayers}
               drawNextQuestion={drawNextQuestion}
               qPool={qPool}
               speedWinSelect={speedWinSelect}
@@ -1277,7 +1389,7 @@ const FameeriGame = forwardRef(function FameeriGame(
       );
     }
 
-    if(gameScreen==='qumairi_results'){const sorted=[...qGList].sort((a,b)=>(b.totalRemaining||0)-(a.totalRemaining||0));return(<div className="scr"><div style={{textAlign:'center',padding:'16px 0'}}><div style={{fontSize:60,animation:'bnc 1s infinite'}}>🏆</div><div className="ptitle" style={{fontSize:24}}>نتائج الجولة</div></div><div className="sg sg3" style={{marginBottom:12}}><div className="sbox"><div className="snum">{sorted.length}</div><div className="slbl">مجموعات</div></div><div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{Object.values(qAttacks||{}).filter(a=>a.result==='success').reduce((s,a)=>s+(a.hunted||0),0)}</div><div className="slbl">قميري صيدت</div></div><div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{Object.keys(qAttacks||{}).length}</div><div className="slbl">هجمات</div></div></div>{[...sorted].reverse().map((g,i)=>{const rank=sorted.length-i;const isWinner=rank===1;return(<div key={g.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:isWinner?'linear-gradient(135deg,rgba(240,192,64,.2),rgba(255,140,0,.1))':'var(--surface)',border:isWinner?'2px solid var(--fameeri-primary)':'1px solid var(--border-faint)',borderRadius:14,marginBottom:8}}><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,width:34,color:isWinner?'var(--fameeri-primary)':'var(--muted)'}}>{isWinner?'👑':rank}</div><div style={{flex:1}}><div style={{fontWeight:900,fontSize:isWinner?16:14}}>{g.name}</div></div><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,color:isWinner?'var(--fameeri-primary)':'var(--text)'}}>{g.totalRemaining||0}</div></div>);})}<button className="btn bgh mt3" onClick={()=>{setGameScreen('home');setSelectedGame(null);setQRoom('');setQRole(null);setQGroupId(null);clearSession(qRoom);localStorage.removeItem('ng_qumairi');}}>🏟️ ساحة الألعاب</button></div>);}
+    if(gameScreen==='qumairi_results'){const sorted=[...qGList].sort((a,b)=>(b.totalRemaining||0)-(a.totalRemaining||0));return(<div className="scr"><div style={{textAlign:'center',padding:'16px 0'}}><div style={{fontSize:60,animation:'bnc 1s infinite'}}>🏆</div><div className="ptitle" style={{fontSize:24}}>نتائج الجولة</div></div><div className="sg sg3" style={{marginBottom:12}}><div className="sbox"><div className="snum">{sorted.length}</div><div className="slbl">مجموعات</div></div><div className="sbox"><div className="snum" style={{color:'var(--red)'}}>{Object.values(qAttacks||{}).filter(a=>a.result==='success').reduce((s,a)=>s+(a.hunted||0),0)}</div><div className="slbl">قميري صيدت</div></div><div className="sbox"><div className="snum" style={{color:'var(--green)'}}>{Object.keys(qAttacks||{}).length}</div><div className="slbl">هجمات</div></div></div>{[...sorted].reverse().map((g,i)=>{const rank=sorted.length-i;const isWinner=rank===1;return(<div key={g.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:isWinner?'linear-gradient(135deg,rgba(240,192,64,.2),rgba(255,140,0,.1))':'var(--surface)',border:isWinner?'2px solid var(--fameeri-primary)':'1px solid var(--border-faint)',borderRadius:14,marginBottom:8}}><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,width:34,color:isWinner?'var(--fameeri-primary)':'var(--muted)'}}>{isWinner?'👑':rank}</div><div style={{flex:1}}><div style={{fontWeight:900,fontSize:isWinner?16:14}}>{g.name}</div></div><div style={{fontFamily:'Cairo',fontSize:isWinner?28:20,fontWeight:900,color:isWinner?'var(--fameeri-primary)':'var(--text)'}}>{g.totalRemaining||0}</div></div>);})}<button className="btn bgh mt3" onClick={()=>{setGameScreen('home');setSelectedGame(null);setQRoom('');setQRole(null);setQGroupId(null);clearAdminSessionLocal(qRoom);localStorage.removeItem('ng_qumairi');}}>🏟️ ساحة الألعاب</button></div>);}
     return null;
   };
 
@@ -1331,7 +1443,7 @@ const FameeriGame = forwardRef(function FameeriGame(
                   setQRole(null);
                   setQGroupId(null);
                   setQDistribution({});
-                  clearSession(qRoom);
+                  clearAdminSessionLocal(qRoom);
                   localStorage.removeItem('ng_qumairi');
                   notify('تم الخروج من المسابقة', 'info');
                 }}

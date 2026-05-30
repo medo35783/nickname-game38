@@ -8,6 +8,7 @@ import FameeriPlayerAttackPanel from './FameeriPlayerAttackPanel';
 import FameeriGroupForest from './FameeriGroupForest.jsx';
 import FameeriPlayerTabs from './FameeriPlayerTabs';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
+import FameeriVerdictBanner from './FameeriVerdictBanner';
 import { Q_TREES } from '../../core/constants';
 
 function AttackBanner({ attack, isTarget, treeCount }) {
@@ -152,9 +153,13 @@ export default function FameeriPlayerPlay({
 
   const ann = qGameState?.announcement;
   const showAnn = ann && Date.now() - ann.timestamp < 10000;
+  const answerVerdict = qGameState?.answerVerdict;
 
   const showQuestionDock =
-    !!qActiveQuestion && !qReveal && (qCanAnswer || qAnswerPhaseDuringTimer || qActiveQuestion.revealToPlayers);
+    !!qActiveQuestion &&
+    !qReveal &&
+    !qGameState?.showResult &&
+    (qAnswerPhaseDuringTimer || qActiveQuestion.revealToPlayers);
 
   const battleBadge = (() => {
     if (showQuestionDock && qCanAnswer) return '❓';
@@ -167,51 +172,20 @@ export default function FameeriPlayerPlay({
   const groupBadge = hitFlash ? `-${hitFlash.lost}` : isTarget && !showShieldPanel ? '🎯' : null;
 
   useEffect(() => {
-    if (showQuestionDock && qCanAnswer) setTab('battle');
-  }, [showQuestionDock, qCanAnswer, qActiveQuestion?.id]);
+    if (showQuestionDock) setTab('battle');
+  }, [showQuestionDock, qActiveQuestion?.id]);
 
   useEffect(() => {
     if (showShieldPanel && isLeader) setTab('battle');
   }, [showShieldPanel, isLeader]);
 
+  useEffect(() => {
+    if (canAttack && isLeader) setTab('battle');
+  }, [canAttack, isLeader]);
+
   return (
     <div className="scr fameeri-player-play">
       {qReveal && <FameeriRevealOverlay qReveal={qReveal} showContinue={false} />}
-
-      {qTurnOverlay && !qReveal && qCurrentAttack && !qTimer && (
-        <div className="q-turn-overlay">
-          <div style={{ fontSize: 70, animation: 'treeBounce 1s ease infinite' }}>⚔️</div>
-          <div
-            style={{
-              fontFamily: 'Cairo',
-              fontSize: 24,
-              fontWeight: 900,
-              color: 'var(--fameeri-primary)',
-              marginTop: 12,
-            }}
-          >
-            {qTurnOverlay.groupName}
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>
-            اختاروا هدفهم بسلاح {qTurnOverlay.weapon}
-          </div>
-        </div>
-      )}
-
-      {qTimer &&
-        !qReveal &&
-        qCountdown !== null &&
-        (qCurrentAttack || qGameState?.speedBatchActive) &&
-        !qAnswerPhaseDuringTimer && (
-          <div className="q-turn-overlay">
-            <div className="q-timer-huge">{qCountdown > 0 ? qCountdown : '⏰'}</div>
-            <div style={{ fontSize: 14, color: 'var(--fameeri-primary)', marginTop: 8 }}>
-              {qGameState?.speedBatchActive && !qCurrentAttack
-                ? '⚡ جولة السرعة — قرار المشرف'
-                : `${qCurrentAttack?.attackerName} يهاجم ${qCurrentAttack?.targetName}`}
-            </div>
-          </div>
-        )}
 
       {/* ── رأس ثابت: HUD + تنبيهات ── */}
       <div className="fameeri-player-sticky">
@@ -229,11 +203,28 @@ export default function FameeriPlayerPlay({
           </div>
         )}
 
-        {qTimer && !qReveal && qCountdown !== null && qAnswerPhaseDuringTimer && (
+        {answerVerdict && !qReveal && <FameeriVerdictBanner verdict={answerVerdict} />}
+
+        {qTurnOverlay && qCurrentAttack && !qTimer && !shieldWindow && !qReveal && (
+          <div className="fameeri-attack-intro" role="status">
+            <span className="fameeri-attack-intro__icon">⚔️</span>
+            <span>
+              <strong>{qTurnOverlay.groupName}</strong> يختار الهدف · {qTurnOverlay.weapon}
+            </span>
+          </div>
+        )}
+
+        {qTimer && !qReveal && qCountdown !== null && (qCurrentAttack || qGameState?.speedBatchActive) && (
           <div className="fameeri-player-timer-bar" aria-live="polite">
             <span className="fameeri-player-timer-bar__num">{qCountdown > 0 ? qCountdown : '⏰'}</span>
             <span className="fameeri-player-timer-bar__txt">
-              {isLeader ? '⏱️ اعتمد الإجابة قبل انتهاء الوقت' : '⏱️ اقترح إجابة للقائد 👑'}
+              {qGameState?.speedBatchActive && !qCurrentAttack
+                ? '⚡ جولة السرعة — قرار المشرف'
+                : qAnswerPhaseDuringTimer
+                  ? isLeader
+                    ? '⏱️ أرسل اعتمادك قبل انتهاء الوقت'
+                    : '⏱️ اقترح إجابة للقائد 👑'
+                  : `${qCurrentAttack?.attackerName} → ${qCurrentAttack?.targetName}`}
             </span>
           </div>
         )}
@@ -257,6 +248,13 @@ export default function FameeriPlayerPlay({
               isTarget ? parseInt(qMyGroup?.trees?.[qCurrentAttack.tree], 10) || 0 : null
             }
           />
+        )}
+
+        {canAttack && isLeader && (
+          <div className="fameeri-player-your-turn" role="status">
+            <span className="fameeri-player-your-turn__icon">👑</span>
+            <span>دورك للهجوم — افتح تبويب «الهجوم» وأكمل الخطوات</span>
+          </div>
         )}
 
         <FameeriPlayerTabs
@@ -332,7 +330,11 @@ export default function FameeriPlayerPlay({
                   <span className="ctitle">❓ السؤال</span>
                   {qCanAnswer && (
                     <span className="fameeri-question-dock__pill">
-                      {isLeader ? '👑 اعتمد الإجابة' : '🎯 اقترح'}
+                      {qGameState?.playMode === 'speed'
+                        ? '⚡ الجميع يجيبون'
+                        : isLeader
+                          ? '👑 اعتمد الإجابة'
+                          : '🎯 اقترح'}
                     </span>
                   )}
                 </div>

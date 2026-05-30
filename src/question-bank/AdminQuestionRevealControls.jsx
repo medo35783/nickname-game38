@@ -1,0 +1,68 @@
+/**
+ * أزرار إظهار/إخفاء السؤال للمجموعات — متاحة في أي وقت (قبل أو بعد المؤقت).
+ */
+export default function AdminQuestionRevealControls({
+  current,
+  onToggleRevealQuestion,
+  onToggleRevealOptions,
+  onHideAll,
+  compact = false,
+}) {
+  if (!current || current.adminOnly) return null;
+
+  const hasOptions = Array.isArray(current.options) && current.options.length > 0;
+
+  return (
+    <div className={`admin-q-reveal-controls${compact ? ' admin-q-reveal-controls--compact' : ''}`}>
+      {!compact && (
+        <>
+          <div className="admin-q-reveal-status" aria-live="polite">
+            <span className={`admin-q-reveal-pill${current.revealToPlayers ? ' on' : ''}`}>
+              {current.revealToPlayers ? '👁️ السؤال ظاهر' : '🔒 السؤال مخفي'}
+            </span>
+            {hasOptions && (
+              <span className={`admin-q-reveal-pill${current.revealOptions ? ' on' : ''}`}>
+                {current.revealOptions ? '👁️ الخيارات ظاهرة' : '🔒 الخيارات مخفية'}
+              </span>
+            )}
+          </div>
+          <p className="admin-q-reveal-hint">
+            مخفي افتراضياً — اضغط <strong>«إظهار السؤال»</strong> ثم <strong>«إظهار الخيارات»</strong> عندما تريد.
+            لن يرى المتسابقون شيئاً حتى تفعّل ذلك.
+          </p>
+        </>
+      )}
+      {compact && (
+        <p className="admin-q-reveal-hint admin-q-reveal-hint--compact">
+          {current.revealToPlayers || current.revealOptions
+            ? 'المجموعات ترى ما فعّلته — أخفِ قبل المؤقت إن رغبت'
+            : 'السؤال مخفي عن المجموعات — أظهره ثم شغّل المؤقت'}
+        </p>
+      )}
+      <div className="admin-q-reveal-btns">
+        <button
+          type="button"
+          className={`btn ${current.revealToPlayers ? 'bg' : 'bgh'} bsm`}
+          onClick={onToggleRevealQuestion}
+        >
+          {current.revealToPlayers ? '🙈 إخفاء السؤال' : '👁️ إظهار السؤال'}
+        </button>
+        {hasOptions && (
+          <button
+            type="button"
+            className={`btn ${current.revealOptions ? 'bg' : 'bgh'} bsm`}
+            disabled={!current.revealToPlayers}
+            onClick={onToggleRevealOptions}
+          >
+            {current.revealOptions ? '🙈 إخفاء الخيارات' : '👁️ إظهار الخيارات'}
+          </button>
+        )}
+        {(current.revealToPlayers || current.revealOptions) && typeof onHideAll === 'function' && (
+          <button type="button" className="btn br bsm" onClick={onHideAll}>
+            🚫 إخفاء الكل
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

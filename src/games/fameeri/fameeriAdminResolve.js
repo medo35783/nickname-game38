@@ -6,20 +6,48 @@ import { applySpeedRoundCorrect } from './fameeriSpeedRound';
 /** مدة نافذة تفعيل الدرع بعد إجابة «صح» (ثوانٍ) */
 export const SHIELD_WINDOW_SEC = 10;
 
-/** بدء مؤقت الهجوم */
+/** جلب حالة المجموعات من Firebase — يُستخدم قبل حسم الدرع لتجنّب بيانات قديمة */
+async function fetchFreshGroupsData(qRoom) {
+  const snap = await get(dbRef(db, `qrooms/${qRoom}/groups`));
+  if (!snap.exists()) return { qGroups: {}, qGList: [] };
+  const qGroups = snap.val();
+  const qGList = Object.entries(qGroups).map(([id, g]) => ({ id, ...g }));
+  return { qGroups, qGList };
+}
+
+/** بناء إعلان الحكم للجميع */
+export function buildAnswerVerdict(attack, correct) {
+  if (!attack?.attackerName) return null;
+  return {
+    correct: !!correct,
+    attackerName: attack.attackerName,
+    targetName: attack.targetName,
+    weaponName: attack.weaponName,
+    tree: attack.tree,
+    msg: correct
+      ? '✅ المشرف: إجابة صحيحة — الهجوم يُحسب!'
+      : '❌ المشرف: إجابة خاطئة — الهجوم لا يُحسب',
+    timestamp: Date.now(),
+  };
+}
+
+/** بدء مؤقت الهجوم — الإظهار للمجموعات يبقى بقرار المشرف فقط */
 export async function startAttackTimer(qRoom, seconds) {
   await update(dbRef(db, `qrooms/${qRoom}/game`), {
     timer: { deadline: Date.now() + seconds * 1000 },
+    answerVerdict: null,
   });
 }
 
 /** بعد «صح» — يمنح المدافع 10 ثوانٍ لتفعيل الدرع (مرة واحدة) */
-export async function beginShieldWindow(qRoom, { winnerGroupId } = {}) {
+export async function beginShieldWindow(qRoom, { winnerGroupId, attack } = {}) {
   const patch = {
     timer: null,
     shieldWindow: { deadline: Date.now() + SHIELD_WINDOW_SEC * 1000 },
   };
   if (winnerGroupId) patch.shieldWindow.winnerGroupId = winnerGroupId;
+  const verdict = buildAnswerVerdict(attack, true);
+  if (verdict) patch.answerVerdict = verdict;
   await update(dbRef(db, `qrooms/${qRoom}/game`), patch);
 }
 
@@ -37,6 +65,8 @@ export async function finalizeShieldWindowIfDue({
   const still = await get(dbRef(db, `qrooms/${qRoom}/game/shieldWindow`));
   if (!still.exists()) return;
 
+  const { qGroups: freshGroups, qGList: freshGList } = await fetchFreshGroupsData(qRoom);
+
   const claims = qGameState?.speedClaims || {};
   const claimIds = Object.keys(claims);
   const isSpeed = qGameState?.playMode === 'speed' && claimIds.length > 0;
@@ -47,7 +77,7 @@ export async function finalizeShieldWindowIfDue({
     await applySpeedRoundCorrect({
       qRoom,
       qGameState,
-      qGroups,
+      qGroups: freshGroups,
       winnerGroupId: winId,
       Q_WEAPONS,
     });
@@ -55,8 +85,8 @@ export async function finalizeShieldWindowIfDue({
     await resolveAttackSuccess({
       qRoom,
       qCurrentAttack: qGameState.currentAttack,
-      qGList,
-      qGroups,
+      qGList: freshGList,
+      qGroups: freshGroups,
       qGameState,
     });
   } else {
@@ -81,13 +111,14 @@ export async function resolveAttackSuccess({ qRoom, qCurrentAttack, qGList, qGro
     u[`qrooms/${qRoom}/game/currentQuestion`] = null;
     u[`qrooms/${qRoom}/game/lastResult`] = {
       ...atk,
-      result: 'success',
+      result: 'shielded',
       hunted: 0,
       msg: '🛡️ الدرع صد الهجوم',
       timestamp: Date.now(),
     };
     u[`qrooms/${qRoom}/game/showResult`] = true;
     u[`qrooms/${qRoom}/game/shieldWindow`] = null;
+    u[`qrooms/${qRoom}/game/answerVerdict`] = null;
     await update(dbRef(db), u);
     return;
   }
@@ -134,6 +165,7 @@ export async function resolveAttackSuccess({ qRoom, qCurrentAttack, qGList, qGro
   u[`qrooms/${qRoom}/game/currentQuestion`] = null;
   u[`qrooms/${qRoom}/game/showResult`] = true;
   u[`qrooms/${qRoom}/game/shieldWindow`] = null;
+  u[`qrooms/${qRoom}/game/answerVerdict`] = null;
   await update(dbRef(db), u);
 }
 
@@ -141,6 +173,8 @@ export async function resolveAttackSuccess({ qRoom, qCurrentAttack, qGList, qGro
 export async function resolveAttackFail({ qRoom, qCurrentAttack, qGroups }) {
   const atk = qCurrentAttack;
   const u = {};
+  const verdict = buildAnswerVerdict(atk, false);
+  if (verdict) u[`qrooms/${qRoom}/game/answerVerdict`] = verdict;
   u[`qrooms/${qRoom}/groups/${atk.attackerId}/weapons/${atk.weapon}`] =
     (qGroups[atk.attackerId]?.weapons?.[atk.weapon] || 1) - 1;
   const logRef = push(dbRef(db, `qrooms/${qRoom}/attacks`));
@@ -161,7 +195,7 @@ export async function resolveAttackFail({ qRoom, qCurrentAttack, qGroups }) {
 
 /** متابعة بعد كشف النتيجة — تدوير الدور */
 export async function continueAfterReveal({ qRoom, qGameState, qGList, lrSnap, recordRoundCompleted }) {
-  const patch = { lastResult: null, showResult: false };
+  const patch = { lastResult: null, showResult: false, answerVerdict: null };
   const pm = qGameState?.playMode || 'sequential';
   const anchor = lrSnap?.attackerId || qGameState?.turnGroup;
   let roundCompleted = false;

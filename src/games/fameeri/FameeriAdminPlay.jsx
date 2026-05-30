@@ -5,14 +5,15 @@ import { Q_TREES, Q_WEAPONS } from '../../core/constants';
 import { playSound } from '../../core/helpers';
 import { applySpeedRoundWrong } from './fameeriSpeedRound';
 import { startAttackTimer, resolveAttackFail, continueAfterReveal, beginShieldWindow, finalizeShieldWindowIfDue, SHIELD_WINDOW_SEC } from './fameeriAdminResolve';
+import { poolStats } from './fameeriQuestionPool';
 import FameeriAdminStepper from './FameeriAdminStepper';
 import FameeriAdminAttack from './FameeriAdminAttack';
 import FameeriAdminBattleLog from './FameeriAdminBattleLog';
 import FameeriAdminRibbon from './FameeriAdminRibbon';
 import FameeriAdminGroupDetail from './FameeriAdminGroupDetail';
 import FameeriAdminDuel from './FameeriAdminDuel';
-import FameeriGroupForest from './FameeriGroupForest';
 import FameeriRevealOverlay from './FameeriRevealOverlay';
+import FameeriVerdictBanner from './FameeriVerdictBanner';
 import AdminQuestionView from '../../question-bank/AdminQuestionView';
 
 const TIMER_PRESETS = [15, 30, 45, 60];
@@ -32,6 +33,7 @@ export default function FameeriAdminPlay({
   qAdminGroupAnswers,
   qAdminPendingGroups,
   toggleQuestionReveal,
+  hideQuestionFromPlayers,
   drawNextQuestion,
   qPool,
   speedWinSelect,
@@ -65,6 +67,18 @@ export default function FameeriAdminPlay({
   const leader = sorted[0];
 
   const [shieldCountdown, setShieldCountdown] = useState(null);
+
+  const speedWinId =
+    shieldWindow?.winnerGroupId ||
+    (claimIds.length === 1 ? claimIds[0] : speedWinSelect) ||
+    null;
+  const shieldTargetAttack =
+    qCurrentAttack ||
+    (speedWinId && qGameState?.speedClaims?.[speedWinId]) ||
+    null;
+  const shieldTargetGroup = shieldTargetAttack
+    ? qGList.find((g) => g.id === shieldTargetAttack.targetId)
+    : null;
 
   useEffect(() => {
     const dl = shieldWindow?.deadline;
@@ -101,17 +115,18 @@ export default function FameeriAdminPlay({
     return () => clearTimeout(t);
   }, [shieldWindow?.deadline, qRoom]);
 
-  const speedWinId =
-    shieldWindow?.winnerGroupId ||
-    (claimIds.length === 1 ? claimIds[0] : speedWinSelect) ||
-    null;
-  const shieldTargetAttack =
-    qCurrentAttack ||
-    (speedWinId && qGameState?.speedClaims?.[speedWinId]) ||
-    null;
-  const shieldTargetGroup = shieldTargetAttack
-    ? qGList.find((g) => g.id === shieldTargetAttack.targetId)
-    : null;
+  /** حسم فوري عند تفعيل الدرع — لا ننتظر انتهاء العدّ */
+  useEffect(() => {
+    if (!shieldWindow || !qRoom || !shieldTargetAttack || !shieldTargetGroup) return;
+    if (shieldTargetGroup.shield !== shieldTargetAttack.tree) return;
+    void finalizeShieldWindowIfDue({
+      qRoom,
+      qGameState,
+      qGList,
+      qGroups,
+      recordRoundCompleted,
+    }).then(() => playSound('explosion'));
+  }, [shieldWindow?.deadline, shieldTargetGroup?.shield, shieldTargetAttack?.tree, qRoom]);
 
   const setPlayMode = async (mode) => {
     await update(dbRef(db, `qrooms/${qRoom}/game`), {
@@ -140,8 +155,53 @@ export default function FameeriAdminPlay({
   const tabs = [
     ['control', '⚔️ التحكم'],
     ['stats', '📊 الإحصائيات'],
-    ['log', '📜 السجل'],
+    ...(qCurrentAttack || shieldWindow ? [] : [['log', '📜 السجل']]),
   ];
+
+  const attackTimerForQuestion =
+    qActiveQuestion && !qActiveQuestion.adminOnly
+      ? shieldWindow
+        ? {
+            mode: 'shield',
+            countdown: shieldCountdown,
+            targetName: shieldTargetGroup?.name,
+          }
+        : qTimer
+          ? { mode: 'run', countdown: qCountdown }
+          : qCurrentAttack
+            ? {
+                mode: 'setup',
+                presets: TIMER_PRESETS,
+                customValue: qCustomTimer,
+                onCustomChange: setQCustomTimer,
+                onStart: async (s) => {
+                  await startAttackTimer(qRoom, s);
+                  setQCustomTimer('');
+                  playSound('suspense');
+                },
+              }
+            : isSpeed && claimIds.length && !qGameState?.speedBatchActive
+              ? {
+                  mode: 'setup',
+                  presets: SPEED_PRESETS,
+                  customValue: String(speedRoundSecs),
+                  onCustomChange: (v) => {
+                    const n = parseInt(v, 10);
+                    if (!Number.isNaN(n)) setSpeedRoundSecs(Math.min(35, Math.max(5, n)));
+                  },
+                  onStart: async (s) => {
+                    if (!canStartSpeedTimer) return;
+                    await update(dbRef(db, `qrooms/${qRoom}/game`), {
+                      speedBatchActive: true,
+                      timer: { deadline: Date.now() + s * 1000 },
+                    });
+                    setSpeedRoundSecs(s);
+                    playSound('suspense');
+                  },
+                  disabled: !canStartSpeedTimer,
+                }
+              : null
+      : null;
 
   const statusLabel = (() => {
     if (qReveal) return '🎬 عرض النتيجة';
@@ -179,6 +239,10 @@ export default function FameeriAdminPlay({
         )}
       </div>
 
+      {qGameState?.answerVerdict && !qReveal && (
+        <FameeriVerdictBanner verdict={qGameState.answerVerdict} />
+      )}
+
       {qActiveQuestion && (
         <AdminQuestionView
           current={qActiveQuestion}
@@ -187,7 +251,21 @@ export default function FameeriAdminPlay({
           pendingGroups={qAdminPendingGroups}
           onToggleRevealQuestion={() => void toggleQuestionReveal('revealToPlayers')}
           onToggleRevealOptions={() => void toggleQuestionReveal('revealOptions')}
-          onDrawNext={qPool.length ? () => void drawNextQuestion() : undefined}
+          onHideAll={() => void hideQuestionFromPlayers?.()}
+          attackTimer={attackTimerForQuestion}
+          onDrawNext={
+            poolStats(qPool).total
+              ? () => {
+                  const w =
+                    qCurrentAttack?.weapon ||
+                    (speedWinSelect && qGameState?.speedClaims?.[speedWinSelect]?.weapon) ||
+                    (Object.keys(qGameState?.speedClaims || {}).length === 1
+                      ? qGameState.speedClaims[Object.keys(qGameState.speedClaims)[0]]?.weapon
+                      : null);
+                  void drawNextQuestion(w);
+                }
+              : undefined
+          }
           accent={accent}
         />
       )}
@@ -254,75 +332,27 @@ export default function FameeriAdminPlay({
                           <span className="fameeri-admin-attack-intel__shield">🛡️ الدرع مُفعّل على هذه الشجرة!</span>
                         )}
                       </div>
-                      {tgtG && (
-                        <FameeriGroupForest
-                          group={tgtG}
-                          groupId={tgtG.id}
-                          attacks={qAttacks}
-                          underAttackTree={qCurrentAttack.tree}
-                          shieldTree={tgtG.shield}
-                          title={`🌳 أشجار الهدف — ${tgtG.name}`}
-                          showHint={false}
-                          compact
-                        />
-                      )}
+                      <p className="fameeri-admin-attack-forest-hint">
+                        🌳 رسم أشجار الهدف — تبويب <strong>الإحصائيات</strong>
+                      </p>
                     </>
                   );
                 })()}
 
                 {!qTimer && !shieldWindow && (
-                  <div className="fameeri-admin-timer-setup">
-                    <div className="lbl">⏱️ مدة المؤقت</div>
-                    <div className="fameeri-admin-pills">
-                      {TIMER_PRESETS.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className="btn bg bsm"
-                          onClick={async () => {
-                            await startAttackTimer(qRoom, s);
-                            playSound('suspense');
-                          }}
-                        >
-                          {s}ث
-                        </button>
-                      ))}
-                    </div>
-                    <div className="fameeri-admin-inline-form" style={{ marginTop: 8 }}>
-                      <input
-                        type="number"
-                        className="inp"
-                        placeholder="مخصص (ث)"
-                        value={qCustomTimer}
-                        onChange={(e) => setQCustomTimer(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="btn bg bsm"
-                        onClick={async () => {
-                          const s = parseInt(qCustomTimer, 10) || 30;
-                          await startAttackTimer(qRoom, s);
-                          setQCustomTimer('');
-                          playSound('suspense');
-                        }}
-                      >
-                        ⏱️
-                      </button>
-                    </div>
-                  </div>
+                  <p className="fameeri-admin-action-hint">
+                    ⬆️ أظهر السؤال وشغّل المؤقت من بطاقة «السؤال الحالي» أعلاه
+                  </p>
                 )}
 
                 {qTimer && !shieldWindow && (
                   <>
-                    <div className="fameeri-admin-timer-display">
-                      {qCountdown !== null ? (qCountdown > 0 ? qCountdown : '⏰') : '...'}
-                    </div>
                     <div className="fameeri-admin-verdict">
                       <button
                         type="button"
                         className="btn bv fameeri-admin-verdict__btn"
                         onClick={async () => {
-                          await beginShieldWindow(qRoom);
+                          await beginShieldWindow(qRoom, { attack: qCurrentAttack });
                           playSound('suspense');
                         }}
                       >
@@ -345,9 +375,6 @@ export default function FameeriAdminPlay({
                 {shieldWindow && shieldTargetAttack && (
                   <div className="fameeri-admin-shield-window">
                     <div className="fameeri-admin-action-card__tag shield">🛡️ نافذة الدرع ({SHIELD_WINDOW_SEC}ث)</div>
-                    <div className="fameeri-admin-shield-window__count">
-                      {shieldCountdown !== null ? (shieldCountdown > 0 ? shieldCountdown : '⏰') : '...'}
-                    </div>
                     <div className="fameeri-admin-shield-window__hint">
                       {shieldTargetGroup?.name} لديها {shieldCountdown ?? SHIELD_WINDOW_SEC} ثانية لتفعيل الدرع (مرة واحدة)
                     </div>
@@ -366,7 +393,7 @@ export default function FameeriAdminPlay({
             {!qCurrentAttack && isSpeed && qGameState?.speedBatchActive && qTimer && !shieldWindow && (
               <>
                 <div className="fameeri-admin-action-card__tag speed">⚡ حسم السرعة</div>
-                <div className="fameeri-admin-timer-display">{qCountdown !== null ? (qCountdown > 0 ? qCountdown : '⏰') : '...'}</div>
+                <p className="fameeri-admin-action-hint">⏱️ المؤقت في بطاقة السؤال أعلاه</p>
                 <div className="fameeri-admin-verdict">
                   <button
                     type="button"
@@ -376,7 +403,10 @@ export default function FameeriAdminPlay({
                       const ids = claimIds;
                       if (ids.length > 1 && !speedWinSelect) return;
                       const win = ids.length === 1 ? ids[0] : speedWinSelect;
-                      await beginShieldWindow(qRoom, { winnerGroupId: win });
+                      await beginShieldWindow(qRoom, {
+                        winnerGroupId: win,
+                        attack: qGameState?.speedClaims?.[win],
+                      });
                       playSound('suspense');
                     }}
                   >
@@ -407,9 +437,6 @@ export default function FameeriAdminPlay({
                   weaponName={shieldTargetAttack.weaponName}
                   size="lg"
                 />
-                <div className="fameeri-admin-shield-window__count">
-                  {shieldCountdown !== null ? (shieldCountdown > 0 ? shieldCountdown : '⏰') : '...'}
-                </div>
                 <div className="fameeri-admin-shield-window__hint">
                   {shieldTargetGroup?.name} — {shieldCountdown ?? SHIELD_WINDOW_SEC}ث لتفعيل الدرع (مرة واحدة)
                 </div>
@@ -436,7 +463,7 @@ export default function FameeriAdminPlay({
                 ))}
                 {needPickWinner && (
                   <div className="ig" style={{ marginTop: 10 }}>
-                    <label className="lbl">المجموعة الفائزة (عند «صح»)</label>
+                    <label className="lbl">المجموعة الفائزة (عند «صح») — يحدد مستوى السؤال</label>
                     <select className="inp" value={speedWinSelect} onChange={(e) => setSpeedWinSelect(e.target.value)}>
                       <option value="">— اختر —</option>
                       {claimIds.map((gid) => (
@@ -447,48 +474,9 @@ export default function FameeriAdminPlay({
                     </select>
                   </div>
                 )}
-                <div className="ig" style={{ marginTop: 10 }}>
-                  <label className="lbl">مدة المؤقت (5–35 ث)</label>
-                  <div className="fameeri-admin-pills">
-                    {SPEED_PRESETS.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={`btn ${speedRoundSecs === s ? 'bg' : 'bgh'} bsm`}
-                        onClick={() => setSpeedRoundSecs(s)}
-                      >
-                        {s}ث
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="number"
-                    min={5}
-                    max={35}
-                    className="inp"
-                    style={{ width: 80, textAlign: 'center', marginTop: 6 }}
-                    value={speedRoundSecs}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (Number.isNaN(v)) return;
-                      setSpeedRoundSecs(Math.min(35, Math.max(5, v)));
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn bg mt2 fameeri-admin-primary-btn"
-                  disabled={!canStartSpeedTimer}
-                  onClick={async () => {
-                    await update(dbRef(db, `qrooms/${qRoom}/game`), {
-                      speedBatchActive: true,
-                      timer: { deadline: Date.now() + speedRoundSecs * 1000 },
-                    });
-                    playSound('suspense');
-                  }}
-                >
-                  ⏱️ بدء المؤقت ({speedRoundSecs}ث)
-                </button>
+                {!canStartSpeedTimer && needPickWinner && (
+                  <p className="fameeri-admin-action-hint">اختر المجموعة الفائزة أولاً لتفعيل المؤقت</p>
+                )}
               </>
             )}
 
@@ -610,6 +598,12 @@ export default function FameeriAdminPlay({
 
       {tab === 'stats' && (
         <div className="fameeri-admin-stats">
+          {qCurrentAttack && (
+            <div className="fameeri-admin-stats-banner card">
+              ⚔️ هجوم على <strong>{qCurrentAttack.targetName}</strong> — شجرة{' '}
+              <strong>{qCurrentAttack.tree}</strong> مُعلّمة بالأحمر
+            </div>
+          )}
           {sorted.map((g, i) => (
             <FameeriAdminGroupDetail
               key={g.id}
@@ -618,6 +612,9 @@ export default function FameeriAdminPlay({
               cursedTree={qGameState?.cursedTree}
               rank={i + 1}
               attacks={qAttacks}
+              highlightTree={
+                qCurrentAttack?.targetId === g.id ? qCurrentAttack.tree : undefined
+              }
             />
           ))}
         </div>

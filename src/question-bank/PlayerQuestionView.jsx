@@ -1,9 +1,7 @@
+import { useState, useEffect } from 'react';
+
 /**
- * عرض السؤال للمتسابق / شاشة العرض — مكوّن مشترك.
- * يظهر فقط حين يفعّل المشرف «إظهار السؤال»، وبدون الإجابة الصحيحة أبدًا.
- *
- * وضع تفاعلي (interactive): يسمح لأعضاء المجموعة المهاجِمة باقتراح إجابة،
- * وللقائد باعتمادها نهائيًا (تظهر للمشرف الذي يحكم صح/خطأ يدويًا).
+ * عرض السؤال للمتسابق — القائد يختار ثم يعتمد بزر منفصل.
  */
 export default function PlayerQuestionView({
   current,
@@ -16,6 +14,12 @@ export default function PlayerQuestionView({
   onSuggest,
   onConfirm,
 }) {
+  const [leaderDraft, setLeaderDraft] = useState(null);
+
+  useEffect(() => {
+    setLeaderDraft(null);
+  }, [current?.id, current?.text, current?.drawnAt]);
+
   if (!current) return null;
   if (current.adminOnly) return null;
   if (!current.revealToPlayers) return null;
@@ -23,101 +27,115 @@ export default function PlayerQuestionView({
   const hasOptions = Array.isArray(current.options) && current.options.length > 0;
   const showOptions = current.revealOptions && hasOptions;
   const canInteract = interactive && showOptions;
+  const leaderLocked = isLeader && finalOpt !== null;
+
+  const handleLeaderPick = (i) => {
+    if (leaderLocked) return;
+    setLeaderDraft(i);
+  };
+
+  const handleMemberPick = (i) => {
+    onSuggest?.(i);
+  };
 
   return (
-    <div className="card" style={{ border: `1.5px solid ${accent}`, background: 'rgba(240,192,64,.06)' }}>
-      <div className="ctitle" style={{ margin: '0 0 6px' }}>❓ السؤال</div>
+    <div className="player-q-view">
       <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.7, color: 'var(--text)', textAlign: 'center' }}>
         {current.text || '—'}
       </div>
 
       {showOptions && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+          <div className="player-q-view__grid">
             {current.options.map((opt, i) => {
               const isFinal = finalOpt === i;
               const isMine = myPick === i;
+              const isDraft = isLeader && leaderDraft === i && !isFinal;
               const votes = tally && tally[i] ? tally[i] : 0;
-              const baseStyle = {
-                position: 'relative',
-                padding: '12px 8px',
-                borderRadius: 10,
-                background: isFinal ? 'rgba(46,204,113,.16)' : 'var(--surface)',
-                border: isFinal
-                  ? '2px solid var(--green)'
-                  : isMine
-                  ? `2px solid ${accent}`
-                  : '1px solid var(--border-faint)',
-                textAlign: 'center',
-                fontSize: 13,
-                fontWeight: 700,
-                color: 'var(--text)',
-                cursor: canInteract ? 'pointer' : 'default',
-                width: '100%',
-              };
-              const content = (
+              const rowClass = [
+                'player-q-view__opt',
+                isFinal ? 'player-q-view__opt--final' : '',
+                isDraft || isMine ? 'player-q-view__opt--pick' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+
+              const inner = (
                 <>
                   {opt}
-                  {isFinal && <span style={{ marginInlineStart: 4 }}>✅</span>}
-                  {votes > 0 && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        insetInlineEnd: 6,
-                        top: 6,
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: accent,
-                        background: 'var(--bg)',
-                        borderRadius: 999,
-                        padding: '1px 6px',
-                        border: `1px solid ${accent}`,
-                      }}
-                    >
-                      👍 {votes}
-                    </span>
-                  )}
+                  {isFinal && <span className="player-q-view__sent"> ✓ مُرسَل</span>}
+                  {isDraft && <span className="player-q-view__draft"> · مسودة</span>}
+                  {votes > 0 && <span className="player-q-view__votes">👍 {votes}</span>}
                 </>
               );
-              return canInteract ? (
-                <button
-                  key={i}
-                  type="button"
-                  style={baseStyle}
-                  onClick={() => {
-                    if (isLeader) onConfirm?.(i);
-                    else onSuggest?.(i);
-                  }}
-                >
-                  {content}
-                </button>
-              ) : (
-                <div key={i} style={baseStyle}>
-                  {content}
+
+              if (canInteract && isLeader) {
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={rowClass}
+                    style={{ borderColor: isDraft || isFinal ? accent : undefined }}
+                    disabled={leaderLocked}
+                    onClick={() => handleLeaderPick(i)}
+                  >
+                    {inner}
+                  </button>
+                );
+              }
+              if (canInteract) {
+                return (
+                  <button key={i} type="button" className={rowClass} onClick={() => handleMemberPick(i)}>
+                    {inner}
+                  </button>
+                );
+              }
+              return (
+                <div key={i} className={rowClass}>
+                  {inner}
                 </div>
               );
             })}
           </div>
 
-          {showOptions && !canInteract && (
-            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 10, lineHeight: 1.6 }}>
+          {canInteract && isLeader && !leaderLocked && (
+            <>
+              {leaderDraft !== null ? (
+                <button
+                  type="button"
+                  className="btn bg player-q-view__submit"
+                  onClick={() => void onConfirm?.(leaderDraft)}
+                >
+                  📤 إرسال واعتماد للمشرف
+                </button>
+              ) : (
+                <p className="player-q-view__hint">👑 اختر الإجابة ثم اضغط «إرسال واعتماد»</p>
+              )}
+            </>
+          )}
+
+          {canInteract && isLeader && leaderLocked && (
+            <p className="player-q-view__hint player-q-view__hint--ok">
+              ✅ اعتمدت الإجابة وأرسلتها للمشرف — بانتظار حكمه (صح / خطأ)
+            </p>
+          )}
+
+          {canInteract && !isLeader && (
+            <p className="player-q-view__hint">
               {finalOpt !== null
                 ? 'اعتمد القائد الإجابة — بانتظار حكم المشرف'
-                : 'هذه الجولة لمجموعة المهاجِم فقط — راقبوا المؤقت والسؤال'}
-            </div>
-          )}
-          {canInteract && (
-            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 10, lineHeight: 1.6 }}>
-              {isLeader
-                ? finalOpt !== null
-                  ? '✅ تم اعتماد إجابتكم — بإمكانك تغييرها بالضغط على خيار آخر'
-                  : '👑 أنت القائد: اضغط الخيار لاعتماده كإجابة نهائية للمجموعة'
-                : finalOpt !== null
-                ? 'اعتمد القائد الإجابة — بانتظار حكم المشرف'
                 : myPick !== null
-                ? '👍 سُجّل اقتراحك — بانتظار اعتماد القائد'
-                : 'اضغط الخيار الذي تقترحه ليراه قائد مجموعتك'}
-            </div>
+                  ? '👍 سُجّل اقتراحك — بانتظار اعتماد القائد'
+                  : 'اضغط الخيار الذي تقترحه ليراه القائد'}
+            </p>
+          )}
+
+          {showOptions && !canInteract && (
+            <p className="player-q-view__hint">
+              {finalOpt !== null
+                ? 'اعتمدت مجموعة المهاجِم — راقبوا المؤقت وحكم المشرف'
+                : 'شاهدوا السؤال وناقشوا — الإجابة للمجموعة المحددة في هذه الجولة'}
+            </p>
           )}
         </>
       )}

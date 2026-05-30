@@ -4,6 +4,7 @@ import { Q_WEAPONS, Q_TOTAL } from '../../core/constants';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import QuestionSourceSetup from '../../question-bank/QuestionSourceSetup';
 import { QSOURCE, QSOURCE_LABELS } from '../../question-bank/questionSession';
+import { poolStats, QUMAIRI_SET_QUOTAS } from './fameeriQuestionPool';
 import FameeriAdminDistribute from './FameeriAdminDistribute';
 import FameeriAdminStepper from './FameeriAdminStepper';
 
@@ -22,9 +23,12 @@ export default function FameeriAdminLobby({
   setQSetupOpen,
   qEffectiveSource,
   qPool,
+  qBankMeta,
   applyQuestionSetup,
   assignGroupLeader,
   QB_GAME_TYPE,
+  authUid,
+  onGoAccount,
 }) {
   const unassigned = qMList.filter((m) => !m.groupId);
   const assistMode = !!qGameState?.assistMode;
@@ -131,6 +135,8 @@ export default function FameeriAdminLobby({
           notify={notify}
           onApply={applyQuestionSetup}
           onClose={() => setQSetupOpen(false)}
+          authUid={authUid}
+          onGoAccount={onGoAccount}
         />
       ) : (
         <div className="card fameeri-admin-section">
@@ -139,7 +145,20 @@ export default function FameeriAdminLobby({
               <div className="ctitle" style={{ margin: 0 }}>🧠 مصدر الأسئلة</div>
               <div className="fameeri-admin-section__sub">
                 {qEffectiveSource
-                  ? `${QSOURCE_LABELS[qEffectiveSource]}${qEffectiveSource !== QSOURCE.EXTERNAL ? ` — ${qPool.length} سؤال` : ''}`
+                  ? (() => {
+                      if (qEffectiveSource === QSOURCE.EXTERNAL) return QSOURCE_LABELS[qEffectiveSource];
+                      const s = poolStats(qPool);
+                      let txt = `${QSOURCE_LABELS[qEffectiveSource]} — ${s.hard.total} صعب · ${s.medium.total} متوسط · ${s.easy.total} سهل`;
+                      if (qBankMeta?.setCount != null) {
+                        txt += ` · ${qBankMeta.setCount} مجموعة جديدة في البنك`;
+                      }
+                      if (qBankMeta?.setsTaken > 1) {
+                        txt += ` (${qBankMeta.setsTaken} مجموعات)`;
+                      } else if (s.total === QUMAIRI_SET_QUOTAS.hard + QUMAIRI_SET_QUOTAS.medium + QUMAIRI_SET_QUOTAS.easy) {
+                        txt += ' (مجموعة مسابقة واحدة)';
+                      }
+                      return txt;
+                    })()
                   : 'الافتراضي: بدون أسئلة — مؤقت وحسم يدوي'}
               </div>
             </div>

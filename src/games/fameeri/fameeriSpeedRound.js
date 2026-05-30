@@ -1,6 +1,7 @@
 import { ref as dbRef, push, update } from 'firebase/database';
 import { db } from '../../core/firebase';
 import { recordRoundCompleted } from '../../core/sessionStats';
+import { buildAnswerVerdict } from './fameeriAdminResolve';
 
 function trackSpeedRoundCompleted(qRoom) {
   if (qRoom) recordRoundCompleted('fameeri', qRoom).catch(() => {});
@@ -30,7 +31,7 @@ export async function applySpeedRoundCorrect({ qRoom, qGameState, qGroups, winne
     const ts = Date.now();
     u[`qrooms/${qRoom}/game/lastResult`] = {
       ...atk,
-      result: 'success',
+      result: 'shielded',
       hunted: 0,
       msg: '🛡️ الدرع صد الهجوم',
       timestamp: ts,
@@ -129,6 +130,8 @@ export async function applySpeedRoundWrong({ qRoom, qGameState, qGroups }) {
     u[`qrooms/${qRoom}/attacks/${logRef.key}`] = { ...c, result: 'fail', hunted: 0, timestamp: ts };
   }
 
+  const verdict = buildAnswerVerdict(firstAtk, false);
+  if (verdict) u[`qrooms/${qRoom}/game/answerVerdict`] = verdict;
   u[`qrooms/${qRoom}/game/lastResult`] = {
     ...(firstAtk || {}),
     result: 'fail',

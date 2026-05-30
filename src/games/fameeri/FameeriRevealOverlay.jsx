@@ -1,125 +1,144 @@
 /**
- * مشهد كشف نتيجة الهجوم — موحّد للمشرف والمتسابقين (نفس التفاصيل والعبارات).
+ * مشهد كشف نتيجة الهجوم — واضح وفخم لجميع الشاشات.
  */
 export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue }) {
   if (!qReveal) return null;
 
-  const ctx = (
-    <div
-      style={{
-        marginTop: 10,
-        padding: '10px 14px',
-        background: 'rgba(255,255,255,.06)',
-        borderRadius: 10,
-        fontSize: 13,
-        lineHeight: 1.55,
-        border: '1px solid rgba(255,255,255,.08)',
-      }}
-    >
-      <div style={{ color: 'var(--gold)', fontWeight: 800 }}>
-        {qReveal.attackerName} يهاجم {qReveal.targetName}
-      </div>
-      <div style={{ color: 'var(--muted)', marginTop: 4, fontSize: 12 }}>
-        الشجرة: <span style={{ color: 'var(--text)', fontWeight: 700 }}>{qReveal.tree}</span> · السلاح:{' '}
-        <span style={{ color: 'var(--text)', fontWeight: 700 }}>{qReveal.weapon}</span>
-      </div>
-    </div>
-  );
+  const weaponEmoji =
+    qReveal.weapon === 'شوزل' || qReveal.weaponName?.includes('شوز')
+      ? '💥'
+      : qReveal.weapon === 'أم صتمة' || qReveal.weaponName?.includes('صتم')
+        ? '🎯'
+        : '🪃';
 
-  const poison = qReveal.poisonMsg ? (
-    <div
-      style={{
-        marginTop: 10,
-        padding: '10px 14px',
-        background: 'rgba(155,89,182,.18)',
-        border: '1px solid rgba(155,89,182,.45)',
-        borderRadius: 10,
-        fontSize: 13,
-        color: 'var(--purple)',
-        fontWeight: 800,
-        lineHeight: 1.5,
-      }}
-    >
-      {qReveal.poisonMsg}
-    </div>
-  ) : null;
+  const resultType = qReveal.phase === 'result' ? qReveal.type : 'pending';
+  const bgClass =
+    resultType === 'success'
+      ? 'q-reveal-bg-success'
+      : resultType === 'shielded'
+        ? 'q-reveal-bg-shield'
+        : resultType === 'empty'
+          ? 'q-reveal-bg-empty'
+          : resultType === 'fail'
+            ? 'q-reveal-bg-fail'
+            : 'q-reveal-bg-pending';
 
   return (
-    <div
-      className={`q-reveal ${qReveal.phase === 'result' ? `q-reveal-bg-${qReveal.type}` : 'q-reveal-bg-pending'}`}
-    >
+    <div className={`q-reveal ${bgClass}`} role="dialog" aria-modal="true" aria-label="كشف الهجوم">
+      <div className="q-reveal-legend">
+        <div className="q-reveal-legend__ribbon">⚔️ كشف الهجوم</div>
+
+        <div className="q-reveal-legend__duel">
+          <div className="q-reveal-legend__side q-reveal-legend__side--atk">
+            <span className="q-reveal-legend__label">المهاجم</span>
+            <span className="q-reveal-legend__name">{qReveal.attackerName || '—'}</span>
+          </div>
+          <div className="q-reveal-legend__vs" aria-hidden>
+            ⚔️
+          </div>
+          <div className="q-reveal-legend__side q-reveal-legend__side--def">
+            <span className="q-reveal-legend__label">الهدف</span>
+            <span className="q-reveal-legend__name">{qReveal.targetName || '—'}</span>
+          </div>
+        </div>
+
+        <div className="q-reveal-legend__meta">
+          <span>🌳 {qReveal.tree}</span>
+          <span className="q-reveal-legend__dot">·</span>
+          <span>
+            {weaponEmoji} {qReveal.weaponName || qReveal.weapon}
+          </span>
+        </div>
+      </div>
+
       <div className="q-scene">
         {qReveal.phase === 'suspense' && (
           <>
             <div className="q-tree-big">🌳</div>
-            <div style={{ fontFamily: 'Cairo', fontSize: 16, color: 'var(--gold)', marginTop: 10 }}>
-              شجرة {qReveal.tree}
-            </div>
-            <div className="q-suspense" style={{ fontFamily: 'Cairo', fontSize: 18, color: 'var(--muted)', marginTop: 20 }}>
-              ... حبس الأنفاس ...
-            </div>
-            {ctx}
+            <div className="q-reveal-phase-title">حبس الأنفاس…</div>
+            <div className="q-suspense">ماذا يخبئ شجر {qReveal.tree}؟</div>
           </>
         )}
+
         {qReveal.phase === 'weapon' && (
           <>
             <div className="q-shake">
-              <div className="q-tree-big">🌳</div>
+              <div className="q-weapon-flash">{weaponEmoji}</div>
             </div>
-            <div className="q-weapon-flash" style={{ fontSize: 44, marginTop: 12 }}>
-              {qReveal.weapon === 'شوزل' ? '💥' : qReveal.weapon === 'أم صتمة' ? '🎯' : '🪃'}
-            </div>
-            <div style={{ fontFamily: 'Cairo', fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>{qReveal.weapon}</div>
-            {ctx}
+            <div className="q-reveal-phase-title">إطلاق السلاح!</div>
+            <div className="q-reveal-phase-sub">{qReveal.weaponName || qReveal.weapon}</div>
           </>
         )}
+
         {qReveal.phase === 'result' && qReveal.type === 'success' && (
           <>
-            <div className="q-tree-big">🌳</div>
+            <div className="q-reveal-result-head q-reveal-pop">🎯 إصابة!</div>
             <div className="q-birds">
               {Array.from({ length: Math.min(qReveal.hunted || 0, 30) }).map((_, i) => (
                 <span
                   key={i}
                   className="q-bird"
-                  style={{ '--br': `${(Math.random() - 0.5) * 40}deg`, animationDelay: `${i * 0.1}s` }}
+                  style={{ '--br': `${(Math.random() - 0.5) * 40}deg`, animationDelay: `${i * 0.08}s` }}
                 >
                   🐦
                 </span>
               ))}
             </div>
-            <div className="q-num" style={{ color: 'var(--green)' }}>
-              -{qReveal.hunted}
+            <div className="q-num q-reveal-hunt-num q-reveal-pop">−{qReveal.hunted}</div>
+            <div className="q-reveal-result-line">
+              <strong>{qReveal.attackerName}</strong> اصطاد{' '}
+              <strong className="q-reveal-hunt-count">{qReveal.hunted}</strong> قميري من{' '}
+              <strong>{qReveal.targetName}</strong>
             </div>
-            <div style={{ fontFamily: 'Cairo', fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>
-              تم اصطياد {qReveal.hunted} قميري
-            </div>
-            {ctx}
-            {poison}
+            <div className="q-reveal-result-sub">من شجرة «{qReveal.tree}»</div>
           </>
         )}
+
+        {qReveal.phase === 'result' && qReveal.type === 'shielded' && (
+          <>
+            <div className="q-reveal-shield-scene">
+              <div className="q-reveal-shield-burst" aria-hidden />
+              <div className="q-reveal-shield-icon q-reveal-pop">🛡️</div>
+              <div className="q-reveal-shield-spark" aria-hidden>✨</div>
+            </div>
+            <div className="q-reveal-result-head q-reveal-result-head--shield q-reveal-pop">صد الهجوم!</div>
+            <div className="q-reveal-result-line">
+              <strong>{qReveal.targetName}</strong> فعّلت الدرع على 🌳{qReveal.tree}
+            </div>
+            <div className="q-reveal-result-sub">
+              {qReveal.attackerName} لم يصطد أي قميري — السلاح أُهدر
+            </div>
+          </>
+        )}
+
         {qReveal.phase === 'result' && qReveal.type === 'empty' && (
           <>
             <div className="q-empty-face">😂</div>
-            <div style={{ fontFamily: 'Cairo', fontSize: 22, fontWeight: 900, color: 'var(--gold)', marginTop: 12 }}>
-              الشجرة فاضية — لا قميري هنا
+            <div className="q-reveal-result-head">شجرة فارغة!</div>
+            <div className="q-reveal-result-line">
+              <strong>{qReveal.attackerName}</strong> هاجم <strong>{qReveal.targetName}</strong> — لا قميري هنا
             </div>
-            {ctx}
-            {poison}
           </>
         )}
+
         {qReveal.phase === 'result' && qReveal.type === 'fail' && (
           <>
-            <div style={{ fontSize: 64 }}>💨</div>
-            <div style={{ fontFamily: 'Cairo', fontSize: 22, fontWeight: 900, color: 'var(--red)', marginTop: 8 }}>
-              إجابة خاطئة — الهجوم لا يُحسب
+            <div className="q-reveal-fail-icon q-reveal-pop">💨</div>
+            <div className="q-reveal-result-head q-reveal-result-head--fail">الهجوم لم يُحسب</div>
+            <div className="q-reveal-result-line">
+              <strong>{qReveal.attackerName}</strong> لم يصب <strong>{qReveal.targetName}</strong>
             </div>
-            {ctx}
-            {poison}
+            <div className="q-reveal-result-sub">إجابة خاطئة — لا صيد</div>
           </>
         )}
+
+        {qReveal.poisonMsg && (
+          <div className="q-reveal-poison">{qReveal.poisonMsg}</div>
+        )}
       </div>
+
       {showContinue && typeof onContinue === 'function' && qReveal.phase === 'result' && (
-        <button className="btn bg mt3" style={{ width: 'auto', padding: '10px 30px' }} type="button" onClick={onContinue}>
+        <button className="btn bg mt3 q-reveal-continue" type="button" onClick={onContinue}>
           ▶️ متابعة
         </button>
       )}
