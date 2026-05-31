@@ -13,9 +13,10 @@ import FameeriGuideModal from './FameeriGuideModal';
 import { ROOM_CODE_PLACEHOLDER, GROUP_MEMBER_NAME_PLACEHOLDER } from '../../core/formLabels';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
-import { QSOURCE, toPublicQuestion } from '../../question-bank/questionSession';
+import { QSOURCE, toPublicQuestion, isAnswerCorrect, optionLabel } from '../../question-bank/questionSession';
 import { markQuestionAsUsed } from './fameeriBankProgress';
 import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
+import { buildAdminAnswerContext } from './fameeriAdminAnswers';
 import {
   drawQuestionForWeapon,
   findInStructuredPool,
@@ -649,10 +650,45 @@ const FameeriGame = forwardRef(function FameeriGame(
   })();
   const qAdminGroupAnswers =
     qActiveQuestion && qKey
-      ? qGList.filter((g) => g.finalAnswer?.q === qKey).map((g) => ({ id: g.id, name: g.name, opt: g.finalAnswer.opt, by: g.finalAnswer.by }))
+      ? qGList
+          .filter((g) => g.finalAnswer?.q === qKey)
+          .map((g) => {
+            const opt = g.finalAnswer.opt;
+            const options = qActiveQuestion.options || [];
+            const letter = typeof opt === 'number' && opt >= 0 ? optionLabel(opt) : null;
+            const optText =
+              typeof opt === 'number' && options[opt] != null ? options[opt] : opt != null ? String(opt) : '';
+            return {
+              id: g.id,
+              name: g.name,
+              opt,
+              letter,
+              optText,
+              by: g.finalAnswer.by,
+              correct: isAnswerCorrect(opt, options, qActiveAnswer),
+              isAttacker: qCurrentAttack?.attackerId === g.id,
+            };
+          })
       : [];
-  const qAdminPendingGroups =
-    qActiveQuestion && qKey
+
+  const qAdminAnswerContext = buildAdminAnswerContext({
+    qKey,
+    qActiveQuestion,
+    qActiveAnswer,
+    qGList,
+    qMList,
+    qCurrentAttack,
+    isSpeed: qPlayMode === 'speed' && !!qGameState?.speedBatchActive,
+    speedAnsweringGroupId: (() => {
+      const ids = Object.keys(qGameState?.speedClaims || {});
+      if (ids.length === 1) return ids[0];
+      return speedWinSelect || null;
+    })(),
+  });
+
+  const qAdminPendingGroups = qAdminAnswerContext?.pendingNames?.length
+    ? qAdminAnswerContext.pendingNames
+    : qActiveQuestion && qKey
       ? qGList.filter((g) => g.finalAnswer?.q !== qKey).map((g) => g.name)
       : [];
 
@@ -1321,6 +1357,7 @@ const FameeriGame = forwardRef(function FameeriGame(
               qActiveQuestion={qActiveQuestion}
               qActiveAnswer={qActiveAnswer}
               qAdminGroupAnswers={qAdminGroupAnswers}
+              qAdminAnswerContext={qAdminAnswerContext}
               qAdminPendingGroups={qAdminPendingGroups}
               toggleQuestionReveal={toggleQuestionReveal}
               hideQuestionFromPlayers={hideQuestionFromPlayers}

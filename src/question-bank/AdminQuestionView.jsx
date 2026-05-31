@@ -6,6 +6,7 @@ import {
   optionLabel,
 } from './questionSession';
 import AdminQuestionRevealControls from './AdminQuestionRevealControls';
+import FameeriAdminAnswerVerdict from '../games/fameeri/FameeriAdminAnswerVerdict';
 
 /**
  * بطاقة السؤال عند المشرف أثناء اللعب — مكوّن مشترك.
@@ -20,6 +21,7 @@ export default function AdminQuestionView({
   onDrawNext,
   groupAnswers = [],
   pendingGroups = [],
+  answerContext = null,
   accent = 'var(--gold)',
   /** مؤقت الهجوم بجانب بنك الأسئلة — setup | run | shield */
   attackTimer = null,
@@ -56,6 +58,15 @@ export default function AdminQuestionView({
 
       <p className="admin-q-card__text">{current.text || '—'}</p>
 
+      {answerContext ? (
+        <FameeriAdminAnswerVerdict
+          answerCtx={answerContext}
+          qActiveAnswer={answer}
+          qActiveQuestion={current}
+          accent={accent}
+        />
+      ) : (
+        <>
       {hasOptions && (
         <div className="admin-q-options" role="list" aria-label="خيارات السؤال">
           {current.options.map((opt, i) => {
@@ -117,7 +128,7 @@ export default function AdminQuestionView({
                 </div>
                 <div className="admin-q-group-row__answer">
                   {letter && <span className="admin-q-group-row__letter">{letter}</span>}
-                  <span className="admin-q-group-row__text">{txt}</span>
+                  <span className="admin-q-group-row__text">{ga.optText || txt}</span>
                   <span className="admin-q-group-row__verdict" aria-label={correct ? 'صحيحة' : 'خاطئة'}>
                     {correct ? '✓' : '✗'}
                   </span>
@@ -135,6 +146,8 @@ export default function AdminQuestionView({
 
           <p className="admin-q-groups__hint">القرار النهائي لك — اضغط ✅ صح أو ❌ خطأ أسفل شاشة الهجوم</p>
         </div>
+      )}
+        </>
       )}
 
       {adminOnly ? (
