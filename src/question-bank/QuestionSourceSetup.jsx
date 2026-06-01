@@ -1,13 +1,11 @@
-import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { fetchGameQuestionsAdvanced, suggestQuestion, QB_CATEGORIES, QB_DIFFICULTIES, QB_AUDIENCES } from './qbank.helpers';
 import {
   QSOURCE,
-  buildCustomPool,
   normalizeBankPool,
   QB_CATEGORY_LABELS,
   QB_DIFFICULTY_LABELS,
   QB_AUDIENCE_LABELS,
-  TRUE_FALSE_OPTIONS,
 } from './questionSession';
 import {
   QUMAIRI_SET_QUOTAS,
@@ -16,23 +14,17 @@ import {
   countCompleteBankSets,
   partitionByDifficulty,
   normalizePoolToStructured,
+  poolStats,
   weaponQuotaHint,
 } from '../games/fameeri/fameeriQuestionPool';
+import { FAMEERI_IDEAL_SET_LABEL } from '../games/fameeri/fameeriQuestionSetup';
 import {
   loadUsedQuestionIds,
   clearUsedQuestionIds,
   isRegisteredHost,
 } from '../games/fameeri/fameeriBankProgress';
-
-const EMPTY_CUSTOM_ROW = () => ({
-  question_text: '',
-  type: 'open_question',
-  correct_answer: '',
-  options: ['', '', '', ''],
-  correctOptionIndex: null,
-  category: 'general',
-  difficulty_level: 'medium',
-});
+import CustomQuestionBuilder from './CustomQuestionBuilder';
+import { flattenSessionPool } from './customQuestionPool';
 
 /**
  * إعداد مصدر الأسئلة قبل بدء اللعبة — مكوّن مشترك بين الألعاب.
@@ -46,8 +38,11 @@ export default function QuestionSourceSetup({
   notify,
   authUid = null,
   onGoAccount,
+  initialSource = null,
+  initialPoolStructured = null,
+  initialPlannedGroups = 2,
 }) {
-  const [source, setSource] = useState(QSOURCE.BANK);
+  const [source, setSource] = useState(initialSource || QSOURCE.BANK);
   const [bankMode, setBankMode] = useState('auto'); // auto | manual
   const [categories, setCategories] = useState([]);
   const [difficulty, setDifficulty] = useState('');
@@ -57,9 +52,22 @@ export default function QuestionSourceSetup({
   const [bankPreview, setBankPreview] = useState(null);
   const [manualList, setManualList] = useState([]);
   const [manualSelected, setManualSelected] = useState({});
-  const [customRows, setCustomRows] = useState([EMPTY_CUSTOM_ROW()]);
+  const [customSessionPool, setCustomSessionPool] = useState(() =>
+    normalizePoolToStructured(initialPoolStructured || {})
+  );
+  const [customApplySuccess, setCustomApplySuccess] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [setsToTake, setSetsToTake] = useState(1);
+
+  useEffect(() => {
+    if (initialSource) setSource(initialSource);
+  }, [initialSource]);
+
+  useEffect(() => {
+    if (initialPoolStructured) {
+      setCustomSessionPool(normalizePoolToStructured(initialPoolStructured));
+    }
+  }, [initialPoolStructured]);
 
   const isQumairi = gameType === 'qumayri';
   const registered = isRegisteredHost();
@@ -183,90 +191,74 @@ export default function QuestionSourceSetup({
       onApply({ source: QSOURCE.BANK, pool });
     }
     notifyMsg(`✅ تم اعتماد ${pool.length} سؤال`, 'success');
+    const s = poolStats(normalizePoolToStructured(pool));
+    if (
+      isQumairi &&
+      (s.total < perSetTotal ||
+        s.hard.total < QUMAIRI_SET_QUOTAS.hard ||
+        s.medium.total < QUMAIRI_SET_QUOTAS.medium ||
+        s.easy.total < QUMAIRI_SET_QUOTAS.easy)
+    ) {
+      notifyMsg(`💡 الموصى به ${FAMEERI_IDEAL_SET_LABEL} — يمكنك المتابعة`, 'gold');
+    }
   };
 
-  const updateRow = (index, patch) => {
-    setCustomRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  };
-
-  const updateRowOption = (index, optIndex, value) => {
-    setCustomRows((prev) =>
-      prev.map((row, i) => {
-        if (i !== index) return row;
-        const options = [...row.options];
-        options[optIndex] = value;
-        return { ...row, options };
-      })
+  const applyCustomSession = () => {
+    const total = poolStats(customSessionPool).total;
+    if (!total) {
+      notifyMsg('أضف سؤالاً واحداً على الأقل للبنك المؤقت', 'error');
+      return;
+    }
+    onApply({
+      source: QSOURCE.CUSTOM,
+      poolStructured: customSessionPool,
+      keepOpen: true,
+    });
+    setCustomApplySuccess(true);
+    const s = poolStats(customSessionPool);
+    const advisory =
+      s.total >= perSetTotal &&
+      s.hard.total >= QUMAIRI_SET_QUOTAS.hard &&
+      s.medium.total >= QUMAIRI_SET_QUOTAS.medium &&
+      s.easy.total >= QUMAIRI_SET_QUOTAS.easy
+        ? null
+        : FAMEERI_IDEAL_SET_LABEL;
+    notifyMsg(
+      advisory
+        ? `✅ بُنك الجلسة معتمد (${total} سؤال) — الموصى به: ${advisory}`
+        : `✅ بُنك الجلسة معتمد — ${total} سؤال جاهز للمسابقة`,
+      advisory ? 'gold' : 'success'
     );
   };
 
-  const applyCustom = () => {
-    const prepared = customRows
-      .filter((row) => row.question_text.trim())
-      .map((row) => {
-        let correct = row.correct_answer;
-        let options = [];
-        if (row.type === 'multiple_choice') {
-          options = row.options.map((o) => o.trim()).filter(Boolean);
-          correct = row.correctOptionIndex != null ? row.options[row.correctOptionIndex] : '';
-        }
-        return {
-          question_text: row.question_text,
-          type: row.type,
-          options,
-          correct_answer: correct,
-          category: row.category,
-          difficulty_level: row.difficulty_level || 'medium',
-        };
-      });
-
-    const pool = buildCustomPool(prepared);
-    if (!pool.length) {
-      notifyMsg('اكتب سؤالًا واحدًا على الأقل', 'error');
-      return;
-    }
-    if (isQumairi) {
-      onApply({ source: QSOURCE.CUSTOM, poolStructured: normalizePoolToStructured(pool) });
-    } else {
-      onApply({ source: QSOURCE.CUSTOM, pool });
-    }
-    notifyMsg(`✅ تم تجهيز ${pool.length} سؤال خاص بك`, 'success');
-  };
-
-  const submitCustomAsSuggestions = async () => {
-    const prepared = customRows.filter((row) => row.question_text.trim());
-    if (!prepared.length) {
-      notifyMsg('اكتب سؤالًا واحدًا على الأقل', 'error');
+  const submitCustomSessionAsSuggestions = () => {
+    const saved = flattenSessionPool(customSessionPool);
+    if (!saved.length) {
+      notifyMsg('أضف أسئلة للبنك المؤقت أولاً', 'error');
       return;
     }
     setSuggesting(true);
-    try {
-      let n = 0;
-      for (const row of prepared) {
-        let correct = row.correct_answer;
-        let options = [];
-        if (row.type === 'multiple_choice') {
-          options = row.options.map((o) => o.trim()).filter(Boolean);
-          correct = row.correctOptionIndex != null ? row.options[row.correctOptionIndex] : '';
+    void (async () => {
+      try {
+        for (const q of saved) {
+          await suggestQuestion({
+            question_text: q.question_text,
+            type: q.type,
+            options: q.options || [],
+            correct_answer: q.correct_answer,
+            category: q.category || 'general',
+            difficulty_level: q.difficulty_level || 'medium',
+            audience: 'general',
+            gameTypes: [gameType],
+          });
         }
-        await suggestQuestion({
-          question_text: row.question_text.trim(),
-          type: row.type,
-          options,
-          correct_answer: correct,
-          category: row.category || 'general',
-          difficulty_level: row.difficulty_level || 'medium',
-          audience: 'general',
-          gameTypes: [gameType],
-        });
-        n += 1;
+        notifyMsg(`✅ أُرسل ${saved.length} سؤال كمقترح — سيراجعها الـ admin`, 'success');
+      } catch {
+        notifyMsg('تعذر إرسال المقترحات', 'error');
+      } finally {
+        setSuggesting(false);
       }
-      notifyMsg(`✅ تم إرسال ${n} سؤال كمقترح — راجعها في بنك الأسئلة واعتمدها`, 'success');
-    } catch {
-      notifyMsg('تعذر حفظ المقترحات', 'error');
-    } finally {
-      setSuggesting(false);
-    }
+    })();
   };
 
   const applyExternal = () => {
@@ -302,8 +294,8 @@ export default function QuestionSourceSetup({
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {sourceButton(QSOURCE.BANK, '🏦', 'البنك', 'أسئلة جاهزة')}
-        {sourceButton(QSOURCE.CUSTOM, '✍️', 'أكتب بنفسي', 'أسئلتك الخاصة')}
+        {sourceButton(QSOURCE.BANK, '🏦', 'البنك', 'أسئلة مركزية جاهزة')}
+        {sourceButton(QSOURCE.CUSTOM, '✍️', 'أكتب بنفسي', 'بنك مؤقت للجلسة')}
         {sourceButton(QSOURCE.EXTERNAL, '⏱️', 'الأسئلة معي', 'بدون عرض')}
       </div>
 
@@ -573,149 +565,19 @@ export default function QuestionSourceSetup({
       )}
 
       {source === QSOURCE.CUSTOM && (
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-            جهّز قائمة أسئلتك قبل بدء اللعبة. لأسئلة التمثيل اختر تصنيف «تمثيل وأمثال» وستبقى عند المشرف فقط.
-          </div>
-          {customRows.map((row, index) => (
-            <div key={index} className="card2" style={{ marginBottom: 8 }}>
-              <div className="ig">
-                <label className="lbl">السؤال {index + 1}</label>
-                <textarea
-                  className="inp"
-                  rows={2}
-                  value={row.question_text}
-                  onChange={(e) => updateRow(index, { question_text: e.target.value })}
-                  placeholder="اكتب نص السؤال…"
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <label className="ig" style={{ flex: 1, minWidth: 120 }}>
-                  <span className="lbl">النوع</span>
-                  <select
-                    className="inp"
-                    value={row.type}
-                    onChange={(e) => updateRow(index, { type: e.target.value, correctOptionIndex: null, correct_answer: '' })}
-                  >
-                    <option value="open_question">سؤال مفتوح</option>
-                    <option value="true_false">صح أو خطأ</option>
-                    <option value="multiple_choice">اختيار من متعدد</option>
-                  </select>
-                </label>
-                <label className="ig" style={{ flex: 1, minWidth: 120 }}>
-                  <span className="lbl">التصنيف</span>
-                  <select className="inp" value={row.category} onChange={(e) => updateRow(index, { category: e.target.value })}>
-                    {QB_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{QB_CATEGORY_LABELS[cat] || cat}</option>
-                    ))}
-                  </select>
-                </label>
-                {isQumairi && (
-                  <label className="ig" style={{ flex: 1, minWidth: 120 }}>
-                    <span className="lbl">الصعوبة / السلاح</span>
-                    <select
-                      className="inp"
-                      value={row.difficulty_level}
-                      onChange={(e) => updateRow(index, { difficulty_level: e.target.value })}
-                    >
-                      <option value="hard">صعب — شوزل</option>
-                      <option value="medium">متوسط — أم صتمة</option>
-                      <option value="easy">سهل — نبيطة</option>
-                    </select>
-                  </label>
-                )}
-              </div>
-
-              {row.type === 'open_question' && (
-                <div className="ig">
-                  <label className="lbl">الإجابة الصحيحة (تظهر للمشرف فقط)</label>
-                  <input
-                    className="inp"
-                    value={row.correct_answer}
-                    onChange={(e) => updateRow(index, { correct_answer: e.target.value })}
-                    placeholder="الإجابة المعتمدة"
-                  />
-                </div>
-              )}
-              {row.type === 'true_false' && (
-                <div className="ig">
-                  <label className="lbl">الإجابة الصحيحة</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {TRUE_FALSE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        className={`btn ${row.correct_answer === opt ? 'bg' : 'bgh'} bsm`}
-                        style={{ flex: 1 }}
-                        onClick={() => updateRow(index, { correct_answer: opt })}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {row.type === 'multiple_choice' && (
-                <div className="ig">
-                  <label className="lbl">الخيارات — اختر الصحيح</label>
-                  {row.options.map((opt, optIndex) => (
-                    <div key={optIndex} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5 }}>
-                      <input
-                        type="radio"
-                        name={`mc-${index}`}
-                        checked={row.correctOptionIndex === optIndex}
-                        onChange={() => updateRow(index, { correctOptionIndex: optIndex })}
-                      />
-                      <input
-                        className="inp"
-                        value={opt}
-                        onChange={(e) => updateRowOption(index, optIndex, e.target.value)}
-                        placeholder={`خيار ${optIndex + 1}`}
-                        style={{ flex: 1 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {customRows.length > 1 && (
-                <button
-                  type="button"
-                  className="btn br bxs"
-                  style={{ width: 'auto' }}
-                  onClick={() => setCustomRows((prev) => prev.filter((_, i) => i !== index))}
-                >
-                  حذف السؤال
-                </button>
-              )}
-            </div>
-          ))}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn bgh"
-              style={{ flex: 1, minWidth: 120 }}
-              onClick={() => setCustomRows((prev) => [...prev, EMPTY_CUSTOM_ROW()])}
-            >
-              ➕ سؤال آخر
-            </button>
-            <button type="button" className="btn bg" style={{ flex: 1, minWidth: 120 }} onClick={applyCustom}>
-              ✅ اعتماد للمسابقة
-            </button>
-            <button
-              type="button"
-              className="btn bb"
-              style={{ flex: 1, minWidth: 120 }}
-              disabled={suggesting}
-              onClick={() => void submitCustomAsSuggestions()}
-            >
-              {suggesting ? '⏳…' : '📤 حفظ كمقترح للبنك'}
-            </button>
-          </div>
-          <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, lineHeight: 1.55 }}>
-            «حفظ كمقترح» يرسل الأسئلة لبنك الأسئلة (حالة انتظار) لمراجعتها واعتمادها لاحقاً.
-          </p>
-        </div>
+        <CustomQuestionBuilder
+          sessionPool={customSessionPool}
+          onSessionPoolChange={setCustomSessionPool}
+          onApplySession={applyCustomSession}
+          onSuggestSession={submitCustomSessionAsSuggestions}
+          suggesting={suggesting}
+          applySuccess={customApplySuccess}
+          onDismissSuccess={() => setCustomApplySuccess(false)}
+          notify={notifyMsg}
+          isQumairi={isQumairi}
+          perSetTotal={perSetTotal}
+          initialPlannedGroups={initialPlannedGroups}
+        />
       )}
 
       {source === QSOURCE.EXTERNAL && (

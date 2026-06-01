@@ -10,6 +10,8 @@ export default function FameeriAdminAnswerVerdict({
   accent = 'var(--fameeri-primary)',
   /** داخل بطاقة السؤال — بدون تكرار مفتاح الإجابة */
   embedded = false,
+  /** اقتراحات الأعضاء فقط — بدون تكرار حكم القائد */
+  suggestionsOnly = false,
 }) {
   if (!answerCtx?.answering?.length && !answerCtx?.manualOnly) return null;
 
@@ -17,7 +19,29 @@ export default function FameeriAdminAnswerVerdict({
   const correctIdx = getCorrectOptionIndex(options, qActiveAnswer);
   const correctLetter = correctIdx >= 0 ? optionLabel(correctIdx) : null;
 
-  const { answering, primary, pendingNames, attacker } = answerCtx;
+  const { answering, pendingNames, attacker } = answerCtx;
+
+  if (suggestionsOnly) {
+    const chips = answering.flatMap((g) =>
+      (g.memberPicks || [])
+        .filter((p) => p.role !== 'leader')
+        .map((p, i) => ({ ...p, groupName: g.name, key: `${g.id}-${i}` }))
+    );
+    if (!chips.length) return null;
+    return (
+      <div className="fameeri-cmd-suggestions">
+        <div className="fameeri-cmd-suggestions__title">اقتراحات الأعضاء قبل اعتماد القائد</div>
+        <div className="fameeri-cmd-suggestions__chips">
+          {chips.map((p) => (
+            <span key={p.key} className={`fameeri-cmd-auto__pick-chip${p.correct ? ' ok' : ' miss'}`}>
+              {p.groupName} · {p.name}: {p.letter ? `${p.letter} ` : ''}
+              {p.optText}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (answerCtx.manualOnly) {
     return (
@@ -46,12 +70,13 @@ export default function FameeriAdminAnswerVerdict({
     );
   }
 
+  if (embedded) return null;
+
   return (
     <div className="fameeri-cmd-auto card" style={{ borderColor: accent }}>
       <div className="fameeri-cmd-auto__head">⚖️ حكم الإجابة — للمشرف</div>
 
       {answering.map((g) => {
-        const isPrimary = primary?.id === g.id;
         if (!g.mustAnswer) return null;
 
         if (!g.submitted) {
@@ -68,7 +93,6 @@ export default function FameeriAdminAnswerVerdict({
                   <span className="fameeri-cmd-auto__picks-label">اقتراحات الأعضاء:</span>
                   {g.memberPicks.map((p, i) => (
                     <span key={i} className={`fameeri-cmd-auto__pick-chip${p.correct ? ' ok' : ' miss'}`}>
-                      {p.role === 'leader' ? '👑 ' : ''}
                       {p.name}: {p.letter ? `${p.letter} ` : ''}
                       {p.optText}
                     </span>
@@ -81,10 +105,7 @@ export default function FameeriAdminAnswerVerdict({
 
         const ok = g.correct;
         return (
-          <div
-            key={g.id}
-            className={`fameeri-cmd-auto__row${ok ? ' ok' : ' miss'}${isPrimary ? ' primary' : ''}`}
-          >
+          <div key={g.id} className={`fameeri-cmd-auto__row${ok ? ' ok' : ' miss'}`}>
             <div className={`fameeri-cmd-auto__verdict-badge${ok ? ' ok' : ' miss'}`}>
               {ok ? '✅ إجابة صحيحة' : '❌ إجابة خاطئة'}
             </div>
@@ -100,24 +121,13 @@ export default function FameeriAdminAnswerVerdict({
                 {g.optText}
               </span>
             </div>
-            {g.memberPicks.length > 1 && (
-              <div className="fameeri-cmd-auto__picks">
-                <span className="fameeri-cmd-auto__picks-label">اقتراحات قبل الاعتماد:</span>
-                {g.memberPicks.map((p, i) => (
-                  <span key={i} className={`fameeri-cmd-auto__pick-chip${p.correct ? ' ok' : ' miss'}`}>
-                    {p.name}: {p.letter ? `${p.letter} ` : ''}
-                    {p.optText}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         );
       })}
 
-      {!embedded && qActiveAnswer && (
+      {qActiveAnswer && (
         <div className="fameeri-cmd-auto__correct-key">
-          <span>🔑 الإجابة المعتمدة:</span>
+          <span>🔑 الإجابة الصحيحة:</span>
           {correctLetter && <span className="fameeri-cmd-auto__letter">{correctLetter}</span>}
           <strong>{qActiveAnswer}</strong>
         </div>
@@ -131,7 +141,7 @@ export default function FameeriAdminAnswerVerdict({
         </div>
       )}
 
-      {!embedded && pendingNames.length > 0 && answerCtx.autoVerdict == null && (
+      {pendingNames.length > 0 && answerCtx.autoVerdict == null && (
         <div className="fameeri-cmd-auto__hint wait">
           ⏳ لم يعتمد القائد بعد — {pendingNames.join(' · ')}
         </div>

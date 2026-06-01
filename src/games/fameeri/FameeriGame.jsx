@@ -17,6 +17,7 @@ import { QSOURCE, toPublicQuestion, isAnswerCorrect, optionLabel } from '../../q
 import { markQuestionAsUsed } from './fameeriBankProgress';
 import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
 import { buildAdminAnswerContext } from './fameeriAdminAnswers';
+import { cancelCurrentAttack } from './fameeriAdminResolve';
 import {
   drawQuestionForWeapon,
   findInStructuredPool,
@@ -171,6 +172,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   const [qPool, setQPool] = useState({ hard: [], medium: [], easy: [] });
   const [qBankMeta, setQBankMeta] = useState(null);
   const [qSetupOpen, setQSetupOpen] = useState(false);
+  const [qSessionReady, setQSessionReady] = useState(false);
   const qPoolCursorsRef = useRef({ hard: 0, medium: 0, easy: 0 });
   const qDrawingRef = useRef(false);
 
@@ -697,25 +699,36 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   // استرجاع مخزون المشرف (محلي + Firebase للمسجّلين) عند العودة للغرفة
   useEffect(() => {
-    if (!qRoom || !isAdmin) return undefined;
+    if (!qRoom || !isAdmin) {
+      setQSessionReady(false);
+      return undefined;
+    }
     let cancelled = false;
+    setQSessionReady(false);
 
     void loadAdminSession(qRoom).then((saved) => {
-      if (cancelled || !saved) return;
-      if (saved.poolStructured) {
+      if (cancelled) return;
+      if (saved?.poolStructured) {
         setQPool(saved.poolStructured);
       }
-      if (saved.source) setQSource(saved.source);
-      if (saved.bankMeta) setQBankMeta(saved.bankMeta);
-      qPoolCursorsRef.current = saved.poolCursors || { hard: 0, medium: 0, easy: 0 };
+      if (saved?.source) setQSource(saved.source);
+      if (saved?.bankMeta) setQBankMeta(saved.bankMeta);
+      qPoolCursorsRef.current = saved?.poolCursors || { hard: 0, medium: 0, easy: 0 };
+      if (saved?.source && !qGameState?.questionSource) {
+        void update(dbRef(db, `qrooms/${qRoom}/game`), { questionSource: saved.source }).catch(() => {});
+      }
+      setQSessionReady(true);
+    }).catch(() => {
+      if (!cancelled) setQSessionReady(true);
     });
 
     return () => {
       cancelled = true;
+      setQSessionReady(false);
     };
   }, [qRoom, isAdmin]);
 
-  const applyQuestionSetup = async ({ source, pool, poolStructured, bankMeta }) => {
+  const applyQuestionSetup = async ({ source, pool, poolStructured, bankMeta, keepOpen = false }) => {
     setQSource(source);
     const structured = normalizePoolToStructured(poolStructured || pool);
     setQPool(structured);
@@ -732,15 +745,22 @@ const FameeriGame = forwardRef(function FameeriGame(
     } catch {
       /* ignore */
     }
-    setQSetupOpen(false);
+    if (!keepOpen) setQSetupOpen(false);
     const stats = poolStats(structured);
-    if (stats.total) notify(`✅ مخزون: ${stats.hard.total} صعب · ${stats.medium.total} متوسط · ${stats.easy.total} سهل`, 'success');
+    if (stats.total && !keepOpen) {
+      notify(`✅ مخزون: ${stats.hard.total} صعب · ${stats.medium.total} متوسط · ${stats.easy.total} سهل`, 'success');
+    }
   };
 
   const drawNextQuestion = async (weaponId) => {
     const structured = normalizePoolToStructured(qPool);
     const total = structured.hard.length + structured.medium.length + structured.easy.length;
-    if (!isAdmin || qDrawingRef.current || !total) return;
+    if (!isAdmin || qDrawingRef.current || !total) {
+      if (isAdmin && !total && weaponId) {
+        notify('⚠️ لا يوجد مخزون أسئلة — افتح «إعداد الأسئلة» من لوحة المشرف', 'error');
+      }
+      return;
+    }
     if (!weaponId) {
       notify('حدّد الهجوم أولاً لربط السؤال بالسلاح', 'info');
       return;
@@ -881,8 +901,8 @@ const FameeriGame = forwardRef(function FameeriGame(
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
-    if (!qEffectiveSource || qEffectiveSource === QSOURCE.EXTERNAL) return;
+    if (!isAdmin || !qSessionReady) return;
+    if (qEffectiveSource === QSOURCE.EXTERNAL) return;
     if (qActiveQuestion) return;
     const structured = normalizePoolToStructured(qPool);
     const total = structured.hard.length + structured.medium.length + structured.easy.length;
@@ -894,6 +914,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     if (weapon) void drawNextQuestion(weapon);
   }, [
     isAdmin,
+    qSessionReady,
     qEffectiveSource,
     qActiveQuestion,
     qGameState?.playMode,
@@ -902,6 +923,17 @@ const FameeriGame = forwardRef(function FameeriGame(
     qPool,
     speedWinSelect,
   ]);
+
+  const handleCancelAttack = async () => {
+    if (!qRoom) return;
+    if (!window.confirm('إلغاء الهجوم الحالي؟ لن يُحسب نجاحاً ولا فشلاً.')) return;
+    try {
+      await cancelCurrentAttack(qRoom);
+      notify('↩️ تم إلغاء الهجوم — يمكنك المتابعة', 'success');
+    } catch {
+      notify('تعذر إلغاء الهجوم', 'error');
+    }
+  };
 
   const assignGroupLeader = async (groupId, member) => {
     const members = qMList.filter((m) => m.groupId === groupId);
@@ -1370,6 +1402,15 @@ const FameeriGame = forwardRef(function FameeriGame(
               hideQuestionFromPlayers={hideQuestionFromPlayers}
               drawNextQuestion={drawNextQuestion}
               qPool={qPool}
+              qEffectiveSource={qEffectiveSource}
+              onOpenQuestionSetup={() => setQSetupOpen(true)}
+              onCancelAttack={handleCancelAttack}
+              qSetupOpen={qSetupOpen}
+              setQSetupOpen={setQSetupOpen}
+              applyQuestionSetup={applyQuestionSetup}
+              QB_GAME_TYPE={QB_GAME_TYPE}
+              authUid={auth.currentUser?.uid}
+              onGoAccount={onGoAccount}
               speedWinSelect={speedWinSelect}
               setSpeedWinSelect={setSpeedWinSelect}
               speedRoundSecs={speedRoundSecs}

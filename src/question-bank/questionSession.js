@@ -146,8 +146,17 @@ export function optionLabel(index) {
 export function getCorrectOptionIndex(options, correctAnswer) {
   if (!Array.isArray(options) || correctAnswer == null || correctAnswer === '') return -1;
   const norm = String(correctAnswer).trim();
-  const idx = options.findIndex((o) => String(o).trim() === norm);
-  return idx >= 0 ? idx : -1;
+
+  const byText = options.findIndex((o) => String(o).trim() === norm);
+  if (byText >= 0) return byText;
+
+  const letterIdx = QB_OPTION_LABELS.indexOf(norm);
+  if (letterIdx >= 0 && letterIdx < options.length) return letterIdx;
+
+  const num = Number(norm);
+  if (!Number.isNaN(num) && num >= 0 && num < options.length) return num;
+
+  return -1;
 }
 
 /** هل اختيار المجموعة (فهرس أو نص) يطابق الإجابة الصحيحة؟ */

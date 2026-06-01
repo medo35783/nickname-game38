@@ -1,5 +1,6 @@
 import FameeriRevealOverlay from './FameeriRevealOverlay';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
+import FameeriAttackDisplay from './FameeriAttackDisplay';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
 
 /**
@@ -124,11 +125,6 @@ export default function FameeriSpectatorView({
         <div style={{ textAlign: 'center', padding: '24px 16px' }}>
           <div style={{ fontSize: 52 }}>🎭</div>
           <div style={{ fontSize: 22, fontWeight: 900, marginTop: 10 }}>تحدي تمثيل / مثل</div>
-          {currentAttack && (
-            <div style={{ fontSize: 16, fontWeight: 800, marginTop: 8, color: accent }}>
-              {currentAttack.attackerName} ⚔️ {currentAttack.targetName}
-            </div>
-          )}
           {revealedAnswer ? (
             <>
               <div style={{ fontSize: 14, color: 'var(--green)', fontWeight: 800, marginTop: 20 }}>✅ الإجابة الصحيحة</div>
@@ -175,18 +171,15 @@ export default function FameeriSpectatorView({
           <div style={{ fontSize: 18, fontWeight: 800, color: accent, marginTop: 12 }}>
             {speedBatchActive && !currentAttack
               ? '⚡ جولة السرعة — أسرع إجابة تكسب'
-              : `${currentAttack?.attackerName} يهاجم ${currentAttack?.targetName}`}
+              : '⏱️ وقت الإجابة'}
           </div>
         </div>
       );
     } else if (currentAttack) {
       stage = (
-        <div style={{ textAlign: 'center', padding: '36px 0' }}>
-          <div style={{ fontSize: 70 }}>⚔️</div>
-          <div style={{ fontSize: 22, fontWeight: 900, marginTop: 12 }}>
-            <span style={{ color: accent }}>{currentAttack.attackerName}</span>
-            {' يهاجم '}
-            <span style={{ color: 'var(--red)' }}>{currentAttack.targetName}</span>
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--muted)' }}>
+            المشرف يجهّز السؤال أو المؤقت…
           </div>
         </div>
       );
@@ -207,8 +200,16 @@ export default function FameeriSpectatorView({
   }
 
   return (
-    <div className="scr" style={{ maxWidth: 760, margin: '0 auto' }}>
+    <div className="scr fameeri-spectator" style={{ maxWidth: 760, margin: '0 auto' }}>
       {header}
+      {currentAttack && phase === 'playing' && !reveal && (
+        <FameeriAttackDisplay
+          attack={currentAttack}
+          badge="⚔️ هجوم نشط"
+          size="xl"
+          className="fameeri-spectator-attack"
+        />
+      )}
       <div className="card" style={{ minHeight: 320, display: 'flex', flexDirection: 'column', justifyContent: 'center', border: `1.5px solid ${accent}` }}>
         {gameState?.answerVerdict && !reveal && (
           <div style={{ padding: '0 0 12px' }}>

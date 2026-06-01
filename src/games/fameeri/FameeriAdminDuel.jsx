@@ -1,4 +1,4 @@
-/** عرض بصري: مهاجِم ← هدف */
+/** عرض بصري: مهاجِم ↔ هدف — أسماء المجموعات بلون محايد لتجنّب لبس أسماء الألوان */
 export default function FameeriAdminDuel({
   attackerName,
   targetName,
@@ -13,7 +13,7 @@ export default function FameeriAdminDuel({
         <span className="fameeri-admin-duel__role">مهاجِم</span>
         <span className="fameeri-admin-duel__name">{attackerName}</span>
       </div>
-      <div className="fameeri-admin-duel__mid">
+      <div className="fameeri-admin-duel__mid" aria-hidden="true">
         <span className="fameeri-admin-duel__swords">⚔️</span>
         {tree && (
           <span className="fameeri-admin-duel__meta">

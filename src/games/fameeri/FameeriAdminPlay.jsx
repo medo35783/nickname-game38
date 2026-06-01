@@ -16,6 +16,7 @@ import FameeriRevealOverlay from './FameeriRevealOverlay';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
 import FameeriAdminCommandCenter, { isCommandCenterActive } from './FameeriAdminCommandCenter';
 import AdminQuestionView from '../../question-bank/AdminQuestionView';
+import QuestionSourceSetup from '../../question-bank/QuestionSourceSetup';
 
 export default function FameeriAdminPlay({
   qRoom,
@@ -35,6 +36,15 @@ export default function FameeriAdminPlay({
   hideQuestionFromPlayers,
   drawNextQuestion,
   qPool,
+  qEffectiveSource,
+  onOpenQuestionSetup,
+  onCancelAttack,
+  qSetupOpen,
+  setQSetupOpen,
+  applyQuestionSetup,
+  QB_GAME_TYPE,
+  authUid,
+  onGoAccount,
   speedWinSelect,
   setSpeedWinSelect,
   speedRoundSecs,
@@ -199,6 +209,9 @@ export default function FameeriAdminPlay({
     (speedWinSelect && qGameState?.speedClaims?.[speedWinSelect]?.weapon) ||
     (claimIds.length === 1 ? qGameState?.speedClaims?.[claimIds[0]]?.weapon : null);
 
+  const poolTotal = poolStats(qPool).total;
+  const questionStuck = liveMode && !!qCurrentAttack && !qActiveQuestion;
+
   const showRibbonInTab = liveMode ? tab === 'field' : tab === 'control';
 
   return (
@@ -243,6 +256,21 @@ export default function FameeriAdminPlay({
         ))}
       </div>
 
+      {qSetupOpen && (
+        <QuestionSourceSetup
+          gameType={QB_GAME_TYPE}
+          accent={accent}
+          notify={notify}
+          onApply={applyQuestionSetup}
+          onClose={() => setQSetupOpen(false)}
+          authUid={authUid}
+          onGoAccount={onGoAccount}
+          initialSource={qEffectiveSource}
+          initialPoolStructured={qPool}
+          initialPlannedGroups={Math.max(2, qGList.length || 0)}
+        />
+      )}
+
       {liveMode && tab === 'qflow' && (
         <FameeriAdminCommandCenter
           qCurrentAttack={qCurrentAttack}
@@ -277,10 +305,12 @@ export default function FameeriAdminPlay({
             if (qActiveQuestion?.revealToPlayers) void toggleQuestionReveal('revealToPlayers');
           }}
           onDrawNext={
-            poolStats(qPool).total && drawWeapon
-              ? () => void drawNextQuestion(drawWeapon)
-              : undefined
+            drawWeapon ? () => void drawNextQuestion(drawWeapon) : undefined
           }
+          poolHasQuestions={poolTotal > 0}
+          questionSource={qEffectiveSource}
+          onOpenQuestionSetup={onOpenQuestionSetup}
+          onCancelAttack={onCancelAttack}
           onStartTimer={async (s) => {
             await startAttackTimer(qRoom, s);
             setQCustomTimer('');
@@ -548,7 +578,18 @@ export default function FameeriAdminPlay({
       {tab === 'log' && <FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} />}
 
       {/* إنهاء المسابقة — مخفي أثناء حسم السؤال لتقليل التشتيت */}
-      <div className={`fameeri-admin-footer${liveMode && tab === 'qflow' ? ' fameeri-admin-footer--hidden' : ''}`}>
+      <div className={`fameeri-admin-footer${liveMode && tab === 'qflow' && qActiveQuestion ? ' fameeri-admin-footer--hidden' : ''}`}>
+        {questionStuck && (
+          <div className="fameeri-admin-stuck-hint card">
+            <div className="fameeri-admin-stuck-hint__title">⚠️ السؤال لم يظهر؟</div>
+            <p className="fameeri-admin-stuck-hint__text">
+              {poolTotal > 0
+                ? 'اضغط «سحب سؤال» في الأعلى، أو احكم يدوياً، أو ألغِ الهجوم.'
+                : 'لم يُحمّل مخزون الأسئلة — افتح «إعداد الأسئلة» أو احكم يدوياً بدون سؤال.'}
+            </p>
+          </div>
+        )}
+
         {!endConfirm ? (
           <>
             <button type="button" className="btn br fameeri-admin-end-btn" onClick={() => setEndConfirm(true)}>

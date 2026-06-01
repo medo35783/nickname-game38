@@ -9,32 +9,8 @@ import FameeriGroupForest from './FameeriGroupForest.jsx';
 import FameeriPlayerTabs from './FameeriPlayerTabs';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
+import FameeriAttackDisplay from './FameeriAttackDisplay';
 import { Q_TREES } from '../../core/constants';
-
-function AttackBanner({ attack, isTarget, treeCount }) {
-  if (!attack) return null;
-  return (
-    <div className={`fameeri-attack-banner${isTarget ? ' danger' : ''}`}>
-      <div className="fameeri-attack-banner__tag">⚔️ هجوم جاري</div>
-      <div className="fameeri-attack-banner__line">
-        <strong>{attack.attackerName}</strong>
-        <span className="fameeri-attack-banner__arrow">→</span>
-        <strong className="fameeri-attack-banner__target">{attack.targetName}</strong>
-      </div>
-      <div className="fameeri-attack-banner__detail">
-        🌳 {attack.tree} · {attack.weaponName}
-      </div>
-      {isTarget && treeCount !== null && (
-        <div className="fameeri-attack-banner__tree-qty">
-          🐦 على شجرة «{attack.tree}»: <strong>{treeCount}</strong> قميري الآن
-        </div>
-      )}
-      {isTarget && (
-        <div className="fameeri-attack-banner__warn">🎯 أنت الهدف — راقب نافذة الدرع بعد «صح»</div>
-      )}
-    </div>
-  );
-}
 
 function WaitCard({ icon, title, sub }) {
   return (
@@ -120,6 +96,7 @@ export default function FameeriPlayerPlay({
     qCurrentAttack?.targetId === qGroupId ? qCurrentAttack.tree : null;
   const shieldTreeActive = qMyGroup?.shield || null;
   const isTarget = shieldAttack?.targetId === qGroupId || qCurrentAttack?.targetId === qGroupId;
+  const isAttacker = qCurrentAttack?.attackerId === qGroupId;
   const shieldActive = !!qMyGroup?.shield;
   const showShieldPanel =
     shieldWindow && isTarget && shieldAttack && !qReveal;
@@ -206,15 +183,6 @@ export default function FameeriPlayerPlay({
 
         {answerVerdict && !qReveal && <FameeriVerdictBanner verdict={answerVerdict} />}
 
-        {qTurnOverlay && qCurrentAttack && !qTimer && !shieldWindow && !qReveal && (
-          <div className="fameeri-attack-intro" role="status">
-            <span className="fameeri-attack-intro__icon">⚔️</span>
-            <span>
-              <strong>{qTurnOverlay.groupName}</strong> يختار الهدف · {qTurnOverlay.weapon}
-            </span>
-          </div>
-        )}
-
         {qTimer && !qReveal && qCountdown !== null && (qCurrentAttack || qGameState?.speedBatchActive) && (
           <div className="fameeri-player-timer-bar" aria-live="polite">
             <span className="fameeri-player-timer-bar__num">{qCountdown > 0 ? qCountdown : '⏰'}</span>
@@ -225,7 +193,7 @@ export default function FameeriPlayerPlay({
                   ? isLeader
                     ? '⏱️ أرسل اعتمادك قبل انتهاء الوقت'
                     : '⏱️ اقترح إجابة للقائد 👑'
-                  : `${qCurrentAttack?.attackerName} → ${qCurrentAttack?.targetName}`}
+                  : `مهاجِم: ${qCurrentAttack?.attackerName} · هدف: ${qCurrentAttack?.targetName}`}
             </span>
           </div>
         )}
@@ -242,9 +210,11 @@ export default function FameeriPlayerPlay({
         )}
 
         {qCurrentAttack && !showShieldPanel && (
-          <AttackBanner
+          <FameeriAttackDisplay
             attack={qCurrentAttack}
+            badge="⚔️ هجوم جاري"
             isTarget={isTarget}
+            isAttacker={isAttacker}
             treeCount={
               isTarget ? parseInt(qMyGroup?.trees?.[qCurrentAttack.tree], 10) || 0 : null
             }

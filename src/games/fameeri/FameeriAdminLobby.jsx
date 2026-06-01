@@ -5,8 +5,17 @@ import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import QuestionSourceSetup from '../../question-bank/QuestionSourceSetup';
 import { QSOURCE, QSOURCE_LABELS } from '../../question-bank/questionSession';
 import { poolStats, QUMAIRI_SET_QUOTAS } from './fameeriQuestionPool';
+import { isFameeriQuestionSetupReady } from './fameeriQuestionSetup';
 import FameeriAdminDistribute from './FameeriAdminDistribute';
 import FameeriAdminStepper from './FameeriAdminStepper';
+import FameeriAdminGroupHead from './FameeriAdminGroupHead';
+import {
+  renameFameeriGroup,
+  deleteFameeriGroup,
+  removeFameeriMemberFromGroup,
+  moveFameeriMemberToGroup,
+  demoteFameeriLeader,
+} from './fameeriAdminLobbyManage';
 
 export default function FameeriAdminLobby({
   qRoom,
@@ -32,9 +41,12 @@ export default function FameeriAdminLobby({
 }) {
   const unassigned = qMList.filter((m) => !m.groupId);
   const assistMode = !!qGameState?.assistMode;
+  const canManageSetup = qPhase === 'lobby' || qPhase === 'distributing';
+  const questionSetup = isFameeriQuestionSetupReady(qEffectiveSource, qPool);
 
   const distReady =
     qGList.length >= 2 &&
+    questionSetup.ok &&
     (assistMode ||
       qGList.every((g) => {
         const ms = qMList.filter((m) => m.groupId === g.id);
@@ -42,6 +54,7 @@ export default function FameeriAdminLobby({
       }));
 
   const allDist = qGList.length >= 2 && qGList.every((g) => g.distributed);
+  const canStartGame = allDist && questionSetup.ok;
 
   const toggleAssist = async () => {
     await update(dbRef(db, `qrooms/${qRoom}/game`), { assistMode: !assistMode });
@@ -87,6 +100,93 @@ export default function FameeriAdminLobby({
     });
     notify('⚔️ اللعبة بدأت!', 'gold');
   };
+
+  const handleRenameGroup = async (groupId, name) => {
+    try {
+      const ok = await renameFameeriGroup(qRoom, groupId, name);
+      if (!ok) {
+        notify('أدخل اسماً صالحاً', 'error');
+        return false;
+      }
+      notify('✅ تم تغيير اسم المجموعة', 'success');
+      return true;
+    } catch {
+      notify('تعذر تغيير الاسم', 'error');
+      return false;
+    }
+  };
+
+  const handleDeleteGroup = async (group) => {
+    const members = qMList.filter((m) => m.groupId === group.id);
+    const msg =
+      members.length > 0
+        ? `حذف "${group.name}"؟ سيُزال ${members.length} عضو من المجموعة ويعودون لقائمة غير الموزّعين.`
+        : `حذف "${group.name}"؟`;
+    if (!window.confirm(msg)) return;
+    try {
+      await deleteFameeriGroup(qRoom, group.id, qMList);
+      notify('🗑️ تم حذف المجموعة', 'success');
+    } catch {
+      notify('تعذر حذف المجموعة', 'error');
+    }
+  };
+
+  const handleRemoveMember = async (group, member) => {
+    if (!window.confirm(`إزالة "${member.name}" من ${group.name}؟`)) return;
+    try {
+      await removeFameeriMemberFromGroup(qRoom, group.id, member, group);
+      notify('↩️ تم إزالة اللاعب من المجموعة', 'success');
+    } catch {
+      notify('تعذر إزالة اللاعب', 'error');
+    }
+  };
+
+  const handleMoveMember = async (fromGroup, toGroupId, member) => {
+    const target = qGList.find((g) => g.id === toGroupId);
+    if (!target) return;
+    try {
+      await moveFameeriMemberToGroup(qRoom, fromGroup.id, toGroupId, member, fromGroup);
+      notify(`✅ نُقل "${member.name}" إلى ${target.name}`, 'success');
+    } catch {
+      notify('تعذر نقل اللاعب', 'error');
+    }
+  };
+
+  const handleDemoteLeader = async (group, leader) => {
+    if (!window.confirm(`إلغاء قيادة "${leader.name}" في ${group.name}؟`)) return;
+    try {
+      await demoteFameeriLeader(qRoom, group.id, leader, group);
+      notify('↩️ تم إلغاء تعيين القائد', 'success');
+    } catch {
+      notify('تعذر إلغاء القيادة', 'error');
+    }
+  };
+
+  const renderMemberActions = (group, member, otherGroups) => (
+    <div className="fameeri-admin-member-row__actions">
+      {member.role === 'leader' ? (
+        <button type="button" className="btn bgh bxs" onClick={() => void handleDemoteLeader(group, member)}>
+          ↩️ إلغاء القيادة
+        </button>
+      ) : (
+        <button type="button" className="btn bg bxs" onClick={() => void assignGroupLeader(group.id, member)}>
+          👑 قائد
+        </button>
+      )}
+      {otherGroups.length > 0 && (
+        <>
+          {otherGroups.map((g) => (
+            <button key={g.id} type="button" className="btn bo bxs" onClick={() => void handleMoveMember(group, g.id, member)}>
+              → {g.name}
+            </button>
+          ))}
+        </>
+      )}
+      <button type="button" className="btn br bxs" onClick={() => void handleRemoveMember(group, member)}>
+        ✕ إزالة
+      </button>
+    </div>
+  );
 
   return (
     <>
@@ -137,12 +237,15 @@ export default function FameeriAdminLobby({
           onClose={() => setQSetupOpen(false)}
           authUid={authUid}
           onGoAccount={onGoAccount}
+          initialSource={qEffectiveSource}
+          initialPoolStructured={qPool}
+          initialPlannedGroups={Math.max(2, qGList.length || 0)}
         />
       ) : (
-        <div className="card fameeri-admin-section">
+        <div className={`card fameeri-admin-section${!questionSetup.ok ? ' fameeri-admin-section--warn' : ''}`}>
           <div className="fameeri-admin-section__head">
             <div>
-              <div className="ctitle" style={{ margin: 0 }}>🧠 مصدر الأسئلة</div>
+              <div className="ctitle" style={{ margin: 0 }}>🧠 مصدر الأسئلة {!questionSetup.ok && '· مطلوب'}</div>
               <div className="fameeri-admin-section__sub">
                 {qEffectiveSource
                   ? (() => {
@@ -159,11 +262,17 @@ export default function FameeriAdminLobby({
                       }
                       return txt;
                     })()
-                  : 'الافتراضي: بدون أسئلة — مؤقت وحسم يدوي'}
+                  : '⚠️ اختر أحد الخيارات الثلاثة قبل بدء التوزيع'}
               </div>
+              {!questionSetup.ok && (
+                <div className="fameeri-admin-setup-alert">{questionSetup.message}</div>
+              )}
+              {questionSetup.ok && questionSetup.advisory && (
+                <div className="fameeri-admin-setup-advisory">💡 {questionSetup.advisory}</div>
+              )}
             </div>
             <button type="button" className="btn bg bsm" style={{ width: 'auto' }} onClick={() => setQSetupOpen(true)}>
-              {qEffectiveSource ? 'تغيير' : 'إعداد'}
+              {qEffectiveSource ? 'تغيير' : 'إعداد الآن'}
             </button>
           </div>
         </div>
@@ -202,33 +311,42 @@ export default function FameeriAdminLobby({
           qGList.map((g) => {
             const members = qMList.filter((m) => m.groupId === g.id);
             const leader = members.find((m) => m.role === 'leader');
-
-            if (qPhase === 'distributing' && assistMode) {
-              return (
-                <FameeriAdminDistribute key={g.id} group={g} qRoom={qRoom} notify={notify} accent={accent} />
-              );
-            }
+            const otherGroups = qGList.filter((og) => og.id !== g.id);
 
             return (
               <div key={g.id} className="fameeri-admin-group-card">
-                <div className="fameeri-admin-group-card__head">
-                  <span className="fameeri-group-name">{g.name}</span>
-                  <span className="fameeri-admin-group-card__meta">
-                    {members.length} عضو{leader ? ` · 👑 ${leader.name}` : assistMode ? '' : ' · ⚠️ بدون قائد'}
-                  </span>
-                </div>
+                <FameeriAdminGroupHead
+                  group={g}
+                  members={members}
+                  leader={leader}
+                  assistMode={assistMode}
+                  canManage={canManageSetup}
+                  canDelete={canManageSetup}
+                  onRename={(name) => handleRenameGroup(g.id, name)}
+                  onDelete={() => handleDeleteGroup(g)}
+                />
+
+                {qPhase === 'distributing' && assistMode && (
+                  <FameeriAdminDistribute group={g} qRoom={qRoom} notify={notify} accent={accent} hideHeader />
+                )}
+
                 {!assistMode &&
                   members.map((m) => (
                     <div key={m.id} className="fameeri-admin-member-row">
                       <span>{m.role === 'leader' ? '👑' : '👤'}</span>
                       <span className="fameeri-admin-member-row__name">{m.name}</span>
-                      {m.role !== 'leader' && (
-                        <button type="button" className="btn bg bxs" onClick={() => void assignGroupLeader(g.id, m)}>
-                          👑 قائد
-                        </button>
+                      {canManageSetup ? (
+                        renderMemberActions(g, m, otherGroups)
+                      ) : (
+                        m.role !== 'leader' && (
+                          <button type="button" className="btn bg bxs" onClick={() => void assignGroupLeader(g.id, m)}>
+                            👑 قائد
+                          </button>
+                        )
                       )}
                     </div>
                   ))}
+
                 {qPhase === 'distributing' && !assistMode && (
                   <div className={`fameeri-admin-dist-status${g.distributed ? ' ok' : ''}`}>
                     {g.distributed ? '✅ تم التوزيع' : '⏳ بانتظار توزيع القائد'}
@@ -242,8 +360,13 @@ export default function FameeriAdminLobby({
         {unassigned.length > 0 && !assistMode && (
           <div className="fameeri-admin-unassigned">
             <div className="fameeri-admin-unassigned__title">⏳ بدون مجموعة ({unassigned.length})</div>
+            {canManageSetup && (
+              <div className="fameeri-admin-section__sub" style={{ marginBottom: 8 }}>
+                عيّن كل لاعب لمجموعة — يمكنك تغيير التوزيع أو التراجع قبل بدء المسابقة
+              </div>
+            )}
             {unassigned.map((m) => (
-              <div key={m.id} className="fameeri-admin-member-row">
+              <div key={m.id} className="fameeri-admin-member-row fameeri-admin-member-row--unassigned">
                 <span>👤 {m.name}</span>
                 <div className="fameeri-admin-member-row__actions">
                   {qGList.map((g) => (
@@ -252,7 +375,12 @@ export default function FameeriAdminLobby({
                       type="button"
                       className="btn bg bxs"
                       onClick={async () => {
-                        await update(dbRef(db, `qrooms/${qRoom}/members/${m.id}`), { groupId: g.id });
+                        try {
+                          await update(dbRef(db, `qrooms/${qRoom}/members/${m.id}`), { groupId: g.id });
+                          notify(`✅ أُضيف "${m.name}" إلى ${g.name}`, 'success');
+                        } catch {
+                          notify('تعذر إضافة اللاعب', 'error');
+                        }
                       }}
                     >
                       {g.name}
@@ -272,7 +400,12 @@ export default function FameeriAdminLobby({
             <button type="button" className="btn bg fameeri-admin-primary-btn" disabled={!distReady} onClick={() => void startDistribution()}>
               🌳 بدء توزيع القميري
             </button>
-            {!distReady && qGList.length >= 2 && !assistMode && (
+            {!distReady && qGList.length >= 2 && !questionSetup.ok && (
+              <div className="fameeri-admin-action-hint fameeri-admin-action-hint--warn">
+                ⚠️ {questionSetup.message}
+              </div>
+            )}
+            {!distReady && qGList.length >= 2 && questionSetup.ok && !assistMode && (
               <div className="fameeri-admin-action-hint">
                 عيّن قائداً 👑 لكل مجموعة (أو فعّل وضع بدون جوالات)
               </div>
@@ -284,9 +417,12 @@ export default function FameeriAdminLobby({
         )}
 
         {qPhase === 'distributing' && allDist && (
-          <button type="button" className="btn bg fameeri-admin-primary-btn" onClick={() => void startGame()}>
+          <button type="button" className="btn bg fameeri-admin-primary-btn" disabled={!canStartGame} onClick={() => void startGame()}>
             ⚔️ بدء المسابقة
           </button>
+        )}
+        {qPhase === 'distributing' && allDist && !canStartGame && (
+          <div className="fameeri-admin-action-hint fameeri-admin-action-hint--warn">⚠️ {questionSetup.message}</div>
         )}
 
         {qPhase === 'distributing' && !allDist && (

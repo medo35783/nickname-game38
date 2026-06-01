@@ -6,7 +6,7 @@ import { Q_TREES, Q_TOTAL } from '../../core/constants';
 /**
  * صف حالة مجموعة في شاشة التوزيع + توزيع نيابةً عنها (وضع بدون جوالات).
  */
-export default function FameeriAdminDistribute({ group, qRoom, notify, accent = 'var(--fameeri-primary)' }) {
+export default function FameeriAdminDistribute({ group, qRoom, notify, accent = 'var(--fameeri-primary)', hideHeader = false }) {
   const [open, setOpen] = useState(false);
   const [dist, setDist] = useState({});
   const [saving, setSaving] = useState(false);
@@ -37,17 +37,31 @@ export default function FameeriAdminDistribute({ group, qRoom, notify, accent = 
   };
 
   return (
-    <div style={{ marginBottom: 6, padding: '9px 10px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border-faint)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <span className="fameeri-group-name">{group.name}</span>
-        {group.distributed ? (
-          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--green)' }}>✅ تم التوزيع</span>
-        ) : (
-          <button type="button" className="btn bb bxs" style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setOpen((o) => !o)}>
-            {open ? 'إغلاق' : '✏️ وزّع نيابةً'}
-          </button>
-        )}
-      </div>
+    <div className={hideHeader ? 'fameeri-admin-distribute-inline' : undefined} style={hideHeader ? undefined : { marginBottom: 6, padding: '9px 10px', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border-faint)' }}>
+      {!hideHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <span className="fameeri-group-name">{group.name}</span>
+          {group.distributed ? (
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--green)' }}>✅ تم التوزيع</span>
+          ) : (
+            <button type="button" className="btn bb bxs" style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setOpen((o) => !o)}>
+              {open ? 'إغلاق' : '✏️ وزّع نيابةً'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {hideHeader && (
+        <div className="fameeri-admin-distribute-inline__bar">
+          {group.distributed ? (
+            <span className="fameeri-admin-dist-status ok">✅ تم التوزيع</span>
+          ) : (
+            <button type="button" className="btn bb bxs" style={{ width: 'auto', whiteSpace: 'nowrap' }} onClick={() => setOpen((o) => !o)}>
+              {open ? 'إغلاق' : '✏️ وزّع نيابةً'}
+            </button>
+          )}
+        </div>
+      )}
 
       {open && !group.distributed && (
         <div style={{ marginTop: 8 }}>

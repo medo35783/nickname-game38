@@ -174,6 +174,18 @@ export async function resolveAttackSuccess({ qRoom, qCurrentAttack, qGList, qGro
   await update(dbRef(db), u);
 }
 
+/** إلغاء الهجوم الحالي دون حسم — للمشرف عند التعلّق أو الخطأ */
+export async function cancelCurrentAttack(qRoom) {
+  await update(dbRef(db, `qrooms/${qRoom}/game`), {
+    currentAttack: null,
+    timer: null,
+    currentQuestion: null,
+    answerVerdict: null,
+    shieldWindow: null,
+    speedBatchActive: false,
+  });
+}
+
 /** حسم الهجوم — إجابة خاطئة */
 export async function resolveAttackFail({ qRoom, qCurrentAttack, qGroups }) {
   const atk = qCurrentAttack;
