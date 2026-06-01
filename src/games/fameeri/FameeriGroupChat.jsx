@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ref as dbRef, push, set, onValue, query, orderByChild, limitToLast } from 'firebase/database';
-import { db } from '../../core/firebase';
+import { ref as dbRef, push, set, onValue } from 'firebase/database';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../../core/firebase';
 
 /**
  * محادثة خاصة لكل مجموعة (نصية) — يراها أعضاء المجموعة فقط.
@@ -16,21 +17,42 @@ export default function FameeriGroupChat({ qRoom, groupId, me, accent = 'var(--f
 
   useEffect(() => {
     if (!qRoom || !groupId) return undefined;
-    const qy = query(dbRef(db, path), orderByChild('ts'), limitToLast(100));
-    const off = onValue(
-      qy,
-      (snap) => {
-        const val = snap.val() || {};
-        const list = Object.entries(val)
-          .map(([id, m]) => ({ id, ...m }))
-          .sort((a, b) => (a.ts || 0) - (b.ts || 0));
-        setMsgs(list);
-      },
-      () => setMsgs([])
-    );
-    return () => off();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qRoom, groupId]);
+
+    let unsubscribeDb = () => {};
+
+    const attachListener = () => {
+      unsubscribeDb();
+      if (!auth.currentUser) return;
+      unsubscribeDb = onValue(
+        dbRef(db, path),
+        (snap) => {
+          const val = snap.val() || {};
+          const list = Object.entries(val)
+            .map(([id, m]) => ({ id, ...m }))
+            .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+            .slice(-100);
+          setMsgs(list);
+        },
+        (err) => {
+          console.warn('[FameeriGroupChat] listen failed', err?.message || err);
+        }
+      );
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeDb();
+      if (!user) {
+        setMsgs([]);
+        return;
+      }
+      attachListener();
+    });
+
+    return () => {
+      unsubAuth();
+      unsubscribeDb();
+    };
+  }, [qRoom, groupId, path]);
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -39,13 +61,23 @@ export default function FameeriGroupChat({ qRoom, groupId, me, accent = 'var(--f
   const send = async () => {
     const t = text.trim();
     if (!t || !me?.uid) return;
+    const payload = {
+      uid: me.uid,
+      name: (me.name || 'لاعب').slice(0, 80),
+      text: t.slice(0, 500),
+      ts: Date.now(),
+    };
+    const tempId = `pending-${payload.ts}`;
     setSending(true);
+    setText('');
+    setMsgs((prev) => [...prev, { id: tempId, ...payload, pending: true }]);
     try {
       const nRef = push(dbRef(db, path));
-      await set(nRef, { uid: me.uid, name: (me.name || 'لاعب').slice(0, 80), text: t.slice(0, 500), ts: Date.now() });
-      setText('');
+      await set(nRef, payload);
+      setMsgs((prev) => prev.filter((m) => m.id !== tempId));
     } catch {
-      /* تجاهل الأخطاء المؤقتة */
+      setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+      setText(t);
     } finally {
       setSending(false);
     }

@@ -27,16 +27,16 @@ export default function AdminQuestionRevealControls({
             )}
           </div>
           <p className="admin-q-reveal-hint">
-            مخفي افتراضياً — اضغط <strong>«إظهار السؤال»</strong> ثم <strong>«إظهار الخيارات»</strong> عندما تريد.
-            لن يرى المتسابقون شيئاً حتى تفعّل ذلك.
+            مخفي افتراضياً — اضغط <strong>«إظهار السؤال»</strong> و/أو <strong>«إظهار الخيارات»</strong> عندما تريد.
+            المؤقت وحكم ✅/❌ متاحان دون إظهار أي شيء للمجموعات.
           </p>
         </>
       )}
       {compact && (
         <p className="admin-q-reveal-hint admin-q-reveal-hint--compact">
           {current.revealToPlayers || current.revealOptions
-            ? 'المجموعات ترى ما فعّلته — أخفِ قبل المؤقت إن رغبت'
-            : 'السؤال مخفي عن المجموعات — أظهره ثم شغّل المؤقت'}
+            ? 'المجموعات ترى ما فعّلته — يمكنك الإخفاء في أي وقت'
+            : 'السؤال مخفي عن المجموعات — الإظهار اختياري؛ المؤقت والحكم متاحان دائماً'}
         </p>
       )}
       <div className="admin-q-reveal-btns">

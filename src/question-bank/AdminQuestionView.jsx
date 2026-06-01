@@ -6,6 +6,7 @@ import {
   optionLabel,
 } from './questionSession';
 import AdminQuestionRevealControls from './AdminQuestionRevealControls';
+import AdminActingRevealControls from './AdminActingRevealControls';
 import FameeriAdminAnswerVerdict from '../games/fameeri/FameeriAdminAnswerVerdict';
 
 /**
@@ -18,6 +19,8 @@ export default function AdminQuestionView({
   onToggleRevealQuestion,
   onToggleRevealOptions,
   onHideAll,
+  onStartActingChallenge,
+  onEndActingChallenge,
   onDrawNext,
   groupAnswers = [],
   pendingGroups = [],
@@ -151,9 +154,11 @@ export default function AdminQuestionView({
       )}
 
       {adminOnly ? (
-        <div className="admin-q-admin-only">
-          🎭 سؤال للمشرف فقط (تمثيل / أمثال) — لا يظهر على جوالات المتسابقين. اقرأه شفهياً أو مثّله.
-        </div>
+        <AdminActingRevealControls
+          current={current}
+          onStartChallenge={onStartActingChallenge}
+          onEndChallenge={onEndActingChallenge}
+        />
       ) : (
         <AdminQuestionRevealControls
           current={current}
@@ -165,9 +170,9 @@ export default function AdminQuestionView({
 
       {attackTimer?.mode === 'setup' && (
         <div className="admin-q-timer-block">
-          <div className="lbl">⏱️ 2 — شغّل المؤقت بعد إظهار السؤال</div>
+          <div className="lbl">⏱️ شغّل المؤقت</div>
           <p className="admin-q-timer-block__hint">
-            السؤال مخفي عن المجموعات حتى تضغط «إظهار» — ثم اختر المدة وابدأ
+            مستقل عن إظهار السؤال — اختر المدة وابدأ متى شئت
           </p>
           <div className="fameeri-admin-pills">
             {(attackTimer.presets || [15, 30, 45, 60]).map((s) => (

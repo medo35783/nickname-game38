@@ -118,6 +118,45 @@ export default function FameeriSpectatorView({
     // playing
     if (reveal) {
       stage = <FameeriRevealOverlay qReveal={reveal} showContinue={false} />;
+    } else if (currentQuestion?.adminOnly && currentQuestion.revealToPlayers) {
+      const revealedAnswer = gameState?.answerVerdict?.revealedAnswer;
+      stage = (
+        <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+          <div style={{ fontSize: 52 }}>🎭</div>
+          <div style={{ fontSize: 22, fontWeight: 900, marginTop: 10 }}>تحدي تمثيل / مثل</div>
+          {currentAttack && (
+            <div style={{ fontSize: 16, fontWeight: 800, marginTop: 8, color: accent }}>
+              {currentAttack.attackerName} ⚔️ {currentAttack.targetName}
+            </div>
+          )}
+          {revealedAnswer ? (
+            <>
+              <div style={{ fontSize: 14, color: 'var(--green)', fontWeight: 800, marginTop: 20 }}>✅ الإجابة الصحيحة</div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 900,
+                  marginTop: 12,
+                  lineHeight: 1.5,
+                  color: 'var(--text)',
+                  padding: '0 8px',
+                }}
+              >
+                «{revealedAnswer}»
+              </div>
+            </>
+          ) : timer && countdown !== null ? (
+            <div style={{ marginTop: 24 }}>
+              <div className="q-timer-huge" style={{ fontSize: 88 }}>{countdown > 0 ? countdown : '⏰'}</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>وقت الإجابة</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 14 }}>
+              القائد يختار شخصاً للتمثيل — المشرف يشغّل المؤقت عند الجاهزية
+            </div>
+          )}
+        </div>
+      );
     } else if (currentQuestion && currentQuestion.revealToPlayers && !currentQuestion.adminOnly) {
       stage = (
         <div style={{ padding: '20px 0' }}>

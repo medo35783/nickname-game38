@@ -58,6 +58,29 @@ export function buildAdminAnswerContext({
 }) {
   if (!qKey || !qActiveQuestion) return null;
 
+  /** تمثيل/أمثال — المشرف يحكم يدوياً دون انتظار اعتماد القائد */
+  if (qActiveQuestion.adminOnly) {
+    const groups = qGList.map((g) => ({
+      id: g.id,
+      name: g.name,
+      isAttacker: qCurrentAttack ? g.id === qCurrentAttack.attackerId : false,
+      isTarget: qCurrentAttack ? g.id === qCurrentAttack.targetId : false,
+      mustAnswer: qCurrentAttack ? g.id === qCurrentAttack.attackerId : false,
+      submitted: false,
+      memberPicks: [],
+    }));
+    const attacker = groups.find((g) => g.isAttacker) || null;
+    return {
+      groups,
+      answering: attacker ? [attacker] : [],
+      attacker,
+      primary: attacker,
+      pendingNames: [],
+      autoVerdict: null,
+      manualOnly: true,
+    };
+  }
+
   const options = Array.isArray(qActiveQuestion.options) ? qActiveQuestion.options : [];
 
   const answeringIds = (() => {

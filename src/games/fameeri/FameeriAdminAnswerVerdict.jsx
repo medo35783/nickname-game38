@@ -8,14 +8,43 @@ export default function FameeriAdminAnswerVerdict({
   qActiveAnswer,
   qActiveQuestion,
   accent = 'var(--fameeri-primary)',
+  /** داخل بطاقة السؤال — بدون تكرار مفتاح الإجابة */
+  embedded = false,
 }) {
-  if (!answerCtx?.answering?.length) return null;
+  if (!answerCtx?.answering?.length && !answerCtx?.manualOnly) return null;
 
   const options = qActiveQuestion?.options || [];
   const correctIdx = getCorrectOptionIndex(options, qActiveAnswer);
   const correctLetter = correctIdx >= 0 ? optionLabel(correctIdx) : null;
 
-  const { answering, primary, pendingNames } = answerCtx;
+  const { answering, primary, pendingNames, attacker } = answerCtx;
+
+  if (answerCtx.manualOnly) {
+    return (
+      <div className="fameeri-cmd-auto card" style={{ borderColor: accent }}>
+        <div className="fameeri-cmd-auto__head">⚖️ حكم التمثيل — للمشرف</div>
+        {attacker && (
+          <div className="fameeri-cmd-auto__row primary">
+            <div className="fameeri-cmd-auto__team">
+              ⚔️ {attacker.name}
+              <span className="fameeri-cmd-auto__role">المهاجِم</span>
+            </div>
+            <div className="fameeri-cmd-auto__status">🎭 راقب التمثيل أو قول المثل</div>
+          </div>
+        )}
+        {qActiveAnswer && (
+          <div className="fameeri-cmd-auto__correct-key">
+            <span>🔑 المثل / الإجابة المتوقعة (للمشرف فقط):</span>
+            {correctLetter && <span className="fameeri-cmd-auto__letter">{correctLetter}</span>}
+            <strong>{qActiveAnswer}</strong>
+          </div>
+        )}
+        <div className="fameeri-cmd-auto__hint ok">
+          → المؤقت و ✅/❌ متاحان دائماً — بدء التحدي اختياري للشاشة. عند «صح» تظهر الإجابة للجميع.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fameeri-cmd-auto card" style={{ borderColor: accent }}>
@@ -86,7 +115,7 @@ export default function FameeriAdminAnswerVerdict({
         );
       })}
 
-      {qActiveAnswer && (
+      {!embedded && qActiveAnswer && (
         <div className="fameeri-cmd-auto__correct-key">
           <span>🔑 الإجابة المعتمدة:</span>
           {correctLetter && <span className="fameeri-cmd-auto__letter">{correctLetter}</span>}
@@ -102,7 +131,7 @@ export default function FameeriAdminAnswerVerdict({
         </div>
       )}
 
-      {pendingNames.length > 0 && answerCtx.autoVerdict == null && (
+      {!embedded && pendingNames.length > 0 && answerCtx.autoVerdict == null && (
         <div className="fameeri-cmd-auto__hint wait">
           ⏳ لم يعتمد القائد بعد — {pendingNames.join(' · ')}
         </div>

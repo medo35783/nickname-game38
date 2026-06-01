@@ -15,6 +15,9 @@ export default function FameeriVerdictBanner({ verdict }) {
       <div className="fameeri-verdict-banner__icon">{ok ? '✅' : '❌'}</div>
       <div className="fameeri-verdict-banner__title">{ok ? 'إجابة صحيحة!' : 'إجابة خاطئة'}</div>
       <div className="fameeri-verdict-banner__msg">{verdict.msg}</div>
+      {ok && verdict.revealedAnswer && (
+        <div className="fameeri-verdict-banner__answer">«{verdict.revealedAnswer}»</div>
+      )}
       {(verdict.attackerName || verdict.targetName) && (
         <div className="fameeri-verdict-banner__duel">
           <span className="fameeri-verdict-banner__attacker">{verdict.attackerName}</span>

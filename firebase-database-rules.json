@@ -188,6 +188,7 @@
     "qchats": {
       "$roomCode": {
         "$groupId": {
+          ".indexOn": ["ts"],
           ".read": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('qrooms').child($roomCode).child('adminId').val() == auth.uid || root.child('qrooms').child($roomCode).child('memberByUid').child(auth.uid).val() == $groupId)",
           "$msgId": {
             ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('qrooms').child($roomCode).child('adminId').val() == auth.uid || (!data.exists() && root.child('qrooms').child($roomCode).child('memberByUid').child(auth.uid).val() == $groupId))",

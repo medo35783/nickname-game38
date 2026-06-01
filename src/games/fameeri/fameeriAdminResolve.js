@@ -16,19 +16,24 @@ async function fetchFreshGroupsData(qRoom) {
 }
 
 /** بناء إعلان الحكم للجميع */
-export function buildAnswerVerdict(attack, correct) {
+export function buildAnswerVerdict(attack, correct, { revealedAnswer } = {}) {
   if (!attack?.attackerName) return null;
-  return {
-    correct: !!correct,
+  const ok = !!correct;
+  const verdict = {
+    correct: ok,
     attackerName: attack.attackerName,
     targetName: attack.targetName,
     weaponName: attack.weaponName,
     tree: attack.tree,
-    msg: correct
-      ? '✅ المشرف: إجابة صحيحة — الهجوم يُحسب!'
+    msg: ok
+      ? revealedAnswer
+        ? `✅ إجابة صحيحة — ${revealedAnswer}`
+        : '✅ المشرف: إجابة صحيحة — الهجوم يُحسب!'
       : '❌ المشرف: إجابة خاطئة — الهجوم لا يُحسب',
     timestamp: Date.now(),
   };
+  if (ok && revealedAnswer) verdict.revealedAnswer = revealedAnswer;
+  return verdict;
 }
 
 /** بدء مؤقت الهجوم — الإظهار للمجموعات يبقى بقرار المشرف فقط */
@@ -40,13 +45,13 @@ export async function startAttackTimer(qRoom, seconds) {
 }
 
 /** بعد «صح» — يمنح المدافع 10 ثوانٍ لتفعيل الدرع (مرة واحدة) */
-export async function beginShieldWindow(qRoom, { winnerGroupId, attack } = {}) {
+export async function beginShieldWindow(qRoom, { winnerGroupId, attack, revealedAnswer } = {}) {
   const patch = {
     timer: null,
     shieldWindow: { deadline: Date.now() + SHIELD_WINDOW_SEC * 1000 },
   };
   if (winnerGroupId) patch.shieldWindow.winnerGroupId = winnerGroupId;
-  const verdict = buildAnswerVerdict(attack, true);
+  const verdict = buildAnswerVerdict(attack, true, { revealedAnswer });
   if (verdict) patch.answerVerdict = verdict;
   await update(dbRef(db, `qrooms/${qRoom}/game`), patch);
 }

@@ -151,11 +151,37 @@ export default function FameeriAdminPlay({
     });
   };
 
-  const tabs = [
-    ['control', '⚔️ التحكم'],
-    ['stats', '📊 الإحصائيات'],
-    ...(qCurrentAttack || shieldWindow ? [] : [['log', '📜 السجل']]),
-  ];
+  const liveMode = isCommandCenterActive({
+    qCurrentAttack,
+    qActiveQuestion,
+    shieldWindow,
+    isSpeed,
+    claimIds,
+    qTimer,
+    speedBatchActive: qGameState?.speedBatchActive,
+  });
+
+  const attackFocusKey = qCurrentAttack?.timestamp || qCurrentAttack?.attackerId || null;
+
+  useEffect(() => {
+    if (liveMode) {
+      setTab((t) => (['qflow', 'field', 'stats'].includes(t) ? (attackFocusKey ? 'qflow' : t) : 'qflow'));
+    } else {
+      setTab((t) => (t === 'qflow' || t === 'field' ? 'control' : t));
+    }
+  }, [liveMode, attackFocusKey]);
+
+  const tabs = liveMode
+    ? [
+        ['qflow', '❓ السؤال والحسم'],
+        ['field', '🏟️ الميدان'],
+        ['stats', '📊 الإحصائيات'],
+      ]
+    : [
+        ['control', '⚔️ التحكم'],
+        ['stats', '📊 الإحصائيات'],
+        ...(qCurrentAttack || shieldWindow ? [] : [['log', '📜 السجل']]),
+      ];
 
   const statusLabel = (() => {
     if (qReveal) return '🎬 عرض النتيجة';
@@ -168,23 +194,15 @@ export default function FameeriAdminPlay({
     return `📋 دور ${turnGroup?.name || '—'}`;
   })();
 
-  const liveMode = isCommandCenterActive({
-    qCurrentAttack,
-    qActiveQuestion,
-    shieldWindow,
-    isSpeed,
-    claimIds,
-    qTimer,
-    speedBatchActive: qGameState?.speedBatchActive,
-  });
-
   const drawWeapon =
     qCurrentAttack?.weapon ||
     (speedWinSelect && qGameState?.speedClaims?.[speedWinSelect]?.weapon) ||
     (claimIds.length === 1 ? qGameState?.speedClaims?.[claimIds[0]]?.weapon : null);
 
+  const showRibbonInTab = liveMode ? tab === 'field' : tab === 'control';
+
   return (
-    <div className={`fameeri-admin-play${liveMode ? ' fameeri-cmd-active' : ''}`}>
+    <div className={`fameeri-admin-play${liveMode ? ' fameeri-admin-play--live' : ''}`}>
       {qReveal && (
         <FameeriRevealOverlay
           qReveal={qReveal}
@@ -212,7 +230,20 @@ export default function FameeriAdminPlay({
         <FameeriVerdictBanner verdict={qGameState.answerVerdict} />
       )}
 
-      {liveMode ? (
+      <div className="fameeri-admin-tabs">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`fameeri-admin-tab${tab === id ? ' on' : ''}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {liveMode && tab === 'qflow' && (
         <FameeriAdminCommandCenter
           qCurrentAttack={qCurrentAttack}
           qActiveQuestion={qActiveQuestion}
@@ -239,6 +270,12 @@ export default function FameeriAdminPlay({
           onToggleRevealQuestion={() => void toggleQuestionReveal('revealToPlayers')}
           onToggleRevealOptions={() => void toggleQuestionReveal('revealOptions')}
           onHideAll={() => void hideQuestionFromPlayers?.()}
+          onStartActingChallenge={() => {
+            if (!qActiveQuestion?.revealToPlayers) void toggleQuestionReveal('revealToPlayers');
+          }}
+          onEndActingChallenge={() => {
+            if (qActiveQuestion?.revealToPlayers) void toggleQuestionReveal('revealToPlayers');
+          }}
           onDrawNext={
             poolStats(qPool).total && drawWeapon
               ? () => void drawNextQuestion(drawWeapon)
@@ -259,7 +296,10 @@ export default function FameeriAdminPlay({
             playSound('suspense');
           }}
           onVerdictOk={async () => {
-            await beginShieldWindow(qRoom, { attack: qCurrentAttack });
+            await beginShieldWindow(qRoom, {
+              attack: qCurrentAttack,
+              revealedAnswer: qActiveQuestion?.adminOnly ? qActiveAnswer || undefined : undefined,
+            });
             playSound('suspense');
           }}
           onVerdictFail={async () => {
@@ -282,8 +322,9 @@ export default function FameeriAdminPlay({
           }}
           accent={accent}
         />
-      ) : (
-        qActiveQuestion && (
+      )}
+
+      {!liveMode && qActiveQuestion && tab === 'control' && (
           <AdminQuestionView
             current={qActiveQuestion}
             answer={qActiveAnswer}
@@ -293,6 +334,12 @@ export default function FameeriAdminPlay({
             onToggleRevealQuestion={() => void toggleQuestionReveal('revealToPlayers')}
             onToggleRevealOptions={() => void toggleQuestionReveal('revealOptions')}
             onHideAll={() => void hideQuestionFromPlayers?.()}
+            onStartActingChallenge={() => {
+              if (!qActiveQuestion?.revealToPlayers) void toggleQuestionReveal('revealToPlayers');
+            }}
+            onEndActingChallenge={() => {
+              if (qActiveQuestion?.revealToPlayers) void toggleQuestionReveal('revealToPlayers');
+            }}
             onDrawNext={
               poolStats(qPool).total
                 ? () => {
@@ -308,38 +355,27 @@ export default function FameeriAdminPlay({
             }
             accent={accent}
           />
-        )
       )}
 
-      {/* الميدان — مضغوط أثناء الهجوم */}
-      <div className={`card fameeri-admin-ribbon-wrap${liveMode ? ' fameeri-admin-ribbon-wrap--compact' : ''}`}>
-        <div className="fameeri-admin-ribbon-wrap__head">
-          <span className="ctitle" style={{ margin: 0 }}>🏟️ الميدان</span>
-          {tab === 'control' && !isSpeed && !qCurrentAttack && (
-            <span className="fameeri-admin-ribbon-wrap__hint">اضغط لتغيير الدور</span>
-          )}
+      {showRibbonInTab && (
+        <div className="card fameeri-admin-ribbon-wrap">
+          <div className="fameeri-admin-ribbon-wrap__head">
+            <span className="ctitle" style={{ margin: 0 }}>🏟️ الميدان</span>
+            {!isSpeed && !qCurrentAttack && (
+              <span className="fameeri-admin-ribbon-wrap__hint">اضغط مجموعة لتغيير الدور</span>
+            )}
+            {liveMode && qCurrentAttack && (
+              <span className="fameeri-admin-ribbon-wrap__hint">متابعة الوضع — الهجوم جارٍ في تبويب السؤال</span>
+            )}
+          </div>
+          <FameeriAdminRibbon
+            groups={sorted}
+            turnGroupId={turnGroupId}
+            onSelectTurn={!isSpeed && !qCurrentAttack ? setTurn : undefined}
+            selectable={!isSpeed && !qCurrentAttack}
+          />
         </div>
-        <FameeriAdminRibbon
-          groups={sorted}
-          turnGroupId={turnGroupId}
-          onSelectTurn={tab === 'control' && !isSpeed ? setTurn : undefined}
-          selectable={tab === 'control' && !isSpeed && !qCurrentAttack}
-        />
-      </div>
-
-      {/* تبويبات */}
-      <div className="fameeri-admin-tabs">
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`fameeri-admin-tab${tab === id ? ' on' : ''}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      )}
 
       {tab === 'control' && !liveMode && (
         <>
@@ -511,8 +547,8 @@ export default function FameeriAdminPlay({
 
       {tab === 'log' && <FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} />}
 
-      {/* إنهاء المسابقة */}
-      <div className="fameeri-admin-footer">
+      {/* إنهاء المسابقة — مخفي أثناء حسم السؤال لتقليل التشتيت */}
+      <div className={`fameeri-admin-footer${liveMode && tab === 'qflow' ? ' fameeri-admin-footer--hidden' : ''}`}>
         {!endConfirm ? (
           <>
             <button type="button" className="btn br fameeri-admin-end-btn" onClick={() => setEndConfirm(true)}>

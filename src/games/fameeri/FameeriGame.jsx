@@ -29,6 +29,7 @@ import FameeriGroupChat from './FameeriGroupChat';
 import FameeriAdminLobby from './FameeriAdminLobby';
 import FameeriAdminPlay from './FameeriAdminPlay';
 import FameeriPlayerPlay from './FameeriPlayerPlay';
+import FameeriPlayerLeaderNotice from './FameeriPlayerLeaderNotice';
 
 /** نوع اللعبة في بنك الأسئلة المركزي (قيمة البنك للقميري). */
 const QB_GAME_TYPE = 'qumayri';
@@ -686,11 +687,13 @@ const FameeriGame = forwardRef(function FameeriGame(
     })(),
   });
 
-  const qAdminPendingGroups = qAdminAnswerContext?.pendingNames?.length
-    ? qAdminAnswerContext.pendingNames
-    : qActiveQuestion && qKey
-      ? qGList.filter((g) => g.finalAnswer?.q !== qKey).map((g) => g.name)
-      : [];
+  const qAdminPendingGroups = qAdminAnswerContext?.manualOnly
+    ? []
+    : qAdminAnswerContext?.pendingNames?.length
+      ? qAdminAnswerContext.pendingNames
+      : qActiveQuestion && qKey
+        ? qGList.filter((g) => g.finalAnswer?.q !== qKey).map((g) => g.name)
+        : [];
 
   // استرجاع مخزون المشرف (محلي + Firebase للمسجّلين) عند العودة للغرفة
   useEffect(() => {
@@ -793,8 +796,13 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   /** إخفاء السؤال والخيارات عن المتسابقين دفعة واحدة */
   const hideQuestionFromPlayers = async () => {
-    if (!qActiveQuestion || qActiveQuestion.adminOnly) return;
+    if (!qActiveQuestion) return;
     try {
+      if (qActiveQuestion.adminOnly) {
+        await update(dbRef(db, `qrooms/${qRoom}/game/currentQuestion`), { revealToPlayers: false });
+        notify('⏸️ تم إيقاف التحدي', 'success');
+        return;
+      }
       await update(dbRef(db, `qrooms/${qRoom}/game/currentQuestion`), {
         revealToPlayers: false,
         revealOptions: false,
@@ -1326,8 +1334,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
 
     if(gameScreen==='qumairi_lobby'){return(
-<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setQExitModal(true)}>← رجوع</button>{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(
-<div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div>);})()}{!isAdmin&&qPhase==='lobby'&&<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?`مجموعتك: ${qMyGroup?.name||'—'}`:'انتظر المشرف'}</div></div>}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}
+<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setQExitModal(true)}>← رجوع</button>{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(<><FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="distributing" /><div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div></>);})()}{!isAdmin&&qPhase==='lobby'&&(<>{isLeader&&qGroupId&&<FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="lobby" />}<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>{isLeader&&qGroupId?'👑':'⏳'}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?(isLeader?`قائد مجموعة ${qMyGroup?.name||'—'}`:`مجموعتك: ${qMyGroup?.name||'—'}`):'انتظر المشرف'}</div></div></>)}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}
 </div>);}
 
     if (gameScreen === 'qumairi_play') {

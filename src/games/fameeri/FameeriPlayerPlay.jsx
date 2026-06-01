@@ -157,6 +157,7 @@ export default function FameeriPlayerPlay({
 
   const showQuestionDock =
     !!qActiveQuestion &&
+    !qActiveQuestion.adminOnly &&
     !qReveal &&
     !qGameState?.showResult &&
     (qAnswerPhaseDuringTimer || qActiveQuestion.revealToPlayers);

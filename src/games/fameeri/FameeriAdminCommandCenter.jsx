@@ -5,10 +5,35 @@ import {
   optionLabel,
 } from '../../question-bank/questionSession';
 import AdminQuestionRevealControls from '../../question-bank/AdminQuestionRevealControls';
+import AdminActingRevealControls from '../../question-bank/AdminActingRevealControls';
 import FameeriAdminDuel from './FameeriAdminDuel';
 import FameeriAdminAnswerVerdict from './FameeriAdminAnswerVerdict';
 
 const TIMER_PRESETS = [15, 30, 45, 60];
+
+function CmdVerdictBar({ ariaLabel, ok, fail }) {
+  return (
+    <div className="fameeri-cmd-verdict-inline" role="group" aria-label={ariaLabel}>
+      <div className="fameeri-cmd-verdict-inline__label">⚖️ الحكم</div>
+      <div className="fameeri-cmd-verdict-inline__row">
+      <button type="button" className={ok.className} disabled={ok.disabled} onClick={ok.onClick}>
+        <span className="fameeri-cmd-verdict__icon" aria-hidden>✓</span>
+        <span className="fameeri-cmd-verdict__text">
+          <span className="fameeri-cmd-verdict__label">صح</span>
+          {ok.sub && <span className="fameeri-cmd-verdict__sub">{ok.sub}</span>}
+        </span>
+      </button>
+      <button type="button" className={fail.className} disabled={fail.disabled} onClick={fail.onClick}>
+        <span className="fameeri-cmd-verdict__icon" aria-hidden>✗</span>
+        <span className="fameeri-cmd-verdict__text">
+          <span className="fameeri-cmd-verdict__label">خطأ</span>
+          {fail.sub && <span className="fameeri-cmd-verdict__sub">{fail.sub}</span>}
+        </span>
+      </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * لوحة تحكم المشرف أثناء الهجوم — تدفق واحد: سؤال → كشف → مؤقت → حسم.
@@ -39,6 +64,8 @@ export default function FameeriAdminCommandCenter({
   onToggleRevealQuestion,
   onToggleRevealOptions,
   onHideAll,
+  onStartActingChallenge,
+  onEndActingChallenge,
   onDrawNext,
   onStartTimer,
   onStartSpeedTimer,
@@ -48,7 +75,7 @@ export default function FameeriAdminCommandCenter({
   onSpeedVerdictFail,
   accent = 'var(--fameeri-primary)',
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [teamsDetailOpen, setTeamsDetailOpen] = useState(false);
 
   const attack = qCurrentAttack || shieldTargetAttack;
   const hasQuestion = !!qActiveQuestion;
@@ -56,18 +83,25 @@ export default function FameeriAdminCommandCenter({
   const hasOptions = Array.isArray(qActiveQuestion?.options) && qActiveQuestion.options.length > 0;
   const revealed = !!qActiveQuestion?.revealToPlayers;
   const optionsRevealed = !hasOptions || !!qActiveQuestion?.revealOptions;
-  const revealReady = revealed && optionsRevealed;
+  const revealStepDone = adminOnly ? revealed : revealed && optionsRevealed;
   const timerRunning = !!qTimer && !shieldWindow;
   const inShield = !!shieldWindow;
 
   const correctIdx = hasQuestion && hasOptions ? getCorrectOptionIndex(qActiveQuestion.options, qActiveAnswer) : -1;
   const correctLetter = correctIdx >= 0 ? optionLabel(correctIdx) : null;
+  const correctText =
+    correctIdx >= 0 && qActiveQuestion?.options?.[correctIdx] != null
+      ? qActiveQuestion.options[correctIdx]
+      : qActiveAnswer || '';
+  const leaderPick = qAdminAnswerContext?.primary?.submitted ? qAdminAnswerContext.primary : null;
+  const pendingLeader = qAdminAnswerContext?.pendingNames?.length
+    ? qAdminAnswerContext.pendingNames.join(' · ')
+    : null;
 
   const step = (() => {
     if (inShield) return 4;
     if (timerRunning) return 4;
-    if (revealReady && !qTimer) return 3;
-    if (hasQuestion && !revealReady) return 2;
+    if (hasQuestion && !revealStepDone) return 2;
     if (hasQuestion) return 3;
     return 1;
   })();
@@ -81,15 +115,46 @@ export default function FameeriAdminCommandCenter({
 
   const countdown = inShield ? shieldCountdown : qCountdown;
   const countdownUrgent = countdown !== null && countdown <= 5 && countdown > 0;
-  const showSpeedVerdictDock = isSpeed && timerRunning && !qCurrentAttack && !inShield;
-  const showVerdictDock = timerRunning && !inShield && (qCurrentAttack || (isSpeed && claimIds.length));
-  const hasDock = (showVerdictDock && qCurrentAttack) || showSpeedVerdictDock;
+  const timerExpired = timerRunning && countdown !== null && countdown <= 0;
+  const showSpeedVerdict = isSpeed && !qCurrentAttack && claimIds.length > 0 && !inShield;
+  const showAttackVerdict = !inShield && !!qCurrentAttack && hasQuestion;
 
   const wDef = attack ? Q_WEAPONS.find((w) => w.id === attack.weapon) : null;
   const groupName = (gid) => qGList.find((g) => g.id === gid)?.name || gid;
 
+  const attackVerdictBar = showAttackVerdict && qCurrentAttack && (
+    <CmdVerdictBar
+      ariaLabel="حكم المشرف"
+      ok={{
+        className: `fameeri-cmd-verdict fameeri-cmd-verdict--ok${qAdminAnswerContext?.autoVerdict === true ? ' suggested' : ''}`,
+        onClick: onVerdictOk,
+        sub: 'نجاح الهجوم',
+      }}
+      fail={{
+        className: `fameeri-cmd-verdict fameeri-cmd-verdict--fail${qAdminAnswerContext?.autoVerdict === false ? ' suggested' : ''}`,
+        onClick: onVerdictFail,
+        sub: 'فشل الهجوم',
+      }}
+    />
+  );
+
+  const speedVerdictBar = showSpeedVerdict && (
+    <CmdVerdictBar
+      ariaLabel="حكم السرعة"
+      ok={{
+        className: 'fameeri-cmd-verdict fameeri-cmd-verdict--ok',
+        onClick: onSpeedVerdictOk,
+        disabled: claimIds.length > 1 && !speedWinSelect,
+      }}
+      fail={{
+        className: 'fameeri-cmd-verdict fameeri-cmd-verdict--fail',
+        onClick: onSpeedVerdictFail,
+      }}
+    />
+  );
+
   return (
-    <div className={`fameeri-cmd${hasDock ? ' fameeri-cmd--dock' : ''}`}>
+    <div className="fameeri-cmd">
       {/* مسار المراحل */}
       <div className="fameeri-cmd-steps card">
         {steps.map((s, i) => (
@@ -133,7 +198,7 @@ export default function FameeriAdminCommandCenter({
         </div>
       )}
 
-      {/* السؤال — ملخص للمشرف */}
+      {/* السؤال — واضح للمشرف: نص → خيارات → مفتاح الإجابة */}
       {hasQuestion && (
         <div className="fameeri-cmd-question card" style={{ borderColor: accent }}>
           <div className="fameeri-cmd-question__head">
@@ -141,64 +206,121 @@ export default function FameeriAdminCommandCenter({
           </div>
           <p className="fameeri-cmd-question__text">{qActiveQuestion.text}</p>
 
-          <FameeriAdminAnswerVerdict
-            answerCtx={qAdminAnswerContext}
-            qActiveAnswer={qActiveAnswer}
-            qActiveQuestion={qActiveQuestion}
-            accent={accent}
-          />
-
-          <button
-            type="button"
-            className="fameeri-cmd-details-toggle"
-            onClick={() => setDetailsOpen((v) => !v)}
-            aria-expanded={detailsOpen}
-          >
-            {detailsOpen ? '▲ إخفاء التفاصيل' : '▼ تفاصيل السؤال والخيارات'}
-          </button>
-
-          {detailsOpen && (
-            <div className="fameeri-cmd-details">
-              {hasOptions && (
-                <div className="admin-q-options">
-                  {qActiveQuestion.options.map((opt, i) => (
-                    <div
-                      key={i}
-                      className={`admin-q-option${i === correctIdx ? ' admin-q-option--correct' : ''}`}
-                    >
-                      <span className="admin-q-option__letter">{optionLabel(i)}</span>
-                      <span className="admin-q-option__text">{opt}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {hasOptions && (
+            <div className="admin-q-options fameeri-cmd-question__options">
+              {qActiveQuestion.options.map((opt, i) => {
+                const isCorrect = i === correctIdx;
+                const isLeader = leaderPick && leaderPick.opt === i;
+                return (
+                  <div
+                    key={i}
+                    className={`admin-q-option${isCorrect ? ' admin-q-option--correct' : ''}${isLeader && !isCorrect ? ' admin-q-option--leader' : ''}`}
+                  >
+                    <span className="admin-q-option__letter">{optionLabel(i)}</span>
+                    <span className="admin-q-option__text">{opt}</span>
+                    {isCorrect && <span className="admin-q-option__badge">✓</span>}
+                  </div>
+                );
+              })}
             </div>
+          )}
+
+          {(leaderPick || correctText || qActiveAnswer) && (
+            <p
+              className={`fameeri-cmd-question__key${leaderPick ? (leaderPick.correct ? ' ok' : ' miss') : ''}`}
+            >
+              🔑{' '}
+              {leaderPick
+                ? 'الإجابة المعتمدة'
+                : adminOnly
+                  ? 'الإجابة المتوقعة'
+                  : 'الإجابة الصحيحة'}
+              :{' '}
+              <strong>
+                {leaderPick
+                  ? `${leaderPick.letter || ''}${leaderPick.letter ? ' — ' : ''}${leaderPick.optText}`
+                  : hasOptions && correctLetter
+                    ? `${correctLetter} — ${correctText}`
+                    : qActiveAnswer || correctText}
+              </strong>
+            </p>
+          )}
+
+          {pendingLeader && !leaderPick && (
+            <p className="fameeri-cmd-question__pending">⏳ بانتظار اعتماد القائد — {pendingLeader}</p>
+          )}
+
+          {qAdminAnswerContext &&
+            (qAdminAnswerContext.manualOnly || (qAdminAnswerContext.answering?.length ?? 0) > 0) && (
+              <>
+                <button
+                  type="button"
+                  className="fameeri-cmd-details-toggle"
+                  onClick={() => setTeamsDetailOpen((v) => !v)}
+                  aria-expanded={teamsDetailOpen}
+                >
+                  {teamsDetailOpen ? '▲ إخفاء حالة المجموعات' : '▼ حالة المجموعات والاقتراحات'}
+                </button>
+                {teamsDetailOpen && (
+                  <div className="fameeri-cmd-details">
+                    <FameeriAdminAnswerVerdict
+                      answerCtx={qAdminAnswerContext}
+                      qActiveAnswer={qActiveAnswer}
+                      qActiveQuestion={qActiveQuestion}
+                      accent={accent}
+                      embedded
+                    />
+                  </div>
+                )}
+              </>
+            )}
+        </div>
+      )}
+
+      {/* كشف — أسئلة الجوالات أو تحدي التمثيل */}
+      {hasQuestion && !timerRunning && !inShield && (
+        <div className="fameeri-cmd-reveal card">
+          <div className="fameeri-cmd-reveal__title">
+            {step === 2
+              ? adminOnly
+                ? '🎭 الخطوة 2 — بدء التحدي'
+                : '👁️ الخطوة 2 — كشف للمجموعات'
+              : adminOnly
+                ? '🎭 التحكم بالتحدي'
+                : '👁️ التحكم بالكشف'}
+          </div>
+          {adminOnly ? (
+            <AdminActingRevealControls
+              current={qActiveQuestion}
+              onStartChallenge={onStartActingChallenge}
+              onEndChallenge={onEndActingChallenge}
+              compact
+            />
+          ) : (
+            <AdminQuestionRevealControls
+              current={qActiveQuestion}
+              onToggleRevealQuestion={onToggleRevealQuestion}
+              onToggleRevealOptions={onToggleRevealOptions}
+              onHideAll={onHideAll}
+              compact
+            />
           )}
         </div>
       )}
 
-      {/* الكشف — قبل المؤقت */}
-      {hasQuestion && !adminOnly && !timerRunning && !inShield && (
-        <div className="fameeri-cmd-reveal card">
-          <div className="fameeri-cmd-reveal__title">
-            {step === 2 ? '👁️ الخطوة 2 — كشف للمجموعات' : '👁️ التحكم بالكشف'}
-          </div>
-          <AdminQuestionRevealControls
-            current={qActiveQuestion}
-            onToggleRevealQuestion={onToggleRevealQuestion}
-            onToggleRevealOptions={onToggleRevealOptions}
-            onHideAll={onHideAll}
-            compact
-          />
-        </div>
-      )}
-
       {/* المؤقت — تجهيز أو يعمل */}
-      {hasQuestion && !adminOnly && !inShield && (
+      {hasQuestion && !inShield && (
         <div className={`fameeri-cmd-timer card${timerRunning ? ' live' : ''}`}>
-          {!timerRunning && revealReady && (
+          {!timerRunning && (
             <>
-              <div className="fameeri-cmd-timer__title">⏱️ الخطوة 3 — شغّل المؤقت</div>
+              <div className="fameeri-cmd-timer__title">
+                {adminOnly ? '🎭 المؤقت والحكم' : '⏱️ المؤقت والحكم'}
+              </div>
+              <p className="fameeri-cmd-timer__hint" style={{ marginBottom: 10 }}>
+                {adminOnly
+                  ? 'المؤقت مستقل عن الكشف — شغّله متى شئت ثم احكم بالأسفل.'
+                  : 'إظهار السؤال/الخيارات اختياري — شغّل المؤقت واحكم بالأسفل.'}
+              </p>
               <div className="fameeri-admin-pills">
                 {TIMER_PRESETS.map((s) => (
                   <button key={s} type="button" className="btn bg bsm" onClick={() => onStartTimer?.(s)}>
@@ -228,21 +350,24 @@ export default function FameeriAdminCommandCenter({
             </>
           )}
 
-          {!timerRunning && !revealReady && (
-            <p className="fameeri-cmd-timer__wait">أظهر السؤال للمجموعات أولاً ثم ابدأ المؤقت</p>
-          )}
-
           {timerRunning && (
             <>
-              <div className="fameeri-cmd-timer__title">⏱️ الوقت المتبقي</div>
-              <div className={`fameeri-cmd-timer__ring${countdownUrgent ? ' urgent' : ''}`}>
+              <div className="fameeri-cmd-timer__title">
+                {timerExpired ? '⏰ انتهى الوقت — احكم الآن' : '⏱️ الوقت المتبقي'}
+              </div>
+              <div className={`fameeri-cmd-timer__ring${countdownUrgent || timerExpired ? ' urgent' : ''}`}>
                 <span className="fameeri-cmd-timer__num">
                   {countdown !== null ? (countdown > 0 ? countdown : '⏰') : '…'}
                 </span>
               </div>
-              <p className="fameeri-cmd-timer__hint">اضغط الحكم أسفل — ✅ صح أو ❌ خطأ</p>
+              <p className="fameeri-cmd-timer__hint">
+                {timerExpired
+                  ? '⏰ انتهى الوقت — احكم بالأسفل'
+                  : 'يمكنك الحكم في أي وقت من الأزرار بالأسفل'}
+              </p>
             </>
           )}
+          {attackVerdictBar}
         </div>
       )}
 
@@ -312,6 +437,7 @@ export default function FameeriAdminCommandCenter({
               </span>
             </div>
           )}
+          {speedVerdictBar}
         </div>
       )}
 
@@ -333,49 +459,6 @@ export default function FameeriAdminCommandCenter({
         </div>
       )}
 
-      {/* شريط الحسم الثابت */}
-      {showVerdictDock && qCurrentAttack && (
-        <div className="fameeri-cmd-dock" role="group" aria-label="حكم المشرف">
-          <button
-            type="button"
-            className={`fameeri-cmd-verdict fameeri-cmd-verdict--ok${qAdminAnswerContext?.autoVerdict === true ? ' suggested' : ''}`}
-            onClick={onVerdictOk}
-          >
-            <span className="fameeri-cmd-verdict__icon">✅</span>
-            <span className="fameeri-cmd-verdict__label">صح</span>
-            <span className="fameeri-cmd-verdict__sub">نجاح الهجوم</span>
-          </button>
-          <div className="fameeri-cmd-dock__gap" aria-hidden />
-          <button
-            type="button"
-            className={`fameeri-cmd-verdict fameeri-cmd-verdict--fail${qAdminAnswerContext?.autoVerdict === false ? ' suggested' : ''}`}
-            onClick={onVerdictFail}
-          >
-            <span className="fameeri-cmd-verdict__icon">❌</span>
-            <span className="fameeri-cmd-verdict__label">خطأ</span>
-            <span className="fameeri-cmd-verdict__sub">فشل الهجوم</span>
-          </button>
-        </div>
-      )}
-
-      {showSpeedVerdictDock && (
-        <div className="fameeri-cmd-dock" role="group" aria-label="حكم السرعة">
-          <button
-            type="button"
-            className="fameeri-cmd-verdict fameeri-cmd-verdict--ok"
-            disabled={claimIds.length > 1 && !speedWinSelect}
-            onClick={onSpeedVerdictOk}
-          >
-            <span className="fameeri-cmd-verdict__icon">✅</span>
-            <span className="fameeri-cmd-verdict__label">صح</span>
-          </button>
-          <div className="fameeri-cmd-dock__gap" aria-hidden />
-          <button type="button" className="fameeri-cmd-verdict fameeri-cmd-verdict--fail" onClick={onSpeedVerdictFail}>
-            <span className="fameeri-cmd-verdict__icon">❌</span>
-            <span className="fameeri-cmd-verdict__label">خطأ</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
