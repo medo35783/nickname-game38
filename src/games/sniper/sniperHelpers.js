@@ -1,4 +1,5 @@
 import { mkInitials } from '../../core/helpers';
+import { QSOURCE } from '../../question-bank/questionSession';
 
 /** هوية قناص الدرجات — برتقالي/أزرق (مستقل عن القميري). للـ inline يُستخدم لون النهار؛ CSS يبدّل تلقائياً */
 export const SNIPER_THEME = {
@@ -19,6 +20,48 @@ export const SNIPER_BORDER_CSS = 'var(--sniper-border)';
 export const SNIPER_SCORE_BG_CSS = 'var(--sniper-score-bg)';
 export const SNIPER_STORAGE_KEY = 'ng_sniper';
 export const QB_GAME_TYPE = 'sniper';
+
+export const SNIPER_BRAND = {
+  title: 'قناص الدرجات',
+  tagline: 'أرينا الدرجات — رهانك يحدد مصيرك',
+  emoji: '🎯',
+  arena: 'ساحة الألعاب',
+};
+
+/** تقدم الجولات (نفس عدد الأسئلة — المصطلح «جولة» في الواجهة) */
+export function sniperRoundDisplay(currentQ, totalQ) {
+  const total = Number(totalQ) || 0;
+  const cur = Number(currentQ) || 0;
+  if (!total) return null;
+  if (cur > 0) {
+    return { value: `${cur}/${total}`, label: 'جولة', phase: 'playing' };
+  }
+  return { value: String(total), label: 'جولات اللعبة', phase: 'planned' };
+}
+
+/** تاريخ ووقت الجلسة — عربي للترويج والمشاركة */
+export function formatSniperDateTime(date = new Date()) {
+  try {
+    return new Intl.DateTimeFormat('ar-SA', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  } catch {
+    return date.toLocaleString('ar-SA');
+  }
+}
+
+export function sortedSniperPlayers(players) {
+  return Object.entries(players || {})
+    .map(([id, p]) => ({ ...p, id }))
+    .filter((p) => !p.isHost)
+    .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+}
 
 export const TOTAL_Q_OPTIONS = [15, 20, 25, 30];
 export const FINAL_VOTE_OPTIONS = [5, 10, 15, 20];
@@ -63,8 +106,33 @@ export const HOT_STREAK_BONUS = 5;
 export const BOARD_CELL = {
   AVAILABLE: 'available',
   USED: 'used',
+  WON: 'won',
+  DOUBLE_WON: 'double_won',
   BURNED: 'burned',
+  TIMEOUT: 'timeout',
 };
+
+/** وصف خلية اللوحة للعرض والـ CSS */
+export function boardCellMeta(state) {
+  switch (state) {
+    case BOARD_CELL.USED:
+      return { className: 'sniper-score-btn--pending', label: '···', title: 'بانتظار التصحيح' };
+    case BOARD_CELL.WON:
+      return { className: 'sniper-score-btn--won', label: '✓', title: 'إجابة صحيحة!' };
+    case BOARD_CELL.DOUBLE_WON:
+      return { className: 'sniper-score-btn--double', label: '×2', title: 'صحيح — درجة مضاعفة!' };
+    case BOARD_CELL.BURNED:
+      return { className: 'sniper-score-btn--burned', label: '✕', title: 'إجابة خاطئة' };
+    case BOARD_CELL.TIMEOUT:
+      return { className: 'sniper-score-btn--timeout', label: '⏱', title: 'انتهى الوقت — لم تُرسل' };
+    default:
+      return { className: '', label: null, title: 'متاحة' };
+  }
+}
+
+export function isBoardCellSelectable(state) {
+  return state === BOARD_CELL.AVAILABLE;
+}
 
 export function readSavedSniper() {
   try {
@@ -171,6 +239,63 @@ export function isTimerRunning(game) {
   return !!(game?.deadline && game.deadline > Date.now());
 }
 
+/** مصدر «الأسئلة معي فقط» — شفهي دائماً */
+export function isSniperExternalSource(game) {
+  return game?.questionSource === QSOURCE.EXTERNAL;
+}
+
+/** نص السؤال على جهاز المتسابق (مع إصلاح غرف قديمة) */
+export function sniperResolvePlayerQuestionText(game) {
+  const direct = (game?.questionText || '').trim();
+  if (direct) return direct;
+  if (game?.questionAdminOnly || isSniperExternalSource(game)) return '';
+  return (game?.hostQuestionText || '').trim();
+}
+
+/**
+ * عرض السؤال للمتسابق:
+ * - معي فقط / تمثيل → مخفي دائماً
+ * - عميان → اختر درجة قبل المؤقت، ينكشف السؤال بعد البدء
+ * - بنك/يدوي → ذهبي قبل المؤقت، النص بعد البدء
+ */
+export function sniperPlayerQuestionView(game) {
+  const blind = game?.specialRound === 'blind';
+  const oral = isSniperExternalSource(game);
+  const hostOnly = oral || !!game?.questionAdminOnly;
+  const text = sniperResolvePlayerQuestionText(game);
+  const timerActive = isTimerRunning(game);
+
+  if (hostOnly) {
+    return { mode: 'masked', oral, blind, text: '' };
+  }
+
+  if (!timerActive) {
+    if (blind) {
+      return { mode: 'blind-pick', blind: true, oral: false, text: '' };
+    }
+    if (!text) {
+      return { mode: 'masked', oral: false, blind: false, text: '', reason: 'empty' };
+    }
+    return { mode: 'pending', oral: false, blind: false, text: '' };
+  }
+
+  if (!text) {
+    return { mode: 'masked', oral: false, blind, text: '', reason: 'empty' };
+  }
+  return { mode: 'visible', oral: false, blind, text };
+}
+
+/** وسوم السؤال في لوحة المشرف */
+export function sniperHostQuestionFlags(game) {
+  const external = isSniperExternalSource(game);
+  const adminOnly = !!game?.questionAdminOnly;
+  const hasPlayerText = !!sniperResolvePlayerQuestionText(game);
+  return {
+    oralHidden: external || adminOnly,
+    revealsOnTimer: !external && !adminOnly && hasPlayerText,
+  };
+}
+
 export function normalizeAnswer(text) {
   return (text || '')
     .trim()
@@ -262,7 +387,7 @@ export function pickAvailableScores(board, totalQ) {
   const list = [];
   for (let i = 1; i <= totalQ; i += 1) {
     const st = board?.[String(i)] || board?.[i];
-    if (st === BOARD_CELL.AVAILABLE) list.push(i);
+    if (isBoardCellSelectable(st)) list.push(i);
   }
   return list;
 }

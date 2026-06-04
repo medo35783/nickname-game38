@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { fetchGameQuestionsAdvanced, suggestQuestion, QB_CATEGORIES, QB_DIFFICULTIES, QB_AUDIENCES } from './qbank.helpers';
+import { fetchGameQuestionsAdvanced, fetchGameAvailableCategories, suggestQuestion, QB_DIFFICULTIES, QB_AUDIENCES } from './qbank.helpers';
 import {
   QSOURCE,
   normalizeBankPool,
@@ -58,6 +58,8 @@ export default function QuestionSourceSetup({
   const [customApplySuccess, setCustomApplySuccess] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [setsToTake, setSetsToTake] = useState(1);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   useEffect(() => {
     if (initialSource) setSource(initialSource);
@@ -68,6 +70,34 @@ export default function QuestionSourceSetup({
       setCustomSessionPool(normalizePoolToStructured(initialPoolStructured));
     }
   }, [initialPoolStructured]);
+
+  useEffect(() => {
+    if (source !== QSOURCE.BANK || !gameType) {
+      setAvailableCategories([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingCategories(true);
+
+    void fetchGameAvailableCategories({ gameType, audience: audience || undefined })
+      .then((rows) => {
+        if (cancelled) return;
+        setAvailableCategories(rows);
+        const allowed = new Set(rows.map((row) => row.id));
+        setCategories((prev) => prev.filter((cat) => allowed.has(cat)));
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableCategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCategories(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [source, gameType, audience]);
 
   const isQumairi = gameType === 'qumayri';
   const registered = isRegisteredHost();
@@ -380,20 +410,38 @@ export default function QuestionSourceSetup({
           </div>
 
           <div className="ig">
-            <label className="lbl">التصنيفات (اتركها فارغة = الكل)</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {QB_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`btn ${categories.includes(cat) ? 'bg' : 'bgh'} bxs`}
-                  style={{ width: 'auto' }}
-                  onClick={() => toggleCategory(cat)}
-                >
-                  {QB_CATEGORY_LABELS[cat] || cat}
-                </button>
-              ))}
-            </div>
+            <label className="lbl">التصنيفات (اتركها فارغة = كل تصنيفات هذه اللعبة)</label>
+            {loadingCategories ? (
+              <div style={{ fontSize: 11, color: 'var(--muted)', padding: '6px 0' }}>جاري تحميل التصنيفات…</div>
+            ) : availableCategories.length === 0 ? (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--muted)',
+                  padding: '8px 10px',
+                  background: 'var(--surface)',
+                  borderRadius: 8,
+                  lineHeight: 1.6,
+                }}
+              >
+                لا توجد أسئلة معتمدة مخصّصة لهذه اللعبة في البنك — راجع «الألعاب» عند إضافة الأسئلة.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {availableCategories.map(({ id: cat, count: catCount }) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`btn ${categories.includes(cat) ? 'bg' : 'bgh'} bxs`}
+                    style={{ width: 'auto' }}
+                    onClick={() => toggleCategory(cat)}
+                  >
+                    {QB_CATEGORY_LABELS[cat] || cat}
+                    <span style={{ opacity: 0.75, marginRight: 4, fontSize: 9 }}>({catCount})</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

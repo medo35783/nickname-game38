@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import QuestionSourceSetup from '../../question-bank/QuestionSourceSetup';
+import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
+import { QSOURCE } from '../../question-bank/questionSession';
+import { countSniperPool } from './sniperQuestions';
 import {
   TOTAL_Q_OPTIONS,
   SNIPER_ACCENT_CSS,
@@ -23,7 +26,8 @@ export default function SniperSetup({
   const [qSource, setQSource] = useState(null);
   const [qPool, setQPool] = useState({ hard: [], medium: [], easy: [] });
 
-  const canCreate = !!qSource;
+  const poolCount = countSniperPool(qPool);
+  const canCreate = !!qSource && (qSource === QSOURCE.EXTERNAL || poolCount > 0);
 
   return (
     <div className="scr sniper-theme">
@@ -78,6 +82,11 @@ export default function SniperSetup({
         ) : (
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>لم يُحدَّد بعد — اضغط الزر أدناه</div>
         )}
+        {qSource && qSource !== QSOURCE.EXTERNAL && (
+          <div style={{ fontSize: 11, color: poolCount ? SNIPER_ACCENT_CSS : 'var(--red)', marginTop: 8 }}>
+            {poolCount > 0 ? `${poolCount} سؤال جاهز للجلسة` : '⚠️ لا توجد أسئلة صالحة — أعد التحميل من البنك'}
+          </div>
+        )}
         <button type="button" className="btn bo mt2" style={{ borderColor: SNIPER_ACCENT_CSS }} onClick={() => setSetupOpen(true)}>
           ⚙️ إعداد الأسئلة (بنك / يدوي / مخصص)
         </button>
@@ -102,9 +111,9 @@ export default function SniperSetup({
           initialSource={qSource}
           initialPoolStructured={qPool}
           onClose={() => setSetupOpen(false)}
-          onApply={({ source, pool }) => {
+          onApply={({ source, pool, poolStructured }) => {
             setQSource(source);
-            setQPool(pool);
+            setQPool(normalizePoolToStructured(poolStructured || pool || {}));
             setSetupOpen(false);
             notify('✅ تم حفظ إعداد الأسئلة', 'success');
           }}

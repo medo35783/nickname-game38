@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { SniperPanelTitle, SNIPER_TOOLS_HELP } from './SniperHelpTip';
 import { SNIPER_SPECIAL_TOOLS, SPEED_QUESTION_SECONDS } from './sniperHelpers';
 
 export default function SniperAdminTools({
@@ -6,60 +6,43 @@ export default function SniperAdminTools({
   timerRunning,
   onSetSpecial,
   onEndTimer,
-  compact = true,
 }) {
-  const [helpOpen, setHelpOpen] = useState(false);
-
   return (
-    <section className={`sniper-admin-tools ${compact ? 'sniper-admin-tools--compact' : ''}`}>
-      <div className="sniper-admin-tools__bar">
-        <span className="sniper-admin-tools__label">⚡ إثارة</span>
-        <button
-          type="button"
-          className={`sniper-admin-info-btn ${helpOpen ? 'is-on' : ''}`}
-          onClick={() => setHelpOpen((v) => !v)}
-          aria-expanded={helpOpen}
-        >
-          {helpOpen ? '✕' : '؟'}
-        </button>
-      </div>
+    <div className="sniper-admin-tools">
+      <SniperPanelTitle help={SNIPER_TOOLS_HELP} helpLabel="أدوات الإثارة">
+        ⚡ إثارة
+      </SniperPanelTitle>
 
-      {helpOpen && (
-        <p className="sniper-admin-tools-guide">
-          اضغط الأداة للتفعيل، واضغطها مرة أخرى لإلغائها. لا تبدأ المؤقت تلقائياً.
-        </p>
-      )}
-
-      <div className="sniper-admin-tools-chips">
+      <div className="sniper-power-grid" role="group" aria-label="أدوات الإثارة">
         {SNIPER_SPECIAL_TOOLS.map((tool) => {
           const active = activeSpecial === tool.id;
           return (
             <button
               key={tool.id}
               type="button"
-              className={`sniper-admin-tool-chip ${active ? 'is-on' : ''}`}
+              className={`sniper-power-btn ${active ? 'is-on' : ''}`}
               title={tool.desc}
               onClick={() => onSetSpecial(tool.id)}
             >
-              <span className="sniper-admin-tool-chip__icon">{tool.icon}</span>
-              <span className="sniper-admin-tool-chip__name">{tool.title}</span>
-              {active && <span className="sniper-admin-tool-chip__off">إلغاء</span>}
+              <span className="sniper-power-btn__ico" aria-hidden>
+                {tool.icon}
+              </span>
+              <span className="sniper-power-btn__tag">{tool.tag}</span>
+              {active && <span className="sniper-power-btn__dot" aria-hidden />}
             </button>
           );
         })}
       </div>
 
       {activeSpecial === 'speed' && (
-        <div className="sniper-admin-chip sniper-admin-chip--speed">
-          مؤقت {SPEED_QUESTION_SECONDS} ث
-        </div>
+        <p className="sniper-admin-micro">مؤقت {SPEED_QUESTION_SECONDS} ث</p>
       )}
 
       {timerRunning && (
-        <button type="button" className="btn bo bsm sniper-admin-end-timer" onClick={onEndTimer}>
-          ⏹ إنهاء الوقت
+        <button type="button" className="btn bo bsm sniper-admin-micro-btn" onClick={onEndTimer}>
+          ⏹ إنهاء
         </button>
       )}
-    </section>
+    </div>
   );
 }

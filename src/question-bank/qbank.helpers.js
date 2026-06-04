@@ -157,3 +157,26 @@ export async function fetchGameQuestionsAdvanced({
 
   return shuffleArray(questions).slice(0, count);
 }
+
+/** تصنيفات لها أسئلة معتمدة مخصّصة للعبة (أو «كل الألعاب») — للعرض في إعداد المصدر. */
+export async function fetchGameAvailableCategories({ gameType, audience } = {}) {
+  const approvedQuestionsQuery = query(
+    ref(db, QUESTION_BANK_PATH),
+    orderByChild('status'),
+    equalTo('approved')
+  );
+  const snapshot = await get(approvedQuestionsQuery);
+  const categoryCounts = {};
+
+  toQuestionsArray(snapshot).forEach((question) => {
+    if (!matchesGameFilters(question, { gameType, audience: audience || undefined })) return;
+    const cat = question.category;
+    if (!cat || !QB_CATEGORIES.includes(cat)) return;
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+
+  return QB_CATEGORIES.filter((cat) => categoryCounts[cat]).map((cat) => ({
+    id: cat,
+    count: categoryCounts[cat],
+  }));
+}

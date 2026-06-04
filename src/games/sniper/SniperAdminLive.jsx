@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
 import SniperCountdown from './SniperCountdown';
+import SniperRoomMeta from './SniperRoomMeta';
 import SniperAdminTools from './SniperAdminTools';
 import SniperAdminLeaderboard from './SniperAdminLeaderboard';
 import {
@@ -14,8 +15,15 @@ import {
   SNIPER_ACCENT_CSS,
   SNIPER_SCORE_BG_CSS,
   SNIPER_BORDER_CSS,
+  sniperHostQuestionFlags,
 } from './sniperHelpers';
+import SniperQuestionPanel from './SniperQuestionPanel';
 import SniperTimerPicker from './SniperTimerPicker';
+import { SniperPanelTitle, SNIPER_HOST_ANSWER_HELP, SNIPER_LIVE_HOST_HELP, SNIPER_LIVE_OPS_HELP, SNIPER_SUBMIT_COUNTER_HELP } from './SniperHelpTip';
+import SniperLiveAnswersPanel, {
+  SniperAdminSubmitCounter,
+  useSniperLiveAnswers,
+} from './SniperLiveAnswers';
 
 const PHASE_LABELS = {
   question: 'جولة سؤال',
@@ -65,6 +73,13 @@ export default function SniperAdminLive({
   const currentQ = game?.currentQ || 1;
   const special = game?.specialRound;
   const progressPct = Math.min(100, Math.round((currentQ / totalQ) * 100));
+  const hostQuestion =
+    game?.hostQuestionText?.trim() || game?.questionText?.trim() || '';
+  const hostFlags = sniperHostQuestionFlags(game);
+
+  useEffect(() => {
+    if (phase === 'question' || phase === 'grading') setAdminTab('round');
+  }, [phase, currentQ]);
 
   const dupGroups = useMemo(
     () => groupDuplicateAnswers(answers, players, hostParticipates ? hostAnswer : null),
@@ -100,14 +115,30 @@ export default function SniperAdminLive({
     setDuplicateMarked((prev) => ({ ...prev, [answerKey]: marked }));
   };
 
+  const { liveCards, totalContestants, submittedCount, hostSent } = useSniperLiveAnswers(
+    answers,
+    players,
+    hostAnswer,
+    hostParticipates
+  );
+
+  const timerNeedsStart = timerWaiting && phase === 'question';
+
   const timerColumn = (
-    <div className="sniper-admin-split__col sniper-admin-split__timer">
-      <h4 className="sniper-admin-split__title">⏱ مدة السؤال</h4>
+    <div
+      className={`sniper-admin-split__col sniper-admin-split__timer ${
+        timerNeedsStart ? 'sniper-admin-split__timer--attention' : ''
+      }`}
+    >
+      <SniperPanelTitle>⏱ المؤقت</SniperPanelTitle>
       {timerWaiting ? (
         <>
-          <p className="sniper-admin-panel__hint">
-            افتراضي: {game?.questionSecs ?? 20} ث
-          </p>
+          {hostFlags.oralHidden ? (
+            <p className="sniper-admin-timer-hint sniper-admin-timer-hint--oral">🎙️ بدون نص للاعبين — استمعوا لك</p>
+          ) : hostFlags.revealsOnTimer ? (
+            <p className="sniper-admin-timer-hint">📱 السؤال يظهر للاعبين بعد «بدء المؤقت»</p>
+          ) : null}
+          <p className="sniper-admin-micro">افتراضي {game?.questionSecs ?? 20} ث</p>
           {game?.specialRound !== 'speed' && (
             <>
               <SniperTimerPicker compact activeSecs={roundSecsUi} onSelect={onRoundSecsChange} />
@@ -118,14 +149,24 @@ export default function SniperAdminLive({
               )}
             </>
           )}
-          <button type="button" className="btn bg sniper-admin-start-timer" onClick={onStartTimer}>
+          <button
+            type="button"
+            className="btn bg sniper-admin-start-timer sniper-admin-start-timer--attention"
+            onClick={onStartTimer}
+          >
             ▶ بدء المؤقت ({maxSec} ث)
           </button>
         </>
       ) : (
         <div className="sniper-admin-timer-live">
-          <p className="sniper-admin-panel__hint">
-            {timerRunning ? `متبقي ~${countdown ?? maxSec} ث` : 'انتهى الوقت'}
+          <SniperCountdown
+            remaining={countdown}
+            maxSeconds={maxSec}
+            size={44}
+            waiting={false}
+          />
+          <p className="sniper-admin-micro">
+            {timerRunning ? 'العدّ جارٍ' : 'انتهى الوقت'}
           </p>
         </div>
       )}
@@ -134,8 +175,9 @@ export default function SniperAdminLive({
 
   const hostColumn = hostParticipates && (
     <div className="sniper-admin-split__col sniper-admin-split__host">
-      <h4 className="sniper-admin-split__title">👑 إجابتك للعرض</h4>
-      <p className="sniper-admin-panel__hint">لا تُحسب نقاطاً</p>
+      <SniperPanelTitle help={SNIPER_HOST_ANSWER_HELP} helpLabel="إجابة العرض">
+        👑 إجابتك
+      </SniperPanelTitle>
       <input
         className="inp sniper-admin-host-inp"
         placeholder="إجابتك…"
@@ -162,25 +204,24 @@ export default function SniperAdminLive({
           <div className="sniper-admin-hero__left">
             <div className="sniper-admin-hero__badge">{PHASE_LABELS[phase] || phase}</div>
             {roomCode && (
-              <div className="sniper-admin-hero__room" title="رمز الغرفة">
-                <span className="sniper-admin-hero__room-label">غرفة</span>
-                <strong className="sniper-admin-hero__room-code">{roomCode}</strong>
-              </div>
+              <SniperRoomMeta roomCode={roomCode} className="sniper-room-meta--hero" />
             )}
           </div>
-          <SniperCountdown
-            remaining={countdown}
-            maxSeconds={maxSec}
-            size={48}
-            waiting={timerWaiting}
-          />
+          {timerWaiting && phase === 'question' && (
+            <span className="sniper-admin-hero__timer-pill sniper-admin-hero__timer-pill--wait">
+              ⏸ لم يبدأ
+            </span>
+          )}
+          {timerRunning && (
+            <span className="sniper-admin-hero__timer-pill">⏱ {countdown ?? maxSec} ث</span>
+          )}
         </div>
         <div className="sniper-admin-hero__progress" aria-hidden>
           <div className="sniper-admin-hero__progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
         <div className="sniper-admin-hero__meta">
           <span className="sniper-admin-hero__q">
-            سؤال <strong>{currentQ}</strong>
+            جولة <strong>{currentQ}</strong>
             <span className="sniper-admin-hero__sep">/</span>
             {totalQ}
           </span>
@@ -208,58 +249,40 @@ export default function SniperAdminLive({
       </nav>
 
       {adminTab === 'rank' ? (
-        <SniperAdminLeaderboard players={players} />
+        <SniperAdminLeaderboard players={players} roomCode={roomCode} game={game} />
       ) : (
         <>
-          <section className="sniper-admin-panel sniper-admin-question">
-            {timerWaiting && (
-              <div className="sniper-admin-banner sniper-admin-banner--wait">
-                ⏸ اقرأ السؤال ثم ابدأ المؤقت
-              </div>
-            )}
-            {timerRunning && (
-              <div className="sniper-admin-banner sniper-admin-banner--run">
-                ⏱ العدّ جارٍ
-              </div>
-            )}
-            {grading && (
-              <div className="sniper-admin-banner sniper-admin-banner--grade">
-                ✋ صنّف الإجابات
-              </div>
-            )}
-            <p className="sniper-admin-question__text">{game?.questionText}</p>
-            {game?.questionCategory && (
-              <span className="sniper-admin-question__cat">{game.questionCategory}</span>
-            )}
-            {supervisorNotes?.trim() && (
-              <div
-                className="sniper-admin-panel"
-                style={{
-                  marginTop: 10,
-                  padding: '10px 12px',
-                  background: 'rgba(240,192,64,.08)',
-                  border: '1px solid rgba(240,192,64,.28)',
-                  borderRadius: 10,
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gold)', marginBottom: 6 }}>
-                  📝 ملاحظات المشرف — لا تظهر للاعبين
-                </div>
-                <p style={{ fontSize: 13, lineHeight: 1.65, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {supervisorNotes}
-                </p>
-              </div>
-            )}
-          </section>
-
           {phase === 'question' && (
-            <section className="sniper-admin-panel sniper-admin-deck">
+            <section className="sniper-admin-panel sniper-admin-tools-panel">
               <SniperAdminTools
                 activeSpecial={special}
                 timerRunning={timerRunning}
                 onSetSpecial={onSetSpecial}
                 onEndTimer={onEndTimer}
               />
+            </section>
+          )}
+
+          <SniperQuestionPanel
+            role="host"
+            questionText={hostQuestion}
+            hostOralHidden={hostFlags.oralHidden}
+            supervisorNotes={supervisorNotes}
+            status={
+              timerRunning || grading ? (
+                <div
+                  className={`sniper-admin-status ${
+                    grading ? 'sniper-admin-status--grade' : 'sniper-admin-status--run'
+                  }`}
+                >
+                  {grading ? '✋ تصحيح' : '⏱ جارٍ'}
+                </div>
+              ) : null
+            }
+          />
+
+          {phase === 'question' && (
+            <section className="sniper-admin-panel sniper-admin-controls">
               <div
                 className={`sniper-admin-split ${!hostParticipates ? 'sniper-admin-split--solo' : ''}`}
               >
@@ -267,6 +290,37 @@ export default function SniperAdminLive({
                 {hostColumn}
               </div>
             </section>
+          )}
+
+          {phase === 'question' && !hostParticipates && (
+            <SniperLiveAnswersPanel
+              highlight
+              title="📡 مباشر"
+              help={SNIPER_LIVE_OPS_HELP}
+              cards={liveCards}
+              emptyMessage={
+                timerRunning
+                  ? 'بانتظار أول إجابة…'
+                  : 'بعد بدء المؤقت تظهر الإجابات هنا مباشرة'
+              }
+            />
+          )}
+
+          {phase === 'question' && hostParticipates && !hostSent && (
+            <SniperAdminSubmitCounter
+              submitted={submittedCount}
+              total={totalContestants}
+              help={SNIPER_SUBMIT_COUNTER_HELP}
+            />
+          )}
+
+          {phase === 'question' && hostParticipates && hostSent && (
+            <SniperLiveAnswersPanel
+              title="📡 حيّ"
+              help={SNIPER_LIVE_HOST_HELP}
+              cards={liveCards}
+              emptyMessage="بانتظار إجابات الآخرين…"
+            />
           )}
 
           {grading && (

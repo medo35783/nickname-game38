@@ -37,7 +37,14 @@ import {
   BOARD_CELL,
   QB_GAME_TYPE,
 } from './sniperHelpers';
-import { flattenSniperPool, createQuestionCursor } from './sniperQuestions';
+import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
+import { QSOURCE } from '../../question-bank/questionSession';
+import {
+  flattenSniperPool,
+  createQuestionCursor,
+  countSniperPool,
+  sniperGameQuestionText,
+} from './sniperQuestions';
 
 function poolStorageKey(room) {
   return `ng_sniper_pool_${room}`;
@@ -78,7 +85,6 @@ const SniperGame = forwardRef(function SniperGame(
   const [duplicateMarked, setDuplicateMarked] = useState({});
   const [hostDraft, setHostDraft] = useState({ answer: '' });
   const [roundSummary, setRoundSummary] = useState([]);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const qCursorRef = useRef(null);
   const [adminQMeta, setAdminQMeta] = useState(null);
@@ -98,17 +104,73 @@ const SniperGame = forwardRef(function SniperGame(
   const me = myId ? players[myId] : null;
   const phase = game?.phase || 'lobby';
 
+  const prevQuestionRef = useRef(null);
+  const prevSubmittedRef = useRef(undefined);
+  const timeoutRoundRef = useRef(null);
+
+  /** مسح حقل الإجابة عند بدء سؤال جديد (لجميع الأدوار) */
+  useEffect(() => {
+    if (!game || game.phase !== 'question') return;
+    const q = game.currentQ || 0;
+    if (prevQuestionRef.current !== null && prevQuestionRef.current !== q) {
+      setAnswerText('');
+      setChosenScore(null);
+      setInsuranceActive(false);
+    }
+    prevQuestionRef.current = q;
+  }, [game?.currentQ, game?.phase]);
+
+  /** مسح الإجابة المحلية عند إعادة ضبط الجولة من Firebase */
+  useEffect(() => {
+    const sub = me?.submitted;
+    if (sub === false && prevSubmittedRef.current === true) {
+      setAnswerText('');
+      setChosenScore(null);
+      setInsuranceActive(false);
+    }
+    if (sub !== undefined) prevSubmittedRef.current = sub;
+  }, [me?.submitted]);
+
+  /** انتهى الوقت دون إرسال — تعليم الدرجة المختارة محلياً */
+  useEffect(() => {
+    if (role !== 'player' || !myId || !roomCode) return;
+    if (game?.phase !== 'grading') {
+      timeoutRoundRef.current = null;
+      return;
+    }
+    if (me?.submitted) return;
+    const rk = String(game.currentQ || 0);
+    if (timeoutRoundRef.current === rk) return;
+    timeoutRoundRef.current = rk;
+    if (!chosenScore) return;
+    const key = String(chosenScore);
+    const st = me?.board?.[key];
+    if (st === BOARD_CELL.AVAILABLE || st === BOARD_CELL.USED) {
+      void update(dbRef(db, `srooms/${roomCode}/players/${myId}/board/${key}`), BOARD_CELL.TIMEOUT).catch(() => {});
+    }
+  }, [game?.phase, game?.currentQ, me?.submitted, me?.board, chosenScore, role, myId, roomCode]);
+
   const restorePoolCursor = useCallback((room) => {
     try {
       const raw = localStorage.getItem(poolStorageKey(room));
       if (!raw) return null;
       const { pool } = JSON.parse(raw);
-      const flat = flattenSniperPool(pool);
+      const flat = flattenSniperPool(normalizePoolToStructured(pool));
+      if (!flat.length) return null;
       return createQuestionCursor(flat);
     } catch {
       return null;
     }
   }, []);
+
+  const gameQuestionPatch = (q, questionSource = game?.questionSource) => ({
+    questionText: sniperGameQuestionText(q, questionSource),
+    hostQuestionText: q.hostText || '',
+    questionCategory: q.categoryLabel || q.category || 'عام',
+    questionType: q.type || 'open_question',
+    questionAdminOnly: !!q.adminOnly,
+    questionWrittenText: !!q.writtenText,
+  });
 
   /* ── Firebase listeners ── */
   useEffect(() => {
@@ -243,6 +305,11 @@ const SniperGame = forwardRef(function SniperGame(
       }
 
       const code = genCode();
+      const poolNorm = normalizePoolToStructured(pool || {});
+      if (source !== QSOURCE.EXTERNAL && countSniperPool(poolNorm) === 0) {
+        notify('لا توجد أسئلة صالحة — حمّل البنك أو أضف أسئلة ثم أنشئ الغرفة', 'error');
+        return;
+      }
       const board = buildScoreBoard(totalQ);
       const adminPid = hostUid;
       await update(dbRef(db), {
@@ -269,8 +336,8 @@ const SniperGame = forwardRef(function SniperGame(
           isHost: true,
         },
       });
-      localStorage.setItem(poolStorageKey(code), JSON.stringify({ source, pool }));
-      qCursorRef.current = createQuestionCursor(flattenSniperPool(pool));
+      localStorage.setItem(poolStorageKey(code), JSON.stringify({ source, pool: poolNorm }));
+      qCursorRef.current = createQuestionCursor(flattenSniperPool(poolNorm));
       setRoomCode(code);
       setRole('admin');
       setMyId(adminPid);
@@ -342,14 +409,20 @@ const SniperGame = forwardRef(function SniperGame(
     const q = qCursorRef.current?.next();
     if (!q) {
       setAdminQMeta(null);
-      return { text: 'سؤال من المشرف', category: 'عام', categoryLabel: 'عام' };
+      return {
+        hostText: 'سؤال من المشرف',
+        playerText: '',
+        text: 'سؤال من المشرف',
+        category: 'عام',
+        categoryLabel: 'عام',
+        type: 'open_question',
+        adminOnly: false,
+        writtenText: false,
+        supervisor_notes: '',
+      };
     }
     setAdminQMeta(q);
-    return {
-      text: q.text,
-      category: q.categoryLabel,
-      categoryLabel: q.categoryLabel,
-    };
+    return q;
   };
 
   const resetRoundAnswers = async () => {
@@ -372,6 +445,10 @@ const SniperGame = forwardRef(function SniperGame(
 
   const startGame = async () => {
     if (!qCursorRef.current) qCursorRef.current = restorePoolCursor(roomCode);
+    if (!qCursorRef.current && game?.questionSource !== QSOURCE.EXTERNAL) {
+      notify('بنك الأسئلة غير متوفر — أعد إعداد البنك من اللوبي أو أنشئ غرفة جديدة', 'error');
+      return;
+    }
     const q = drawNextQuestion();
     const board = buildScoreBoard(game?.totalQ || 20);
     const playerPatches = {};
@@ -382,8 +459,9 @@ const SniperGame = forwardRef(function SniperGame(
       ...playerPatches,
       [`srooms/${roomCode}/game/phase`]: 'question',
       [`srooms/${roomCode}/game/currentQ`]: 1,
-      [`srooms/${roomCode}/game/questionText`]: q.text,
-      [`srooms/${roomCode}/game/questionCategory`]: q.category,
+      ...Object.fromEntries(
+        Object.entries(gameQuestionPatch(q)).map(([k, v]) => [`srooms/${roomCode}/game/${k}`, v])
+      ),
       [`srooms/${roomCode}/game/deadline`]: null,
       [`srooms/${roomCode}/game/specialRound`]: null,
       [`srooms/${roomCode}/game/roundSecs`]: null,
@@ -393,14 +471,11 @@ const SniperGame = forwardRef(function SniperGame(
   };
 
   const startQuestion = async (qNum, { ultimate = false, fixedScore = null } = {}) => {
-    const q = ultimate
-      ? drawNextQuestion()
-      : drawNextQuestion();
+    const q = drawNextQuestion();
     await update(dbRef(db, `srooms/${roomCode}/game`), {
       phase: 'question',
       currentQ: qNum,
-      questionText: q.text,
-      questionCategory: q.category,
+      ...gameQuestionPatch(q),
       deadline: null,
       roundSecs: null,
       specialRound: ultimate ? null : null,
@@ -478,6 +553,10 @@ const SniperGame = forwardRef(function SniperGame(
 
   const submitAnswer = async () => {
     if (!myId || me?.submitted) return;
+    if (!game?.deadline || game.deadline <= Date.now()) {
+      notify('انتظر حتى يبدأ المشرف المؤقت', 'gold');
+      return;
+    }
     const text = answerText.trim();
     const score = game?.finalVoteResult ? game.finalVoteResult : chosenScore;
     if (!text || !score) return;
@@ -583,18 +662,22 @@ const SniperGame = forwardRef(function SniperGame(
           delta = row.insuranceUsed ? Math.floor(base / 2) : 0;
         }
       } else if (v === 'correct') {
-          correct = true;
-          delta = gradedPoints(base, true, spec, row.insuranceUsed);
-          if (currentQ >= HOT_STREAK_START_Q) {
-            const streak = (p.consecutiveCorrect || 0) + 1;
-            let bonus = 0;
-            let onFire = !!p.isOnFire;
-            if (streak >= HOT_STREAK_NEED) onFire = true;
-            if (onFire && streak >= HOT_STREAK_NEED + 1) bonus = HOT_STREAK_BONUS;
-            playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = streak;
-            playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = onFire;
-            hotStreak[pid] = streak;
-            delta += bonus;
+        correct = true;
+        delta = gradedPoints(base, true, spec, row.insuranceUsed);
+        const bKey = String(base);
+        const board = { ...(p.board || {}) };
+        board[bKey] = spec === 'double' ? BOARD_CELL.DOUBLE_WON : BOARD_CELL.WON;
+        playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
+        if (currentQ >= HOT_STREAK_START_Q) {
+          const streak = (p.consecutiveCorrect || 0) + 1;
+          let bonus = 0;
+          let onFire = !!p.isOnFire;
+          if (streak >= HOT_STREAK_NEED) onFire = true;
+          if (onFire && streak >= HOT_STREAK_NEED + 1) bonus = HOT_STREAK_BONUS;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = streak;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = onFire;
+          hotStreak[pid] = streak;
+          delta += bonus;
         }
       } else if (v === 'wrong') {
         delta = gradedPoints(base, false, spec, false);
@@ -608,6 +691,10 @@ const SniperGame = forwardRef(function SniperGame(
       }
 
       if (dupKeys.has(key) && duplicateMarked[key]) {
+        const bKey = String(base);
+        const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
+        board[bKey] = BOARD_CELL.BURNED;
+        playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
         playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = 0;
         playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = false;
         hotStreak[pid] = 0;
@@ -828,7 +915,7 @@ const SniperGame = forwardRef(function SniperGame(
           players={players}
           answers={answers}
           hostAnswer={hostAnswer}
-          supervisorNotes={adminQMeta?.type === 'written_text' ? adminQMeta.supervisor_notes : ''}
+          supervisorNotes={adminQMeta?.supervisor_notes || ''}
           countdown={countdown}
           onSetSpecial={onSetSpecial}
           hostParticipates={!!game?.hostParticipates}
@@ -867,59 +954,46 @@ const SniperGame = forwardRef(function SniperGame(
     }
 
     if (gameScreen === 'leaderboard') {
-      const lbBody = (
-        <>
-          <div className="card">
-            <div className="ctitle">🏆 الترتيب</div>
-            <SniperLeaderboardList players={players} myId={myId} />
-          </div>
-          {role === 'admin' ? (
+      if (role === 'admin') {
+        return (
+          <div className="scr sniper-theme">
+            <SniperLeaderboardList
+              players={players}
+              myId={myId}
+              roomCode={roomCode}
+              game={game}
+            />
             <button type="button" className="btn bg" onClick={() => void onNextQuestion()}>
               ➡️ السؤال التالي
             </button>
-          ) : (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>انتظر المشرف…</div>
-          )}
-        </>
-      );
-      if (role === 'admin') {
-        return <div className="scr sniper-theme">{lbBody}</div>;
+          </div>
+        );
       }
       return (
+        <SniperPlayerHud
+          roomCode={roomCode}
+          me={me}
+          myId={myId}
+          game={game}
+          players={players}
+          initialTab="rank"
+          rankFooter={
+            <p className="sniper-player-wait">⏳ انتظر المشرف للجولة التالية…</p>
+          }
+        />
+      );
+    }
+
+    if (gameScreen === 'final' && role === 'player') {
+      return (
         <SniperPlayerHud roomCode={roomCode} me={me} myId={myId} game={game} players={players}>
-          {lbBody}
+          <SniperFinal players={players} onHome={leaveToArena} />
         </SniperPlayerHud>
       );
     }
 
     if (gameScreen === 'final') {
-      return (
-        <>
-          <SniperFinal
-            players={players}
-            onHome={leaveToArena}
-            showLeaderboardPopup={() => setLeaderboardOpen(true)}
-          />
-          {leaderboardOpen && (
-            <div className="modal-bg" onClick={() => setLeaderboardOpen(false)}>
-              <div className="modal-box card" onClick={(e) => e.stopPropagation()}>
-                <div className="ctitle">🏆 الترتيب النهائي</div>
-                {Object.entries(players)
-                  .map(([id, p]) => ({ ...p, id }))
-                  .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
-                  .map((p, i) => (
-                    <div key={p.id} className="sniper-result-row">
-                      {i + 1}. {p.name} — {p.totalScore}
-                    </div>
-                  ))}
-                <button type="button" className="btn bgh mt2" onClick={() => setLeaderboardOpen(false)}>
-                  إغلاق
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      );
+      return <SniperFinal players={players} onHome={leaveToArena} />;
     }
 
     return null;

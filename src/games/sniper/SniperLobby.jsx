@@ -1,6 +1,8 @@
 import Av from '../../shared/Av';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
+import { SniperPanelTitle, SNIPER_HOST_PARTICIPATE_HELP } from './SniperHelpTip';
 import { SNIPER_ACCENT_CSS, SNIPER_BORDER_CSS } from './sniperHelpers';
+import SniperRoomMeta from './SniperRoomMeta';
 import SniperTimerPicker from './SniperTimerPicker';
 
 export default function SniperLobby({
@@ -24,12 +26,9 @@ export default function SniperLobby({
   return (
     <div className="scr sniper-theme">
       <div className="card" style={{ textAlign: 'center', padding: '18px 12px' }}>
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>رمز الغرفة</div>
-        <div className="room-code-big" style={{ fontSize: 36, letterSpacing: 8 }}>
-          {roomCode}
-        </div>
+        <SniperRoomMeta roomCode={roomCode} className="sniper-room-meta--lobby" />
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-          {totalQ} سؤال · لوحة 1–{totalQ}
+          {totalQ} جولة · لوحة 1–{totalQ}
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
           <button type="button" className="btn bgh bsm" style={{ width: 'auto' }} onClick={() => onShare(false)}>
@@ -54,26 +53,23 @@ export default function SniperLobby({
 
       {isAdmin && (
         <div className="card">
-          <div className="ctitle">👑 هل تشارك بإجابات؟</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.6 }}>
-            اختر قبل البدء. المشاركة <strong>عرضية فقط</strong> — لا تُحسب في النقاط ولا تستهلك أرقام اللوحة.
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <SniperPanelTitle help={SNIPER_HOST_PARTICIPATE_HELP} helpLabel="المشاركة">
+            👑 مشاركة بإجابات؟
+          </SniperPanelTitle>
+          <div className="sniper-lobby-toggle">
             <button
               type="button"
-              className={`btn ${hostParticipates ? 'bg' : 'bgh'}`}
-              style={{ flex: 1, borderColor: hostParticipates ? SNIPER_ACCENT_CSS : undefined }}
+              className={`sniper-lobby-toggle__btn ${hostParticipates ? 'is-on' : ''}`}
               onClick={() => onHostParticipatesChange(true)}
             >
-              ✅ نعم — أشارك للمتعة
+              ✅ أشارك
             </button>
             <button
               type="button"
-              className={`btn ${!hostParticipates ? 'bg' : 'bgh'}`}
-              style={{ flex: 1 }}
+              className={`sniper-lobby-toggle__btn ${!hostParticipates ? 'is-on' : ''}`}
               onClick={() => onHostParticipatesChange(false)}
             >
-              🎛️ لا — إدارة فقط
+              🎛️ إدارة
             </button>
           </div>
         </div>

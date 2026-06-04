@@ -1,6 +1,5 @@
 import Av from '../../shared/Av';
 import SniperPlayerHud from './SniperPlayerHud';
-import SniperLeaderboardList from './SniperLeaderboardList';
 export default function SniperResults({
   roomCode,
   game,
@@ -35,14 +34,10 @@ export default function SniperResults({
         </div>
       )}
 
-      <div className="card">
-        <div className="ctitle">🏅 الترتيب الحالي</div>
-        <SniperLeaderboardList players={players} myId={myId} />
-      </div>
-
       <button type="button" className="btn bg" onClick={onContinue}>
         متابعة →
       </button>
+      <p className="sniper-player-hint">🏆 الترتيب الكامل من تبويب «الترتيب» أعلى الشاشة</p>
     </>
   );
 

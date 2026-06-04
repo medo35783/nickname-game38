@@ -34,7 +34,7 @@ function ConfettiBurst() {
   );
 }
 
-export default function SniperFinal({ players, onHome, showLeaderboardPopup }) {
+export default function SniperFinal({ players, onHome }) {
   const list = Object.entries(players || {})
     .map(([id, p]) => ({ ...p, id }))
     .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
@@ -48,15 +48,6 @@ export default function SniperFinal({ players, onHome, showLeaderboardPopup }) {
   return (
     <div className="scr sniper-theme sniper-final">
       <ConfettiBurst />
-      <button
-        type="button"
-        className="sniper-trophy-fab"
-        title="الترتيب"
-        onClick={showLeaderboardPopup}
-      >
-        🏆
-      </button>
-
       <div style={{ textAlign: 'center', padding: '12px 0 20px', position: 'relative', zIndex: 2 }}>
         <div style={{ fontSize: 48 }}>🏆</div>
         <div className="ptitle" style={{ fontSize: 26 }}>

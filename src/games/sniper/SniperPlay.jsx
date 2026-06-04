@@ -1,44 +1,17 @@
-import { useMemo } from 'react';
-import Av from '../../shared/Av';
 import SniperCountdown from './SniperCountdown';
+import SniperQuestionPanel from './SniperQuestionPanel';
 import SniperPlayerHud from './SniperPlayerHud';
+import SniperScoreGrid from './SniperScoreGrid';
+import { LiveAnswerCard, useSniperLiveAnswers } from './SniperLiveAnswers';
 import {
-  pickAvailableScores,
   questionDurationSec,
+  isTimerRunning,
+  isTimerWaiting,
+  sniperPlayerQuestionView,
   FINAL_VOTE_OPTIONS,
   FINAL_VOTE_SECONDS,
   SNIPER_ACCENT_CSS,
-  SNIPER_GLOW_CSS,
 } from './sniperHelpers';
-
-function LiveAnswerCard({ entry, isHost }) {
-  return (
-    <div
-      className="sniper-live-card"
-      style={{
-        border: isHost ? `2px solid ${SNIPER_ACCENT_CSS}` : '1px solid var(--border-subtle)',
-        boxShadow: isHost ? `0 0 14px ${SNIPER_GLOW_CSS}` : undefined,
-      }}
-    >
-      <Av p={entry.player} sz={36} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: 13 }}>
-          {entry.name}
-          {isHost && (
-            <span style={{ marginRight: 6, fontSize: 10, color: SNIPER_ACCENT_CSS }}>المشرف</span>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{entry.answer || '—'}</div>
-      </div>
-      {!isHost && <div className="sniper-score-pill">{entry.chosenScore ?? '—'}</div>}
-      {isHost && (
-        <span className="tag tg" style={{ fontSize: 10 }}>
-          عرض
-        </span>
-      )}
-    </div>
-  );
-}
 
 export default function SniperPlay({
   roomCode,
@@ -62,41 +35,24 @@ export default function SniperPlay({
   voteCountdown,
 }) {
   const phase = game?.phase;
-  const blind = game?.specialRound === 'blind';
   const isFinalBet = !!game?.finalVoteResult && game?.currentQ > (game?.totalQ || 0);
+  const qView = sniperPlayerQuestionView(game);
   const maxSec = questionDurationSec(game);
-  const deadline = game?.deadline;
-  const timerWaiting = phase === 'question' && !deadline;
-  const remaining = deadline ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) : null;
-
   const submitted = !!me?.submitted;
-  const canUseInsurance = (me?.insuranceLeft || 0) > 0 && !submitted && !timerWaiting;
+  const timerWaiting = isTimerWaiting(game);
+  const timerActive = isTimerRunning(game);
+  const remaining = game?.deadline
+    ? Math.max(0, Math.ceil((game.deadline - Date.now()) / 1000))
+    : null;
+  const inputLocked = timerWaiting && !submitted;
+  const canUseInsurance = (me?.insuranceLeft || 0) > 0 && !submitted && timerActive;
 
-  const liveCards = useMemo(() => {
-    const cards = [];
-    Object.entries(answers || {}).forEach(([pid, row]) => {
-      cards.push({
-        id: pid,
-        name: players[pid]?.name,
-        answer: row.answer,
-        chosenScore: row.chosenScore,
-        player: players[pid],
-        ts: row.ts || 0,
-        isHost: false,
-      });
-    });
-    if (game?.hostParticipates && hostAnswer?.answer) {
-      cards.push({
-        id: '__host__',
-        name: 'المشرف',
-        answer: hostAnswer.answer,
-        player: { name: 'المشرف', initials: '👑', colorIdx: 0 },
-        ts: hostAnswer.ts || 0,
-        isHost: true,
-      });
-    }
-    return cards.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-  }, [answers, hostAnswer, players, game?.hostParticipates]);
+  const { liveCards } = useSniperLiveAnswers(
+    answers,
+    players,
+    hostAnswer,
+    !!game?.hostParticipates
+  );
 
   const hud = (body) => (
     <SniperPlayerHud roomCode={roomCode} me={me} myId={myId} game={game} players={players}>
@@ -144,81 +100,50 @@ export default function SniperPlay({
 
   return hud(
     <>
-      <div className="card sniper-q-card">
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <SniperQuestionPanel
+        role="player"
+        playerMode={qView.mode}
+        maskReason={qView.reason}
+        questionText={qView.text}
+        blind={qView.blind}
+        oral={qView.oral}
+        isFinalBet={isFinalBet}
+        finalBetScore={game?.finalVoteResult}
+        aside={
           <SniperCountdown remaining={remaining} maxSeconds={maxSec} waiting={timerWaiting} />
-          <div style={{ flex: 1 }}>
-            {timerWaiting && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'var(--muted)',
-                  marginBottom: 8,
-                  padding: '6px 10px',
-                  background: 'var(--surface)',
-                  borderRadius: 8,
-                }}
-              >
-                ⏸ بانتظار المشرف لبدء المؤقت…
-              </div>
-            )}
-            {game?.questionCategory && (
-              <div className="tag tg" style={{ fontSize: 10, marginBottom: 6 }}>
-                {game.questionCategory}
-              </div>
-            )}
-            {blind ? (
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--muted)' }}>🙈 جولة عميان — التصنيف فقط</div>
-            ) : (
-              <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.5 }}>{game?.questionText || '…'}</div>
-            )}
-            {blind && game?.questionCategory && (
-              <div style={{ marginTop: 8, fontSize: 14 }}>{game.questionCategory}</div>
-            )}
-            {isFinalBet && (
-              <div style={{ marginTop: 8, fontSize: 12, color: SNIPER_ACCENT_CSS }}>
-                🎲 رهان حاسم: {game.finalVoteResult} نقطة للجميع
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="card">
-        <div className="ctitle">✍️ إجابتك</div>
-        <input
-          className="inp"
-          placeholder={timerWaiting ? 'انتظر بدء المؤقت…' : 'اكتب إجابتك…'}
-          value={answerText}
-          disabled={submitted || timerWaiting}
-          onChange={(e) => setAnswerText(e.target.value)}
-        />
+        {timerWaiting && (
+          <p className="sniper-play-hint">
+            🎯 اختر درجتك أولاً — يظهر السؤال وتُكتب الإجابة بعد بدء المؤقت
+          </p>
+        )}
         {!isFinalBet && (
           <>
-            <div className="ctitle" style={{ marginTop: 12 }}>
-              🎯 اختر درجتك
-            </div>
-            <div className="sniper-score-grid">
-              {Array.from({ length: game?.totalQ || 15 }, (_, i) => i + 1).map((n) => {
-                const st = me?.board?.[String(n)] || 'available';
-                const disabled = submitted || timerWaiting || st !== 'available';
-                const burned = st === 'burned';
-                const used = st === 'used';
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`sniper-score-btn ${chosenScore === n ? 'active' : ''}`}
-                    disabled={disabled}
-                    onClick={() => setChosenScore(n)}
-                  >
-                    {burned ? '❌' : used ? '·' : n}
-                  </button>
-                );
-              })}
-            </div>
+            <div className="ctitle">🎯 اختر درجتك</div>
+            <SniperScoreGrid
+              totalQ={game?.totalQ}
+              board={me?.board}
+              chosenScore={chosenScore}
+              disabled={submitted}
+              onPick={setChosenScore}
+            />
           </>
         )}
+        <div className="ctitle" style={{ marginTop: isFinalBet ? 0 : 12 }}>✍️ إجابتك</div>
+        {inputLocked && (
+          <p className="sniper-input-locked">🔒 الإجابة تُفتح بعد بدء المؤقت</p>
+        )}
+        <input
+          className="inp"
+          placeholder={inputLocked ? 'بانتظار بدء المؤقت…' : 'اكتب إجابتك…'}
+          value={answerText}
+          disabled={submitted || timerWaiting}
+          readOnly={timerWaiting}
+          onChange={(e) => setAnswerText(e.target.value)}
+        />
         {canUseInsurance && (
           <button
             type="button"
@@ -233,7 +158,12 @@ export default function SniperPlay({
           <button
             type="button"
             className="btn bg mt2"
-            disabled={submitting || timerWaiting || !answerText.trim() || (!isFinalBet && !chosenScore)}
+            disabled={
+              submitting ||
+              !timerActive ||
+              !answerText.trim() ||
+              (!isFinalBet && !chosenScore)
+            }
             onClick={onSubmit}
           >
             {submitting ? '⏳' : '📤 إرسال'}
