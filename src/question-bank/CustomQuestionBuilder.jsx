@@ -36,6 +36,7 @@ const EMPTY_DRAFT = () => ({
   question_text: '',
   type: 'multiple_choice',
   correct_answer: '',
+  supervisor_notes: '',
   options: ['', '', '', ''],
   correctOptionIndex: null,
   category: 'general',
@@ -53,6 +54,7 @@ function questionToDraft(q) {
     question_text: q.question_text || '',
     type: q.type || 'multiple_choice',
     correct_answer: q.correct_answer || '',
+    supervisor_notes: q.supervisor_notes || '',
     options,
     correctOptionIndex: correctIdx >= 0 ? correctIdx : null,
     category: q.category || 'general',
@@ -74,6 +76,7 @@ function rowToPrepared(row) {
     type: row.type,
     options,
     correct_answer: correct,
+    supervisor_notes: row.type === 'written_text' ? String(row.supervisor_notes || '').trim() : '',
     category: row.category,
     difficulty_level: row.difficulty_level || 'medium',
   };
@@ -92,6 +95,9 @@ function validateDraft(row) {
   if (row.type === 'open_question' && !row.correct_answer.trim()) {
     return '⚠️ اكتب الإجابة الصحيحة — لا يُحفظ السؤال بدونها';
   }
+  if (row.type === 'written_text' && !row.supervisor_notes?.trim()) {
+    return '⚠️ أضف ملاحظات المشرف (إجابات متوقعة أو تعليق) — لا تظهر للاعبين';
+  }
   if (row.type === 'true_false' && !row.correct_answer) {
     return '⚠️ اختر صح أو خطأ — لا يُحفظ السؤال بدون إجابة';
   }
@@ -103,6 +109,9 @@ function correctAnswerHint(q) {
     const idx = getCorrectOptionIndex(q.options, q.correct_answer);
     if (idx >= 0) return `✓ ${optionLabel(idx)}: ${q.options[idx]}`;
     if (q.correct_answer) return `✓ ${q.correct_answer}`;
+  }
+  if (q.type === 'written_text' && q.supervisor_notes) {
+    return `📝 ${q.supervisor_notes.slice(0, 48)}${q.supervisor_notes.length > 48 ? '…' : ''}`;
   }
   if (q.type === 'true_false' || q.type === 'open_question') {
     return q.correct_answer ? `✓ ${q.correct_answer}` : null;
@@ -417,6 +426,7 @@ export default function CustomQuestionBuilder({
               <option value="multiple_choice">اختيار من متعدد</option>
               <option value="true_false">صح أو خطأ</option>
               <option value="open_question">سؤال مفتوح</option>
+              <option value="written_text">نص كتابي</option>
             </select>
           </label>
           <label className="ig">
@@ -502,6 +512,19 @@ export default function CustomQuestionBuilder({
               value={draft.correct_answer}
               onChange={(e) => updateDraft({ correct_answer: e.target.value })}
               placeholder="الإجابة المعتمدة"
+            />
+          </div>
+        )}
+
+        {draft.type === 'written_text' && (
+          <div className="ig">
+            <label className="lbl">ملاحظات المشرف (لا تظهر للاعبين)</label>
+            <textarea
+              className="inp"
+              rows={3}
+              value={draft.supervisor_notes}
+              onChange={(e) => updateDraft({ supervisor_notes: e.target.value })}
+              placeholder="إجابات متوقعة أو تعليق للمشرف فقط"
             />
           </div>
         )}

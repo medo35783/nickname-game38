@@ -29,6 +29,7 @@ export default function FameeriAdminPlay({
   qCountdown,
   qActiveQuestion,
   qActiveAnswer,
+  qSupervisorNotes = '',
   qAdminGroupAnswers,
   qAdminAnswerContext,
   qAdminPendingGroups,
@@ -276,6 +277,7 @@ export default function FameeriAdminPlay({
           qCurrentAttack={qCurrentAttack}
           qActiveQuestion={qActiveQuestion}
           qActiveAnswer={qActiveAnswer}
+          qSupervisorNotes={qSupervisorNotes}
           qAdminGroupAnswers={qAdminGroupAnswers}
           qAdminAnswerContext={qAdminAnswerContext}
           qAdminPendingGroups={qAdminPendingGroups}
@@ -358,6 +360,7 @@ export default function FameeriAdminPlay({
           <AdminQuestionView
             current={qActiveQuestion}
             answer={qActiveAnswer}
+            supervisorNotes={qSupervisorNotes}
             groupAnswers={qAdminGroupAnswers}
             answerContext={qAdminAnswerContext}
             pendingGroups={qAdminPendingGroups}

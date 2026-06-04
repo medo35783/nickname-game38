@@ -29,6 +29,7 @@ export const QB_CATEGORY_LABELS = {
   animals: 'حيوانات',
   sports: 'رياضة',
   acting_proverbs: 'تمثيل وأمثال',
+  five_items: 'اسم/حيوان/نبات/جماد/بلاد',
   general: 'عام',
 };
 
@@ -42,7 +43,12 @@ export const QB_TYPE_LABELS = {
   multiple_choice: 'اختيار من متعدد',
   true_false: 'صح أو خطأ',
   open_question: 'سؤال مفتوح',
+  written_text: 'نص كتابي',
 };
+
+export function isWrittenTextQuestion(question) {
+  return (question?.type || '') === 'written_text';
+}
 
 export const QB_AUDIENCE_LABELS = {
   general: 'عام',
@@ -73,6 +79,7 @@ export function toPublicQuestion(question, { revealToPlayers = false, revealOpti
 
   const adminOnly = isAdminOnlyQuestion(question);
   const type = question.type || 'open_question';
+  const writtenText = isWrittenTextQuestion({ type });
 
   let options = [];
   if (type === 'multiple_choice') {
@@ -87,6 +94,7 @@ export function toPublicQuestion(question, { revealToPlayers = false, revealOpti
     type,
     category: question.category || null,
     options,
+    writtenText,
     adminOnly,
     // أسئلة المشرف فقط لا تُكشف للمتسابقين مهما كان
     revealToPlayers: adminOnly ? false : !!revealToPlayers,
@@ -105,6 +113,7 @@ export function buildCustomPool(items) {
       type: item.type || 'open_question',
       options: Array.isArray(item.options) ? item.options.filter(Boolean) : [],
       correct_answer: String(item.correct_answer || '').trim(),
+      supervisor_notes: String(item.supervisor_notes || '').trim(),
       category: item.category || 'general',
       difficulty_level: item.difficulty_level || 'medium',
       audience: item.audience || 'general',
@@ -119,6 +128,7 @@ export function normalizeBankPool(items) {
     type: item.type || 'open_question',
     options: Array.isArray(item.options) ? item.options.filter(Boolean) : [],
     correct_answer: String(item.correct_answer || '').trim(),
+    supervisor_notes: String(item.supervisor_notes || '').trim(),
     category: item.category || 'general',
     difficulty_level: item.difficulty_level || 'medium',
     audience: item.audience || 'general',

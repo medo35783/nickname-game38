@@ -1,3 +1,5 @@
+import { isWrittenTextQuestion } from './questionSession';
+
 /**
  * أزرار إظهار/إخفاء السؤال للمجموعات — متاحة في أي وقت (قبل أو بعد المؤقت).
  */
@@ -11,6 +13,7 @@ export default function AdminQuestionRevealControls({
   if (!current || current.adminOnly) return null;
 
   const hasOptions = Array.isArray(current.options) && current.options.length > 0;
+  const writtenText = isWrittenTextQuestion(current) || !!current.writtenText;
 
   return (
     <div className={`admin-q-reveal-controls${compact ? ' admin-q-reveal-controls--compact' : ''}`}>
@@ -20,9 +23,15 @@ export default function AdminQuestionRevealControls({
             <span className={`admin-q-reveal-pill${current.revealToPlayers ? ' on' : ''}`}>
               {current.revealToPlayers ? '👁️ السؤال ظاهر' : '🔒 السؤال مخفي'}
             </span>
-            {hasOptions && (
+            {(hasOptions || writtenText) && (
               <span className={`admin-q-reveal-pill${current.revealOptions ? ' on' : ''}`}>
-                {current.revealOptions ? '👁️ الخيارات ظاهرة' : '🔒 الخيارات مخفية'}
+                {current.revealOptions
+                  ? writtenText
+                    ? '👁️ حقل الإجابة ظاهر'
+                    : '👁️ الخيارات ظاهرة'
+                  : writtenText
+                    ? '🔒 حقل الإجابة مخفي'
+                    : '🔒 الخيارات مخفية'}
               </span>
             )}
           </div>
@@ -47,14 +56,20 @@ export default function AdminQuestionRevealControls({
         >
           {current.revealToPlayers ? '🙈 إخفاء السؤال' : '👁️ إظهار السؤال'}
         </button>
-        {hasOptions && (
+        {(hasOptions || writtenText) && (
           <button
             type="button"
             className={`btn ${current.revealOptions ? 'bg' : 'bgh'} bsm`}
             disabled={!current.revealToPlayers}
             onClick={onToggleRevealOptions}
           >
-            {current.revealOptions ? '🙈 إخفاء الخيارات' : '👁️ إظهار الخيارات'}
+            {current.revealOptions
+              ? writtenText
+                ? '🙈 إخفاء حقل الإجابة'
+                : '🙈 إخفاء الخيارات'
+              : writtenText
+                ? '✍️ إظهار حقل الإجابة'
+                : '👁️ إظهار الخيارات'}
           </button>
         )}
         {(current.revealToPlayers || current.revealOptions) && typeof onHideAll === 'function' && (

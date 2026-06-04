@@ -3,6 +3,7 @@ import {
   QB_TYPE_LABELS,
   getCorrectOptionIndex,
   isAnswerCorrect,
+  isWrittenTextQuestion,
   optionLabel,
 } from './questionSession';
 import AdminQuestionRevealControls from './AdminQuestionRevealControls';
@@ -16,6 +17,7 @@ import FameeriAdminAnswerVerdict from '../games/fameeri/FameeriAdminAnswerVerdic
 export default function AdminQuestionView({
   current,
   answer,
+  supervisorNotes = '',
   onToggleRevealQuestion,
   onToggleRevealOptions,
   onHideAll,
@@ -32,6 +34,8 @@ export default function AdminQuestionView({
   if (!current) return null;
 
   const adminOnly = current.adminOnly;
+  const writtenText = isWrittenTextQuestion(current) || !!current.writtenText;
+  const notesForSupervisor = String(supervisorNotes || '').trim();
   const hasOptions = Array.isArray(current.options) && current.options.length > 0;
   const correctIdx = hasOptions ? getCorrectOptionIndex(current.options, answer) : -1;
   const optText = (i) =>
@@ -91,18 +95,30 @@ export default function AdminQuestionView({
         </div>
       )}
 
-      <div className="admin-q-answer-key" aria-label="الإجابة الصحيحة للمشرف">
-        <div className="admin-q-answer-key__label">🔑 الإجابة الصحيحة — للمشرف فقط</div>
-        <div className="admin-q-answer-key__value">
-          {correctIdx >= 0 && (
-            <span className="admin-q-answer-key__letter">{optionLabel(correctIdx)}</span>
-          )}
-          <span>{answer || '—'}</span>
+      {writtenText ? (
+        <div className="admin-q-answer-key" aria-label="ملاحظات المشرف">
+          <div className="admin-q-answer-key__label">📝 ملاحظات المشرف — إجابات متوقعة أو تعليق (لا يظهر للاعبين)</div>
+          <div className="admin-q-answer-key__value" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+            {notesForSupervisor || '—'}
+          </div>
+          <p className="admin-q-groups__hint" style={{ marginTop: 8 }}>
+            التصحيح يدوي — اضغط ✅ صح أو ❌ خطأ حسب إجابات المجموعات.
+          </p>
         </div>
-        {hasOptions && correctIdx < 0 && answer && (
-          <div className="admin-q-answer-key__warn">⚠️ لم يُطابق نص الإجابة أي خيار — راجع المخزون</div>
-        )}
-      </div>
+      ) : (
+        <div className="admin-q-answer-key" aria-label="الإجابة الصحيحة للمشرف">
+          <div className="admin-q-answer-key__label">🔑 الإجابة الصحيحة — للمشرف فقط</div>
+          <div className="admin-q-answer-key__value">
+            {correctIdx >= 0 && (
+              <span className="admin-q-answer-key__letter">{optionLabel(correctIdx)}</span>
+            )}
+            <span>{typeof answer === 'string' ? answer : '—'}</span>
+          </div>
+          {hasOptions && correctIdx < 0 && answer && (
+            <div className="admin-q-answer-key__warn">⚠️ لم يُطابق نص الإجابة أي خيار — راجع المخزون</div>
+          )}
+        </div>
+      )}
 
       {(answeredCount > 0 || pendingGroups.length > 0) && (
         <div className="admin-q-groups">

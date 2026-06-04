@@ -57,7 +57,9 @@ export function buildGameSessionTracking(gameType) {
 }
 
 function roomBase(gameType, roomCode) {
-  return gameType === 'titles' ? `rooms/${roomCode}` : `qrooms/${roomCode}`;
+  if (gameType === 'titles') return `rooms/${roomCode}`;
+  if (gameType === 'sniper') return `srooms/${roomCode}`;
+  return `qrooms/${roomCode}`;
 }
 
 function gamePath(gameType, roomCode) {
@@ -65,9 +67,9 @@ function gamePath(gameType, roomCode) {
 }
 
 function playersPath(gameType, roomCode) {
-  return gameType === 'titles'
-    ? `rooms/${roomCode}/players`
-    : `qrooms/${roomCode}/members`;
+  if (gameType === 'titles') return `rooms/${roomCode}/players`;
+  if (gameType === 'sniper') return `srooms/${roomCode}/players`;
+  return `qrooms/${roomCode}/members`;
 }
 
 export function computeNextStats(prev = {}, sessionData) {
@@ -113,6 +115,7 @@ export function computeNextStats(prev = {}, sessionData) {
     gamesPlayed: {
       titles: (prev.gamesPlayed?.titles || 0) + (gameType === 'titles' ? 1 : 0),
       fameeri: (prev.gamesPlayed?.fameeri || 0) + (gameType === 'fameeri' ? 1 : 0),
+      sniper: (prev.gamesPlayed?.sniper || 0) + (gameType === 'sniper' ? 1 : 0),
     },
     recentSessions,
   };
@@ -128,7 +131,7 @@ async function writeStatsSummary(statsPath, sessionData) {
  * يُستدعى عند انتهاء كل جولة — يزيد game/totalRounds بمقدار 1.
  */
 export async function recordRoundCompleted(gameType, roomCode) {
-  if (gameType !== 'titles' && gameType !== 'fameeri') return;
+  if (gameType !== 'titles' && gameType !== 'fameeri' && gameType !== 'sniper') return;
   try {
     const path = gamePath(gameType, roomCode);
     const snap = await get(ref(db, path));
@@ -144,7 +147,7 @@ export async function recordRoundCompleted(gameType, roomCode) {
  * يُستدعى عند إنهاء المشرف للجلسة — يحدّث عقدة game ثم يجمّع إحصائيات الكود/المستخدم.
  */
 export async function recordSessionEnd(gameType, roomCode, completed = true) {
-  if (gameType !== 'titles' && gameType !== 'fameeri') return;
+  if (gameType !== 'titles' && gameType !== 'fameeri' && gameType !== 'sniper') return;
   try {
     const base = roomBase(gameType, roomCode);
     const playersSnap = await get(ref(db, playersPath(gameType, roomCode)));

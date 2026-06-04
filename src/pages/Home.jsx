@@ -1,4 +1,5 @@
 import { SUPPORT_EMAIL } from '../core/constants';
+import '../styles/sniper.css';
 
 export default function Home({ setSelectedGame }) {
   return (
@@ -50,11 +51,34 @@ export default function Home({ setSelectedGame }) {
         </div>
       </div>
 
-      {/* قريباً — ألعاب أخرى */}
+      {/* بطاقة قناص الدرجات */}
+      <div
+        className="home-game-card home-game-card--sniper"
+        onClick={() => setSelectedGame('sniper')}
+        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
+        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ fontSize: 44 }}>🎯</div>
+          <div style={{ flex: 1 }}>
+            <div className="home-game-card__title">قناص الدرجات</div>
+            <div className="home-game-card__sub">
+              اختر درجتك، أجب بذكاء، ونافس على التتويج
+            </div>
+            <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
+              {['15–30 سؤال', 'تأمين واشتعال', 'رهان حاسم'].map((t) => (
+                <span key={t} className="tag" style={{ fontSize: 10 }}>{t}</span>
+              ))}
+            </div>
+          </div>
+          <div className="home-game-card__arrow">←</div>
+        </div>
+      </div>
+
       <div className="card2" style={{ borderStyle: 'dashed', textAlign: 'center', padding: '16px', marginBottom: 12 }}>
         <div style={{ fontSize: 28, marginBottom: 6 }}>🎲</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>المزيد من الألعاب قادمة!</div>
-        <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 3 }}>ترقبوا ألعاب جماعية جديدة ومثيرة</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>المزيد قادم!</div>
+        <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 3 }}>ألعاب جماعية جديدة على الساحة</div>
       </div>
 
       <button className="btn bgh" style={{ marginTop: 4, fontSize: 12 }} onClick={() => window.open(`mailto:${SUPPORT_EMAIL}?subject=اقتراح لعبة جديدة`)}>

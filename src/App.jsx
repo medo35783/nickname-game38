@@ -8,8 +8,7 @@ import AdminCodesPanel from './components/admin/AdminCodesPanel';
 import QBankManager from './question-bank/QBankManager';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
 import AccountPage from './components/account/AccountPage';
-import TitlesGame from './games/titles/TitlesGame';
-import FameeriGame from './games/fameeri/FameeriGame';
+import { renderPlatformGame, handlePlatformGameBack } from './games/platformGameRouter';
 import './styles/base.css';
 import Stars from './shared/Stars';
 import Notif from './shared/Notif';
@@ -47,6 +46,7 @@ export default function App() {
 
   const fameeriRef = useRef(null);
   const titlesRef = useRef(null);
+  const sniperRef = useRef(null);
 
   /* ── معلومات تأتي من TitlesGame لرسم زر 👑 في الهيدر ── */
   const [titlesMeta, setTitlesMeta] = useState({ inRoom: false, showAdminBtn: false, gameScreen: 'home' });
@@ -215,35 +215,22 @@ export default function App() {
   const showSiteFooter = !selectedGame;
 
   const renderGame = () => {
-    if(selectedGame === 'nicknames') return (
-      <TitlesGame
-        ref={titlesRef}
-        notify={notify}
-        setTab={setTab}
-        setSelectedGame={setSelectedGame}
-        onHeaderMeta={setTitlesMeta}
-        canCreateRoom={canHostRoom}
-        onRequestActivation={() => setShowCodeActivation(true)}
-        onGameEnd={onGameEnd}
-      />
-    );
+    const mounted = renderPlatformGame(selectedGame, {
+      titlesRef,
+      fameeriRef,
+      sniperRef,
+      notify,
+      setTab,
+      setSelectedGame,
+      onHeaderMeta: setTitlesMeta,
+      canHostRoom,
+      onRequestActivation: () => setShowCodeActivation(true),
+      onGameEnd,
+      onGoAccount: () => setTab('account'),
+    });
+    if (mounted) return mounted;
 
-    if (selectedGame === 'qumairi') {
-      return (
-        <FameeriGame
-          ref={fameeriRef}
-          notify={notify}
-          setTab={setTab}
-          setSelectedGame={setSelectedGame}
-          canCreateRoom={canHostRoom}
-          onRequestActivation={() => setShowCodeActivation(true)}
-          onGameEnd={onGameEnd}
-          onGoAccount={() => setTab('account')}
-        />
-      );
-    }
-
-    if(gameScreen==='home'){
+    if (gameScreen === 'home') {
       return <Home setSelectedGame={setSelectedGame} />;
     }
 
@@ -402,7 +389,7 @@ export default function App() {
   }
 
   return(
-    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}`}>
+    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}${selectedGame === 'sniper' ? ' app--in-sniper' : ''}`}>
       <Stars/>
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
@@ -473,18 +460,15 @@ export default function App() {
                   goToTab('game');
                   return;
                 }
-                if (selectedGame === 'qumairi') {
-                  if (fameeriRef.current?.handleHeaderBack?.()) return;
-                  setSelectedGame(null);
+                if (
+                  handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, sniperRef }, {
+                    setSelectedGame,
+                    setGameScreen,
+                    gameScreen,
+                  })
+                ) {
                   return;
                 }
-                if (selectedGame === 'nicknames') {
-                  if (titlesRef.current?.handleHeaderBack?.()) return;
-                  setSelectedGame(null);
-                  return;
-                }
-                if (gameScreen !== 'home') setGameScreen('home');
-                else setSelectedGame(null);
               }}
             >
               رجوع →

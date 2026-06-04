@@ -18,6 +18,7 @@ import {
 const EMPTY_FORM = {
   question_text: '',
   correct_answer: '',
+  supervisor_notes: '',
   category: '',
   difficulty_level: '',
   audience: 'general',
@@ -38,6 +39,7 @@ const CATEGORY_LABELS = {
   animals: 'حيوانات',
   sports: 'رياضة',
   acting_proverbs: 'تمثيل وأمثال',
+  five_items: 'اسم/حيوان/نبات/جماد/بلاد',
   general: 'عام',
 };
 
@@ -51,6 +53,7 @@ const TYPE_LABELS = {
   multiple_choice: 'اختيار من متعدد',
   true_false: 'صح أو خطأ',
   open_question: 'سؤال مفتوح',
+  written_text: 'نص كتابي',
 };
 
 const STATUS_LABELS = {
@@ -62,6 +65,7 @@ const STATUS_LABELS = {
 const GAME_TYPE_LABELS = {
   qumayri: 'القميري',
   titles: 'الألقاب',
+  sniper: 'قناص الدرجات',
   all: 'كل الألعاب',
 };
 
@@ -81,6 +85,7 @@ const CSV_HEADER_ALIASES = {
   gameTypes: ['gameTypes', 'game_types', 'اللعبة', 'الألعاب', 'العاب'],
   tags: ['tags', 'وسوم', 'الوسوم'],
   audience: ['audience', 'الفئة', 'الفئة المستهدفة', 'العمر'],
+  supervisor_notes: ['supervisor_notes', 'ملاحظات المشرف', 'ملاحظات', 'notes'],
 };
 
 function cleanFilters(filters) {
@@ -282,6 +287,7 @@ function csvRowToQuestion(row) {
     rowNumber: row.rowNumber,
     question_text: normalizeCsvToken(row.question_text),
     correct_answer: normalizeCsvToken(row.correct_answer),
+    supervisor_notes: normalizeCsvToken(row.supervisor_notes),
     category: normalizeCsvToken(row.category),
     difficulty_level: normalizeCsvToken(row.difficulty_level),
     type,
@@ -295,7 +301,7 @@ function csvRowToQuestion(row) {
 
 function validateQuestionPayload(payload) {
   if (!payload.question_text) return 'نص السؤال مفقود';
-  if (!payload.correct_answer) return 'الإجابة الصحيحة مفقودة';
+  if (payload.type !== 'written_text' && !payload.correct_answer) return 'الإجابة الصحيحة مفقودة';
   if (!QB_CATEGORIES.includes(payload.category)) return 'التصنيف غير صحيح';
   if (!QB_DIFFICULTIES.includes(payload.difficulty_level)) return 'الصعوبة غير صحيحة';
   if (!QB_TYPES.includes(payload.type)) return 'نوع السؤال غير صحيح';
@@ -563,11 +569,14 @@ export default function QBankManager({ notify }) {
       : [];
     const correctAnswer = type === 'multiple_choice'
       ? options[form.correctOptionIndex] || ''
-      : form.correct_answer.trim();
+      : type === 'written_text'
+        ? ''
+        : form.correct_answer.trim();
 
     return {
       question_text: form.question_text.trim(),
       correct_answer: correctAnswer,
+      supervisor_notes: type === 'written_text' ? form.supervisor_notes.trim() : '',
       category: form.category,
       difficulty_level: form.difficulty_level,
       audience: form.audience || 'general',
@@ -646,6 +655,7 @@ export default function QBankManager({ notify }) {
     setForm({
       question_text: question.question_text || '',
       correct_answer: question.correct_answer || '',
+      supervisor_notes: question.supervisor_notes || '',
       category: question.category || '',
       difficulty_level: question.difficulty_level || '',
       audience: question.audience || 'general',
@@ -663,6 +673,7 @@ export default function QBankManager({ notify }) {
     setForm({
       question_text: question.question_text || '',
       correct_answer: question.correct_answer || '',
+      supervisor_notes: question.supervisor_notes || '',
       category: question.category || '',
       difficulty_level: question.difficulty_level || '',
       audience: question.audience || 'general',
@@ -766,6 +777,7 @@ export default function QBankManager({ notify }) {
         const created = await suggestQuestion({
           question_text: row.question_text,
           correct_answer: row.correct_answer,
+          supervisor_notes: row.supervisor_notes || '',
           category: row.category,
           difficulty_level: row.difficulty_level,
           audience: row.audience || 'general',
@@ -1029,6 +1041,27 @@ export default function QBankManager({ notify }) {
             onChange={(event) => updateForm('correct_answer', event.target.value)}
             placeholder="الإجابة النصية المعتمدة"
           />
+        </div>
+      );
+    }
+
+    if (form.type === 'written_text') {
+      return (
+        <div className="ig">
+          <label className="lbl" htmlFor="qbank-supervisor-notes">
+            ملاحظات المشرف — إجابات متوقعة أو تعليق (لا يظهر للاعبين)
+          </label>
+          <textarea
+            id="qbank-supervisor-notes"
+            className="inp"
+            rows={4}
+            value={form.supervisor_notes}
+            onChange={(event) => updateForm('supervisor_notes', event.target.value)}
+            placeholder="مثال: ذئب، wolf&#10;أو: اقرأ الحرف «ر» فقط للجميع"
+          />
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.6 }}>
+            في القميري وقناص الدرجات يظهر للاعبين حقل كتابة واعتماد فقط — هذه الملاحظة للمشرف وحده.
+          </p>
         </div>
       );
     }

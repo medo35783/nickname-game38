@@ -13,7 +13,13 @@ import FameeriGuideModal from './FameeriGuideModal';
 import { ROOM_CODE_PLACEHOLDER, GROUP_MEMBER_NAME_PLACEHOLDER } from '../../core/formLabels';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
-import { QSOURCE, toPublicQuestion, isAnswerCorrect, optionLabel } from '../../question-bank/questionSession';
+import {
+  QSOURCE,
+  toPublicQuestion,
+  isAnswerCorrect,
+  isWrittenTextQuestion,
+  optionLabel,
+} from '../../question-bank/questionSession';
 import { markQuestionAsUsed } from './fameeriBankProgress';
 import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
 import { buildAdminAnswerContext } from './fameeriAdminAnswers';
@@ -618,11 +624,12 @@ const FameeriGame = forwardRef(function FameeriGame(
   /* ── جلسة الأسئلة: استرجاع، سحب، إظهار، اعتماد ── */
   const qActiveQuestion = qGameState?.currentQuestion || null;
   const qEffectiveSource = qGameState?.questionSource || qSource || null;
-  const qActiveAnswer = qActiveQuestion?.id
-    ? findInStructuredPool(qPool, qActiveQuestion.id)?.correct_answer || ''
-    : '';
+  const qPoolEntry = qActiveQuestion?.id ? findInStructuredPool(qPool, qActiveQuestion.id) : null;
+  const qActiveAnswer = qPoolEntry?.correct_answer || '';
+  const qSupervisorNotes = qPoolEntry?.supervisor_notes || '';
 
   const qKey = qActiveQuestion ? qActiveQuestion.id || qActiveQuestion.text || null : null;
+  const qWrittenText = isWrittenTextQuestion(qActiveQuestion);
   const qPlayMode = qGameState?.playMode || 'sequential';
   const qIsSpeedRound = qPlayMode === 'speed' && !!qGameState?.speedBatchActive;
   const qIsSequentialAttack = qPlayMode !== 'speed' && !!qCurrentAttack;
@@ -634,8 +641,8 @@ const FameeriGame = forwardRef(function FameeriGame(
     !qActiveQuestion.adminOnly &&
     !!qGroupId &&
     qCanAnswerGroup &&
-    Array.isArray(qActiveQuestion.options) &&
-    qActiveQuestion.options.length > 0;
+    (qWrittenText ||
+      (Array.isArray(qActiveQuestion.options) && qActiveQuestion.options.length > 0));
   /** سؤال مفتوح أثناء المؤقت — لا نستخدم overlay كاملًا حتى لا يُحجب النقر */
   const qAnswerPhaseDuringTimer =
     !!qActiveQuestion?.revealToPlayers &&
@@ -1395,6 +1402,7 @@ const FameeriGame = forwardRef(function FameeriGame(
               qCountdown={qCountdown}
               qActiveQuestion={qActiveQuestion}
               qActiveAnswer={qActiveAnswer}
+              qSupervisorNotes={qSupervisorNotes}
               qAdminGroupAnswers={qAdminGroupAnswers}
               qAdminAnswerContext={qAdminAnswerContext}
               qAdminPendingGroups={qAdminPendingGroups}

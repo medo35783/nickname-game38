@@ -8,14 +8,15 @@ export const QB_CATEGORIES = [
   'animals',
   'sports',
   'acting_proverbs',
+  'five_items',
   'general',
 ];
 
 export const QB_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
-export const QB_TYPES = ['multiple_choice', 'true_false', 'open_question'];
+export const QB_TYPES = ['multiple_choice', 'true_false', 'open_question', 'written_text'];
 
-export const QB_GAME_TYPES = ['qumayri', 'titles', 'all'];
+export const QB_GAME_TYPES = ['qumayri', 'titles', 'sniper', 'all'];
 
 export const QB_AUDIENCES = ['general', 'family', 'kids'];
 

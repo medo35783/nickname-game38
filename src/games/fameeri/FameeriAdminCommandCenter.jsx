@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Q_WEAPONS } from '../../core/constants';
 import {
   getCorrectOptionIndex,
+  isWrittenTextQuestion,
   optionLabel,
   QSOURCE,
 } from '../../question-bank/questionSession';
@@ -44,6 +45,7 @@ export default function FameeriAdminCommandCenter({
   qCurrentAttack,
   qActiveQuestion,
   qActiveAnswer,
+  qSupervisorNotes = '',
   qAdminGroupAnswers = [],
   qAdminAnswerContext = null,
   qAdminPendingGroups = [],
@@ -86,9 +88,11 @@ export default function FameeriAdminCommandCenter({
   const attack = qCurrentAttack || shieldTargetAttack;
   const hasQuestion = !!qActiveQuestion;
   const adminOnly = qActiveQuestion?.adminOnly;
+  const writtenText = isWrittenTextQuestion(qActiveQuestion);
   const hasOptions = Array.isArray(qActiveQuestion?.options) && qActiveQuestion.options.length > 0;
   const revealed = !!qActiveQuestion?.revealToPlayers;
-  const optionsRevealed = !hasOptions || !!qActiveQuestion?.revealOptions;
+  const optionsRevealed =
+    writtenText || hasOptions ? !!qActiveQuestion?.revealOptions : true;
   const revealStepDone = adminOnly ? revealed : revealed && optionsRevealed;
   const timerRunning = !!qTimer && !shieldWindow;
   const inShield = !!shieldWindow;
@@ -307,7 +311,16 @@ export default function FameeriAdminCommandCenter({
             </p>
           )}
 
-          {(correctIdx >= 0 || qActiveAnswer || correctText) && !adminOnly && (
+          {writtenText && !adminOnly && (
+            <div className="admin-q-answer-key fameeri-cmd-question__answer-key">
+              <div className="admin-q-answer-key__label">📝 ملاحظات المشرف (لا تظهر للاعبين)</div>
+              <div className="admin-q-answer-key__value" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                {qSupervisorNotes || '—'}
+              </div>
+            </div>
+          )}
+
+          {(correctIdx >= 0 || qActiveAnswer || correctText) && !adminOnly && !writtenText && (
             <div className="admin-q-answer-key fameeri-cmd-question__answer-key">
               <div className="admin-q-answer-key__label">🔑 الإجابة الصحيحة (للمشرف)</div>
               <div className="admin-q-answer-key__value">

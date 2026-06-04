@@ -1,0 +1,1190 @@
+/* ═══ قناص الدرجات — أرينا الهدف (مستقل عن القميري) ═══ */
+
+/* ── متغيرات الهوية: نهاري vs ليلي ── */
+:root,
+[data-theme='light'] {
+  --sniper-accent: #e65100;
+  --sniper-accent-light: #ff8f00;
+  --sniper-secondary: #1565c0;
+  --sniper-secondary-light: #42a5f5;
+  --sniper-gold: #f9a825;
+  --sniper-bg-deep: #fff8f0;
+  --sniper-bg-mid: #e8f4fc;
+  --sniper-glow: rgba(230, 81, 0, 0.35);
+  --sniper-border: rgba(21, 101, 192, 0.28);
+  --sniper-card-bg: rgba(255, 255, 255, 0.92);
+  --sniper-muted: #5d4037;
+  --sniper-inp-bg: #ffffff;
+  --sniper-focus-ring: rgba(230, 81, 0, 0.18);
+  --sniper-nav-bg: rgba(255, 248, 240, 0.97);
+  --sniper-score-bg: rgba(21, 101, 192, 0.06);
+  --sniper-score-text: #1a237e;
+  --sniper-grid: rgba(230, 81, 0, 0.07);
+  --sniper-hud-bg: rgba(255, 255, 255, 0.95);
+}
+
+[data-theme='dark'] {
+  --sniper-accent: #ffab00;
+  --sniper-accent-light: #ffd54f;
+  --sniper-secondary: #00e5ff;
+  --sniper-secondary-light: #84ffff;
+  --sniper-gold: #ffe082;
+  --sniper-bg-deep: #030810;
+  --sniper-bg-mid: #0c1a32;
+  --sniper-glow: rgba(255, 171, 0, 0.4);
+  --sniper-border: rgba(0, 229, 255, 0.32);
+  --sniper-card-bg: rgba(8, 20, 42, 0.9);
+  --sniper-muted: #90caf9;
+  --sniper-inp-bg: rgba(6, 14, 30, 0.85);
+  --sniper-focus-ring: rgba(0, 229, 255, 0.2);
+  --sniper-nav-bg: rgba(3, 8, 16, 0.97);
+  --sniper-score-bg: rgba(0, 229, 255, 0.08);
+  --sniper-score-text: #e3f2fd;
+  --sniper-grid: rgba(0, 229, 255, 0.06);
+  --sniper-hud-bg: rgba(8, 20, 42, 0.94);
+}
+
+/* بطاقة الساحة */
+.home-game-card--sniper {
+  background: linear-gradient(135deg, var(--sniper-bg-deep), var(--sniper-bg-mid));
+  border: 2px solid var(--sniper-accent);
+  border-radius: 16px;
+  padding: 18px 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.25s;
+  box-shadow: 0 6px 20px var(--sniper-glow);
+}
+
+[data-theme='light'] .home-game-card--sniper {
+  box-shadow: 0 6px 18px rgba(230, 81, 0, 0.2);
+}
+
+.home-game-card--sniper:active {
+  transform: scale(0.98);
+}
+
+.home-game-card--sniper .home-game-card__title {
+  font-family: Cairo, sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--sniper-accent);
+}
+
+.home-game-card--sniper .home-game-card__sub {
+  font-size: 12px;
+  color: var(--sniper-muted);
+  margin-top: 3px;
+  line-height: 1.6;
+}
+
+.home-game-card--sniper .home-game-card__arrow {
+  font-size: 20px;
+  color: var(--sniper-accent);
+}
+
+.home-game-card--sniper .tag {
+  background: var(--sniper-score-bg);
+  color: var(--sniper-secondary);
+  border: 1px solid var(--sniper-border);
+}
+
+.app--in-sniper .stars {
+  display: none;
+}
+
+.app--in-sniper .hdr {
+  background: var(--sniper-nav-bg);
+  border-bottom-color: var(--sniper-border);
+}
+
+/* شريط التنقل أثناء اللعب */
+.app--in-sniper .bnav {
+  background: var(--sniper-nav-bg);
+  border-top-color: var(--sniper-border);
+}
+
+.app--in-sniper .bnav-item.active {
+  color: var(--sniper-accent);
+}
+
+.app--in-sniper .bnav-item.active .bnav-icon {
+  filter: drop-shadow(0 0 6px var(--sniper-glow));
+}
+
+/* غلاف اللعبة */
+.sniper-theme {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+/* خلفية — نهاري: سماء دافئة */
+[data-theme='light'] .sniper-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 100% 70% at 50% 0%, rgba(255, 183, 77, 0.45), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(66, 165, 245, 0.25), transparent 50%),
+    linear-gradient(175deg, #fff8f0 0%, #ffe0b2 35%, #e3f2fd 100%);
+  pointer-events: none;
+}
+
+[data-theme='light'] .sniper-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle at 20% 30%, var(--sniper-grid) 0 1px, transparent 2px),
+    radial-gradient(circle at 80% 70%, var(--sniper-grid) 0 1px, transparent 2px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+/* خلفية — ليلي: أرينا ليلية */
+[data-theme='dark'] .sniper-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(0, 229, 255, 0.2), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 0% 100%, rgba(255, 171, 0, 0.15), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(0, 100, 180, 0.2), transparent 40%),
+    linear-gradient(165deg, #030810 0%, #0c1a32 50%, #061018 100%);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .sniper-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(var(--sniper-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sniper-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  animation: sniperGridPulse 10s ease-in-out infinite;
+}
+
+@keyframes sniperGridPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sniper-theme .ptitle {
+  background: linear-gradient(135deg, var(--sniper-accent), var(--sniper-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='dark'] .sniper-theme .ptitle {
+  filter: drop-shadow(0 0 14px var(--sniper-glow));
+}
+
+.sniper-theme .ctitle {
+  color: var(--sniper-accent);
+}
+
+[data-theme='light'] .sniper-theme .ctitle {
+  color: var(--sniper-secondary);
+}
+
+.sniper-theme .psub {
+  color: var(--sniper-muted);
+}
+
+.sniper-theme .room-code-big {
+  color: var(--sniper-accent);
+  border: 2px dashed var(--sniper-border);
+  background: var(--sniper-score-bg);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+[data-theme='dark'] .sniper-theme .room-code-big {
+  text-shadow: 0 0 20px var(--sniper-glow);
+}
+
+.sniper-theme .card,
+.sniper-theme .card2 {
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='light'] .sniper-theme .card,
+[data-theme='light'] .sniper-theme .card2 {
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.1), 0 2px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+[data-theme='dark'] .sniper-theme .card,
+[data-theme='dark'] .sniper-theme .card2 {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 229, 255, 0.06) inset;
+}
+
+.sniper-theme .btn.bg {
+  background: linear-gradient(135deg, var(--sniper-accent-light), var(--sniper-accent));
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 18px var(--sniper-glow);
+}
+
+[data-theme='dark'] .sniper-theme .btn.bg {
+  background: linear-gradient(135deg, var(--sniper-accent), var(--sniper-secondary));
+}
+
+.sniper-theme .btn.bo {
+  color: var(--sniper-accent);
+  border-color: var(--sniper-accent);
+}
+
+.sniper-theme .btn.bo:hover:not(:disabled) {
+  background: var(--sniper-score-bg);
+}
+
+.sniper-theme .btn.bgh {
+  border-color: var(--sniper-border);
+  color: var(--sniper-muted);
+}
+
+.sniper-theme .btn.bgh:hover:not(:disabled) {
+  border-color: var(--sniper-accent);
+  color: var(--sniper-accent);
+}
+
+.sniper-theme .lbl {
+  color: var(--sniper-muted);
+}
+
+.sniper-theme .inp,
+.sniper-theme textarea.inp,
+.sniper-theme .tunit input {
+  background: var(--sniper-inp-bg);
+  border-color: var(--sniper-border);
+  color: var(--text);
+}
+
+.sniper-theme .inp:focus,
+.sniper-theme textarea.inp:focus,
+.sniper-theme .tunit input:focus {
+  border-color: var(--sniper-accent);
+  box-shadow: 0 0 0 3px var(--sniper-focus-ring);
+}
+
+.sniper-q-card {
+  background: linear-gradient(135deg, var(--sniper-score-bg), transparent);
+  border: 1px solid var(--sniper-border);
+  box-shadow: 0 0 20px var(--sniper-glow);
+}
+
+.sniper-score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  gap: 6px;
+}
+
+.sniper-score-btn {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid var(--sniper-border);
+  background: var(--sniper-score-bg);
+  font-family: Cairo, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--sniper-score-text);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.sniper-score-btn.active {
+  border-color: var(--sniper-accent);
+  box-shadow: 0 0 14px var(--sniper-glow);
+  color: var(--sniper-accent);
+  background: var(--sniper-focus-ring);
+}
+
+.sniper-score-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sniper-score-pill {
+  min-width: 36px;
+  text-align: center;
+  font-weight: 900;
+  color: var(--sniper-accent);
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.sniper-live-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+  animation: sniperCardIn 0.35s ease;
+}
+
+@keyframes sniperCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sniper-grade-box {
+  border: 1px solid var(--sniper-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--sniper-score-bg);
+}
+
+.sniper-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sniper-border);
+}
+
+.sniper-result-row:last-child {
+  border-bottom: none;
+}
+
+.sniper-final {
+  overflow: hidden;
+  position: relative;
+}
+
+.sniper-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.sniper-podium-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 110px;
+}
+
+.sniper-podium-bar {
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.sniper-confetti {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.sniper-confetti span {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: sniperConfettiFall 2.8s ease-in forwards;
+}
+
+@keyframes sniperConfettiFall {
+  to {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.sniper-player-screen {
+  padding-top: 0;
+}
+
+.sniper-player-hud {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sniper-hud-bg);
+  border: 1px solid var(--sniper-border);
+  box-shadow: 0 4px 20px var(--sniper-glow);
+  backdrop-filter: blur(12px);
+}
+
+.sniper-player-hud__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sniper-player-hud__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sniper-player-hud__name {
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.sniper-player-hud__meta {
+  font-size: 11px;
+  color: var(--sniper-muted);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+.sniper-player-hud__code {
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--sniper-accent);
+}
+
+[data-theme='dark'] .sniper-player-hud__code {
+  text-shadow: 0 0 10px var(--sniper-glow);
+}
+
+.sniper-player-hud__score {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.sniper-player-hud__trophy {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px solid var(--sniper-accent);
+  background: var(--sniper-score-bg);
+  font-size: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  box-shadow: 0 0 12px var(--sniper-glow);
+}
+
+.sniper-player-hud__trophy:active {
+  transform: scale(0.94);
+}
+
+.sniper-player-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sniper-player-alert {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(249, 168, 37, 0.15);
+  border: 1px solid rgba(249, 168, 37, 0.45);
+  color: var(--sniper-gold);
+}
+
+.sniper-lb-modal {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.sniper-trophy-fab {
+  position: fixed;
+  left: 16px;
+  bottom: 80px;
+  z-index: 10;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--sniper-accent);
+  background: var(--sniper-hud-bg);
+  font-size: 26px;
+  box-shadow: 0 4px 20px var(--sniper-glow);
+  cursor: pointer;
+}
+
+.sniper-countdown svg circle:first-of-type {
+  stroke: var(--sniper-border);
+}
+
+.sniper-theme.onb-bg .onb-card,
+.sniper-theme .onb-card {
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+}
+
+.sniper-theme .onb-title {
+  color: var(--sniper-accent);
+}
+
+.sniper-theme .onb-sub {
+  color: var(--sniper-muted);
+}
+
+.sniper-hero-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-border);
+  color: var(--sniper-accent);
+  margin-top: 6px;
+}
+
+/* ═══ لوحة المشرف — أرينا القيادة ═══ */
+.sniper-admin {
+  padding-bottom: 12px;
+}
+
+.sniper-admin-hero {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+  box-shadow: 0 8px 32px var(--sniper-glow), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  overflow: hidden;
+}
+
+[data-theme='dark'] .sniper-admin-hero {
+  background: linear-gradient(145deg, rgba(8, 20, 42, 0.95), rgba(12, 28, 56, 0.88));
+}
+
+[data-theme='light'] .sniper-admin-hero {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(232, 244, 252, 0.9));
+}
+
+.sniper-admin-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--sniper-glow), transparent);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.sniper-admin-hero__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.sniper-admin-hero__left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sniper-admin-hero__room {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sniper-admin-hero__room-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sniper-muted);
+}
+
+.sniper-admin-hero__room-code {
+  font-family: monospace;
+  font-size: 18px;
+  letter-spacing: 3px;
+  color: var(--sniper-accent);
+}
+
+[data-theme='dark'] .sniper-admin-hero__room-code {
+  text-shadow: 0 0 12px var(--sniper-glow);
+}
+
+.sniper-admin-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sniper-admin-tabs__btn {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--sniper-border);
+  background: var(--sniper-card-bg);
+  font-family: Cairo, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sniper-muted);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.sniper-admin-tabs__btn.is-active {
+  border-color: var(--sniper-accent);
+  color: var(--sniper-accent);
+  box-shadow: 0 0 14px var(--sniper-glow);
+  background: var(--sniper-score-bg);
+}
+
+.sniper-admin-hero__badge {
+  font-family: Cairo, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-accent);
+  color: var(--sniper-accent);
+  box-shadow: 0 0 12px var(--sniper-glow);
+}
+
+.sniper-admin-hero__progress {
+  height: 4px;
+  margin: 12px 0 8px;
+  border-radius: 4px;
+  background: var(--sniper-border);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.sniper-admin-hero__progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--sniper-secondary), var(--sniper-accent));
+  box-shadow: 0 0 10px var(--sniper-glow);
+  transition: width 0.4s ease;
+}
+
+.sniper-admin-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.sniper-admin-hero__q {
+  font-family: Cairo, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.sniper-admin-hero__q strong {
+  color: var(--sniper-accent);
+  font-size: 28px;
+}
+
+.sniper-admin-hero__sep {
+  opacity: 0.45;
+  margin: 0 2px;
+}
+
+.sniper-admin-hero__special {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(249, 168, 37, 0.2);
+  border: 1px solid var(--sniper-gold);
+  color: var(--sniper-gold);
+}
+
+/* ترتيب المشرف */
+.sniper-admin-lb {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] .sniper-admin-lb {
+  background: linear-gradient(160deg, rgba(6, 14, 30, 0.92), rgba(8, 22, 48, 0.85));
+  border-color: var(--sniper-gold);
+  box-shadow: 0 0 24px rgba(255, 224, 130, 0.08);
+}
+
+.sniper-admin-lb__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.sniper-admin-lb__title {
+  margin: 0;
+  font-family: Cairo, sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--sniper-gold);
+}
+
+[data-theme='light'] .sniper-admin-lb__title {
+  color: var(--sniper-secondary);
+}
+
+.sniper-admin-lb__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sniper-muted);
+}
+
+.sniper-admin-lb__row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.sniper-admin-lb__row--top1 {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.22), transparent);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+}
+
+.sniper-admin-lb__row--top2 {
+  background: linear-gradient(90deg, rgba(192, 192, 192, 0.18), transparent);
+}
+
+.sniper-admin-lb__row--top3 {
+  background: linear-gradient(90deg, rgba(205, 127, 50, 0.18), transparent);
+}
+
+.sniper-admin-lb__rank {
+  font-weight: 900;
+  color: var(--sniper-muted);
+  text-align: center;
+}
+
+.sniper-admin-lb__row--top1 .sniper-admin-lb__rank {
+  color: var(--sniper-gold);
+}
+
+.sniper-admin-lb__name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sniper-admin-lb__pts {
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  color: var(--sniper-accent);
+  min-width: 36px;
+  text-align: left;
+}
+
+.sniper-admin-lb__more {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: var(--sniper-score-bg);
+  color: var(--sniper-muted);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sniper-admin-lb__full {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sniper-border);
+}
+
+.sniper-admin-lb__empty {
+  font-size: 12px;
+  color: var(--sniper-muted);
+  text-align: center;
+  padding: 8px;
+}
+
+/* لوحات المحتوى */
+.sniper-admin-panel {
+  margin-bottom: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--sniper-card-bg);
+  border: 1px solid var(--sniper-border);
+}
+
+.sniper-admin-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sniper-admin-panel__title {
+  margin: 0 0 4px;
+  font-family: Cairo, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--sniper-accent);
+}
+
+.sniper-admin-panel__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sniper-muted);
+}
+
+.sniper-admin-question__text {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.sniper-admin-question__cat {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-border);
+  color: var(--sniper-secondary);
+}
+
+.sniper-admin-banner {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.sniper-admin-banner--wait {
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-border);
+  color: var(--sniper-muted);
+}
+
+.sniper-admin-banner--run {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #16a34a;
+}
+
+[data-theme='dark'] .sniper-admin-banner--run {
+  color: #4ade80;
+}
+
+.sniper-admin-banner--grade {
+  background: rgba(249, 168, 37, 0.15);
+  border: 1px solid var(--sniper-gold);
+  color: var(--sniper-gold);
+}
+
+.sniper-admin-deck {
+  padding: 12px;
+}
+
+.sniper-admin-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sniper-admin-split--solo {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 400px) {
+  .sniper-admin-split {
+    grid-template-columns: 1fr;
+  }
+
+  .sniper-admin-tools-chips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.sniper-admin-split__col {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--sniper-score-bg);
+  border: 1px solid var(--sniper-border);
+  min-width: 0;
+}
+
+.sniper-admin-split__title {
+  margin: 0 0 6px;
+  font-family: Cairo, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--sniper-accent);
+}
+
+.sniper-admin-start-timer {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 12px 10px;
+}
+
+.sniper-admin-reset-secs {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.sniper-admin-host-inp {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.sniper-admin-host-send {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.sniper-admin-tools {
+  padding-bottom: 0;
+  border: none;
+  background: transparent;
+  margin-bottom: 0;
+}
+
+.sniper-admin-tools__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sniper-admin-tools__label {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--sniper-secondary);
+}
+
+.sniper-admin-tools-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.sniper-admin-tool-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--sniper-border);
+  background: var(--sniper-card-bg);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sniper-admin-tool-chip.is-on {
+  border-color: var(--sniper-accent);
+  box-shadow: 0 0 12px var(--sniper-glow);
+  background: var(--sniper-score-bg);
+}
+
+.sniper-admin-tool-chip__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.sniper-admin-tool-chip__name {
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.sniper-admin-tool-chip__off {
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--sniper-accent);
+}
+
+.sniper-admin-tools-guide {
+  margin: 0 0 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--sniper-muted);
+}
+
+.sniper-admin-chip--speed {
+  margin-top: 8px;
+  font-size: 10px;
+  padding: 6px;
+}
+
+.sniper-admin-end-timer {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.sniper-admin-info-btn {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--sniper-border);
+  background: var(--sniper-score-bg);
+  color: var(--sniper-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sniper-admin-info-btn.is-on,
+.sniper-admin-info-btn:hover {
+  border-color: var(--sniper-accent);
+  color: var(--sniper-accent);
+  box-shadow: 0 0 10px var(--sniper-glow);
+}
+
+.sniper-admin-ref__answer {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.sniper-admin-grade__row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.sniper-admin-grade__name {
+  font-weight: 800;
+}
+
+.sniper-admin-grade__answer {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.sniper-admin-grade__score {
+  font-size: 11px;
+  color: var(--sniper-accent);
+  margin-top: 4px;
+}
+
+.sniper-admin-grade__who {
+  font-size: 12px;
+  color: var(--sniper-muted);
+  margin-top: 6px;
+}
+
+.sniper-admin-grade__warn {
+  font-size: 10px;
+  color: var(--sniper-accent);
+  margin: 6px 0;
+}
+
+.sniper-admin-grade__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sniper-admin-grade__actions .btn {
+  flex: 1;
+}
+
+.sniper-admin-grade.is-correct {
+  border-color: #22c55e;
+}
+
+.sniper-admin-grade.is-wrong {
+  border-color: var(--red);
+}
+
+.sniper-admin-grade.is-marked-dup {
+  border-color: var(--red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sniper-admin-footnote {
+  font-size: 12px;
+  color: var(--sniper-muted);
+  text-align: center;
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.sniper-admin-cta {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+}
+

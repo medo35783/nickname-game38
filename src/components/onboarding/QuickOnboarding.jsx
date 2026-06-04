@@ -21,6 +21,26 @@ const COPY = {
       ],
     },
   },
+  sniper: {
+    admin: {
+      title: 'مشرف قناص الدرجات',
+      sub: 'اختر الأسئلة وادفع الجولات',
+      steps: [
+        { icon: '🔢', text: 'أنشئ غرفة وشارك الرمز مع اللاعبين' },
+        { icon: '❓', text: 'حدّد عدد الأسئلة ومصدر البنك (تلقائي / يدوي / مخصص)' },
+        { icon: '✅', text: 'صحّح الإجابات، فعّل الجولات الخاصة، وأعلن الفائز' },
+      ],
+    },
+    player: {
+      title: 'قناص درجات',
+      sub: 'اربط كل سؤال برقم على لوحتك',
+      steps: [
+        { icon: '🎯', text: 'اختر درجة متاحة واكتب إجابة فريدة' },
+        { icon: '🛡️', text: 'التأمين يحميك جزئياً عند التكرار' },
+        { icon: '🔥', text: 'سلسلة صحيحة من السؤال 6 = اشتعال + بونص' },
+      ],
+    },
+  },
   fameeri: {
     admin: {
       title: 'مشرف الصيد',
@@ -47,8 +67,11 @@ export default function QuickOnboarding({ game, role, onDismiss }) {
   const pack = COPY[game]?.[role];
   if (!pack) return null;
 
+  const themeClass =
+    game === 'sniper' ? ' sniper-theme' : game === 'fameeri' || game === 'qumairi' ? ' fameeri-theme' : '';
+
   return (
-    <div className="onb-bg">
+    <div className={`onb-bg${themeClass}`}>
       <div className="onb-card">
         <div className="onb-icon">{role === 'admin' ? '👑' : '🎮'}</div>
         <div className="onb-title">{pack.title}</div>
