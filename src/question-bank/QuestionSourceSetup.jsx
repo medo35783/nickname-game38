@@ -27,7 +27,7 @@ import {
   loadUsedHesbahQuestionIds,
   clearUsedHesbahQuestionIds,
 } from '../games/hesbah/hesbahBankProgress';
-import { hesbahBankFilterKey } from '../games/hesbah/hesbahHelpers';
+import { hesbahBankFilterKey } from '../games/hesbah/HesbahHelpers';
 import CustomQuestionBuilder from './CustomQuestionBuilder';
 import { flattenSessionPool } from './customQuestionPool';
 
