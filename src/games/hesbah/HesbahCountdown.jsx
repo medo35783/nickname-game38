@@ -1,4 +1,4 @@
-﻿import { countdownColor } from './hesbahHelpers';
+﻿import { countdownColor } from './HesbahHelpers';
 
 export default function HesbahCountdown({ remaining, maxSeconds = 20, size = 72, waiting = false }) {
   const max = Math.max(1, maxSeconds);

@@ -1,6 +1,6 @@
 ﻿import HesbahLeaderboardCard from './HesbahLeaderboardCard';
 
-export { sortedHesbahPlayers } from './hesbahHelpers';
+export { sortedHesbahPlayers } from './HesbahHelpers';
 
 /** قائمة الترتيب — بطاقة فاخرة موحّدة */
 export default function HesbahLeaderboardList({ players, myId, roomCode, game }) {

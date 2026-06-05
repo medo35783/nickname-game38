@@ -5,7 +5,7 @@ import {
   clampCustomQuestionSecs,
   MIN_QUESTION_SECS,
   MAX_QUESTION_SECS,
-} from './hesbahHelpers';
+} from './HesbahHelpers';
 
 /** اختيار مدة المؤقت — افتراضي في اللوبي أو لهذه الجولة في لوحة المشرف */
 export default function HesbahTimerPicker({

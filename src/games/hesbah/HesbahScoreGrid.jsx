@@ -1,4 +1,4 @@
-﻿import { BOARD_CELL, boardCellMeta, isBoardCellSelectable } from './hesbahHelpers';
+﻿import { BOARD_CELL, boardCellMeta, isBoardCellSelectable } from './HesbahHelpers';
 
 const LEGEND = [
   { cls: 'hesbah-score-btn--won', label: '✓', text: 'صح' },

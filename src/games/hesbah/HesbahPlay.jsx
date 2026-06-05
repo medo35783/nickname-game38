@@ -11,7 +11,7 @@ import {
   FINAL_VOTE_OPTIONS,
   FINAL_VOTE_SECONDS,
   HESBAH_ACCENT_CSS,
-} from './hesbahHelpers';
+} from './HesbahHelpers';
 
 export default function HesbahPlay({
   roomCode,

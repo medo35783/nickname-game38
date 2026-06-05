@@ -2,7 +2,7 @@
 import QuestionSourceSetup from '../../question-bank/QuestionSourceSetup';
 import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
 import { QSOURCE } from '../../question-bank/questionSession';
-import { countHesbahPool } from './hesbahQuestions';
+import { countHesbahPool } from './HesbahQuestions';
 import {
   TOTAL_Q_OPTIONS,
   HESBAH_ACCENT_CSS,
@@ -10,7 +10,7 @@ import {
   HESBAH_BORDER_CSS,
   HESBAH_SCORE_BG_CSS,
   QB_GAME_TYPE,
-} from './hesbahHelpers';
+} from './HesbahHelpers';
 import HesbahTopNav from './HesbahTopNav';
 
 export default function HesbahSetup({

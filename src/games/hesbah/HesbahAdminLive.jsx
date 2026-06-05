@@ -16,7 +16,7 @@ import {
   HESBAH_SCORE_BG_CSS,
   HESBAH_BORDER_CSS,
   hesbahHostQuestionFlags,
-} from './hesbahHelpers';
+} from './HesbahHelpers';
 import HesbahQuestionPanel from './HesbahQuestionPanel';
 import HesbahTimerPicker from './HesbahTimerPicker';
 import { HesbahPanelTitle, HESBAH_HOST_ANSWER_HELP, HESBAH_LIVE_HOST_HELP, HESBAH_LIVE_OPS_HELP, HESBAH_SUBMIT_COUNTER_HELP } from './HesbahHelpTip';

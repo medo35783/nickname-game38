@@ -1,5 +1,5 @@
 ﻿import { HesbahPanelTitle, HESBAH_TOOLS_HELP } from './HesbahHelpTip';
-import { HESBAH_SPECIAL_TOOLS, SPEED_QUESTION_SECONDS } from './hesbahHelpers';
+import { HESBAH_SPECIAL_TOOLS, SPEED_QUESTION_SECONDS } from './HesbahHelpers';
 
 export default function HesbahAdminTools({
   activeSpecial,

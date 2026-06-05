@@ -1,7 +1,7 @@
 ﻿import Av from '../../shared/Av';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import { HesbahPanelTitle, HESBAH_HOST_PARTICIPATE_HELP } from './HesbahHelpTip';
-import { HESBAH_ACCENT_CSS, HESBAH_BORDER_CSS, isActiveHesbahPlayer } from './hesbahHelpers';
+import { HESBAH_ACCENT_CSS, HESBAH_BORDER_CSS, isActiveHesbahPlayer } from './HesbahHelpers';
 import HesbahRoomMeta from './HesbahRoomMeta';
 import HesbahTimerPicker from './HesbahTimerPicker';
 import HesbahTopNav from './HesbahTopNav';

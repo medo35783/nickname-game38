@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { formatHesbahDateTime } from './hesbahHelpers';
+import { formatHesbahDateTime } from './HesbahHelpers';
 
 /** رمز الغرفة + التاريخ والوقت */
 export default function HesbahRoomMeta({

@@ -1,7 +1,7 @@
 ﻿import { useMemo } from 'react';
 import Av from '../../shared/Av';
 import { HesbahInfoBtn, HesbahPanelTitle } from './HesbahHelpTip';
-import { HESBAH_ACCENT_CSS, HESBAH_GLOW_CSS } from './hesbahHelpers';
+import { HESBAH_ACCENT_CSS, HESBAH_GLOW_CSS } from './HesbahHelpers';
 
 export function LiveAnswerCard({ entry, isHost }) {
   return (

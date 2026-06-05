@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import Av from '../../shared/Av';
 import { playSound } from '../../core/helpers';
-import { HESBAH_ACCENT_CSS, HESBAH_THEME, sortedHesbahPlayers } from './hesbahHelpers';
+import { HESBAH_ACCENT_CSS, HESBAH_THEME, sortedHesbahPlayers } from './HesbahHelpers';
 import { downloadHesbahVictoryImage, shareHesbahVictoryImage } from './hesbahVictoryShare';
 import HesbahTopNav from './HesbahTopNav';
 

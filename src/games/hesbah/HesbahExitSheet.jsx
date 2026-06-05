@@ -1,4 +1,4 @@
-import { HESBAH_BRAND } from './hesbahHelpers';
+import { HESBAH_BRAND } from './HesbahHelpers';
 
 /**
  * خيار الرجوع — UX واضح: أكمل أو انسحب (مشرف / متسابق).

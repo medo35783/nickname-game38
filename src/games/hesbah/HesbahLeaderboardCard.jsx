@@ -1,7 +1,7 @@
 ﻿import { useMemo } from 'react';
 import Av from '../../shared/Av';
 import HesbahRoomMeta from './HesbahRoomMeta';
-import { HESBAH_BRAND, hesbahRoundDisplay, sortedHesbahPlayers } from './hesbahHelpers';
+import { HESBAH_BRAND, hesbahRoundDisplay, sortedHesbahPlayers } from './HesbahHelpers';
 
 const PODIUM_ORDER = [1, 0, 2];
 const PODIUM_HEIGHT = { 0: 76, 1: 58, 2: 46 };

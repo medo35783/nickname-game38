@@ -1,4 +1,4 @@
-import { sortedHesbahPlayers, formatHesbahDateTime, HESBAH_BRAND } from './hesbahHelpers';
+import { sortedHesbahPlayers, formatHesbahDateTime, HESBAH_BRAND } from './HesbahHelpers';
 
 const CARD_W = 1080;
 const CARD_H = 1440;

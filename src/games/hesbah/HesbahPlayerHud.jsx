@@ -2,7 +2,7 @@
 import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
 import HesbahLeaderboardList from './HesbahLeaderboardList';
-import { HESBAH_ACCENT_CSS, hesbahPlayerQuestionView } from './hesbahHelpers';
+import { HESBAH_ACCENT_CSS, hesbahPlayerQuestionView } from './HesbahHelpers';
 import HesbahTopNav from './HesbahTopNav';
 
 export function getHesbahPlayerAlerts(game, me) {

@@ -43,7 +43,7 @@ import {
   gradedPoints,
   BOARD_CELL,
   QB_GAME_TYPE,
-} from './hesbahHelpers';
+} from './HesbahHelpers';
 import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
 import { QSOURCE } from '../../question-bank/questionSession';
 import {
@@ -51,7 +51,7 @@ import {
   createQuestionCursor,
   countHesbahPool,
   hesbahGameQuestionText,
-} from './hesbahQuestions';
+} from './HesbahQuestions';
 import { markHesbahQuestionAsUsed } from './hesbahBankProgress';
 
 function poolStorageKey(room) {
