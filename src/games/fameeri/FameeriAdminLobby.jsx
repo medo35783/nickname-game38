@@ -199,7 +199,7 @@ export default function FameeriAdminLobby({
         <button
           type="button"
           className="btn bo bxs fameeri-admin-room-card__share"
-          onClick={() => void shareRoomInvite({ gameName: 'صيد القميري', roomCode: qRoom, preferWhatsApp: true })}
+          onClick={() => void shareRoomInvite({ gameName: 'لعبة القميري', roomCode: qRoom, preferWhatsApp: true })}
         >
           مشاركة عبر <WhatsAppLogoIcon />
         </button>

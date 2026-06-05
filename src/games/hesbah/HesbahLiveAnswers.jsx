@@ -1,15 +1,15 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import Av from '../../shared/Av';
-import { SniperInfoBtn, SniperPanelTitle } from './SniperHelpTip';
-import { SNIPER_ACCENT_CSS, SNIPER_GLOW_CSS } from './sniperHelpers';
+import { HesbahInfoBtn, HesbahPanelTitle } from './HesbahHelpTip';
+import { HESBAH_ACCENT_CSS, HESBAH_GLOW_CSS } from './hesbahHelpers';
 
 export function LiveAnswerCard({ entry, isHost }) {
   return (
     <div
-      className="sniper-live-card"
+      className="hesbah-live-card"
       style={{
-        border: isHost ? `2px solid ${SNIPER_ACCENT_CSS}` : '1px solid var(--border-subtle)',
-        boxShadow: isHost ? `0 0 14px ${SNIPER_GLOW_CSS}` : undefined,
+        border: isHost ? `2px solid ${HESBAH_ACCENT_CSS}` : '1px solid var(--border-subtle)',
+        boxShadow: isHost ? `0 0 14px ${HESBAH_GLOW_CSS}` : undefined,
       }}
     >
       <Av p={entry.player} sz={36} />
@@ -17,12 +17,12 @@ export function LiveAnswerCard({ entry, isHost }) {
         <div style={{ fontWeight: 800, fontSize: 13 }}>
           {entry.name}
           {isHost && (
-            <span style={{ marginRight: 6, fontSize: 10, color: SNIPER_ACCENT_CSS }}>المشرف</span>
+            <span style={{ marginRight: 6, fontSize: 10, color: HESBAH_ACCENT_CSS }}>المشرف</span>
           )}
         </div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{entry.answer || '—'}</div>
       </div>
-      {!isHost && <div className="sniper-score-pill">{entry.chosenScore ?? '—'}</div>}
+      {!isHost && <div className="hesbah-score-pill">{entry.chosenScore ?? '—'}</div>}
       {isHost && (
         <span className="tag tg" style={{ fontSize: 10 }}>
           عرض
@@ -74,7 +74,7 @@ export function countSubmittedAnswers(answers, players) {
   }).length;
 }
 
-export default function SniperLiveAnswersPanel({
+export default function HesbahLiveAnswersPanel({
   title = '📡 البطاقات الحية',
   help,
   cards,
@@ -82,11 +82,11 @@ export default function SniperLiveAnswersPanel({
   highlight = false,
 }) {
   return (
-    <section className={`sniper-admin-panel sniper-admin-live-feed ${highlight ? 'sniper-admin-live-feed--ops' : ''}`}>
-      <SniperPanelTitle help={help} helpLabel="شرح">{title}</SniperPanelTitle>
-      <div className="sniper-admin-live-feed__list">
+    <section className={`hesbah-admin-panel hesbah-admin-live-feed ${highlight ? 'hesbah-admin-live-feed--ops' : ''}`}>
+      <HesbahPanelTitle help={help} helpLabel="شرح">{title}</HesbahPanelTitle>
+      <div className="hesbah-admin-live-feed__list">
         {cards.length === 0 ? (
-          <p className="sniper-admin-live-feed__empty">{emptyMessage}</p>
+          <p className="hesbah-admin-live-feed__empty">{emptyMessage}</p>
         ) : (
           cards.map((c) => <LiveAnswerCard key={c.id} entry={c} isHost={c.isHost} />)
         )}
@@ -96,25 +96,25 @@ export default function SniperLiveAnswersPanel({
 }
 
 /** عداد الإرسال للمشرف المشارك قبل إرسال إجابته */
-export function SniperAdminSubmitCounter({ submitted, total, help }) {
+export function HesbahAdminSubmitCounter({ submitted, total, help }) {
   const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
   return (
-    <section className="sniper-admin-panel sniper-admin-submit-counter">
-      <div className="sniper-sec-head">
-        <span className="sniper-sec-head__label">📨 وصول</span>
-        <span className="sniper-submit-pill">
+    <section className="hesbah-admin-panel hesbah-admin-submit-counter">
+      <div className="hesbah-sec-head">
+        <span className="hesbah-sec-head__label">📨 وصول</span>
+        <span className="hesbah-submit-pill">
           <strong>{submitted}</strong>/{total}
         </span>
-        {help && <SniperInfoBtn content={help} label="الوصول" />}
+        {help && <HesbahInfoBtn content={help} label="الوصول" />}
       </div>
-      <div className="sniper-admin-submit-counter__bar" aria-hidden>
-        <div className="sniper-admin-submit-counter__fill" style={{ width: `${pct}%` }} />
+      <div className="hesbah-admin-submit-counter__bar" aria-hidden>
+        <div className="hesbah-admin-submit-counter__fill" style={{ width: `${pct}%` }} />
       </div>
     </section>
   );
 }
 
-export function useSniperLiveAnswers(answers, players, hostAnswer, hostParticipates) {
+export function useHesbahLiveAnswers(answers, players, hostAnswer, hostParticipates) {
   const liveCards = useMemo(
     () => buildLiveAnswerCards(answers, players, hostAnswer, hostParticipates),
     [answers, players, hostAnswer, hostParticipates]

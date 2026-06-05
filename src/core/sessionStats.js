@@ -1,4 +1,4 @@
-import { ref, update, get, set } from 'firebase/database';
+﻿import { ref, update, get, set } from 'firebase/database';
 import { auth, db } from '../firebase';
 
 const MAX_RECENT_SESSIONS = 20;
@@ -56,9 +56,14 @@ export function buildGameSessionTracking(gameType) {
   };
 }
 
+function normalizeGameType(gameType) {
+  return gameType === 'sniper' ? 'hesbah' : gameType;
+}
+
 function roomBase(gameType, roomCode) {
-  if (gameType === 'titles') return `rooms/${roomCode}`;
-  if (gameType === 'sniper') return `srooms/${roomCode}`;
+  const type = normalizeGameType(gameType);
+  if (type === 'titles') return `rooms/${roomCode}`;
+  if (type === 'hesbah') return `srooms/${roomCode}`;
   return `qrooms/${roomCode}`;
 }
 
@@ -67,8 +72,9 @@ function gamePath(gameType, roomCode) {
 }
 
 function playersPath(gameType, roomCode) {
-  if (gameType === 'titles') return `rooms/${roomCode}/players`;
-  if (gameType === 'sniper') return `srooms/${roomCode}/players`;
+  const type = normalizeGameType(gameType);
+  if (type === 'titles') return `rooms/${roomCode}/players`;
+  if (type === 'hesbah') return `srooms/${roomCode}/players`;
   return `qrooms/${roomCode}/members`;
 }
 
@@ -115,7 +121,7 @@ export function computeNextStats(prev = {}, sessionData) {
     gamesPlayed: {
       titles: (prev.gamesPlayed?.titles || 0) + (gameType === 'titles' ? 1 : 0),
       fameeri: (prev.gamesPlayed?.fameeri || 0) + (gameType === 'fameeri' ? 1 : 0),
-      sniper: (prev.gamesPlayed?.sniper || 0) + (gameType === 'sniper' ? 1 : 0),
+      hesbah: (prev.gamesPlayed?.hesbah || 0) + (normalizeGameType(gameType) === 'hesbah' ? 1 : 0),
     },
     recentSessions,
   };
@@ -131,9 +137,10 @@ async function writeStatsSummary(statsPath, sessionData) {
  * يُستدعى عند انتهاء كل جولة — يزيد game/totalRounds بمقدار 1.
  */
 export async function recordRoundCompleted(gameType, roomCode) {
-  if (gameType !== 'titles' && gameType !== 'fameeri' && gameType !== 'sniper') return;
+  const type = normalizeGameType(gameType);
+  if (type !== 'titles' && type !== 'fameeri' && type !== 'hesbah') return;
   try {
-    const path = gamePath(gameType, roomCode);
+    const path = gamePath(type, roomCode);
     const snap = await get(ref(db, path));
     const game = snap.val() || {};
     const current = Number(game.totalRounds) || 0;
@@ -147,10 +154,11 @@ export async function recordRoundCompleted(gameType, roomCode) {
  * يُستدعى عند إنهاء المشرف للجلسة — يحدّث عقدة game ثم يجمّع إحصائيات الكود/المستخدم.
  */
 export async function recordSessionEnd(gameType, roomCode, completed = true) {
-  if (gameType !== 'titles' && gameType !== 'fameeri' && gameType !== 'sniper') return;
+  const type = normalizeGameType(gameType);
+  if (type !== 'titles' && type !== 'fameeri' && type !== 'hesbah') return;
   try {
-    const base = roomBase(gameType, roomCode);
-    const playersSnap = await get(ref(db, playersPath(gameType, roomCode)));
+    const base = roomBase(type, roomCode);
+    const playersSnap = await get(ref(db, playersPath(type, roomCode)));
     const players = playersSnap.val() || {};
     const playerCount = Object.keys(players).length;
     const sessionEnd = Date.now();
@@ -167,7 +175,7 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
     const durationMinutes = Math.max(0, (sessionEnd - sessionStart) / 60000);
 
     const sessionData = {
-      gameType,
+      gameType: type,
       totalRounds: Number(game.totalRounds) || 0,
       completed,
       playerCount,

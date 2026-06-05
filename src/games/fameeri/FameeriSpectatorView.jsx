@@ -26,7 +26,7 @@ export default function FameeriSpectatorView({
 
   const header = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-      <div style={{ fontSize: 22, fontWeight: 900, color: accent }}>🦅 صيد القميري</div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: accent }}>🦅 لعبة القميري</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: 'var(--muted)' }}>رمز الغرفة</div>

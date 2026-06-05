@@ -1,5 +1,5 @@
-import { SUPPORT_EMAIL } from '../core/constants';
-import '../styles/sniper.css';
+﻿import { SUPPORT_EMAIL } from '../core/constants';
+import '../styles/hesbah.css';
 
 export default function Home({ setSelectedGame }) {
   return (
@@ -10,22 +10,25 @@ export default function Home({ setSelectedGame }) {
         <div className="psub">ألعاب جماعية تفاعلية للرحلات والاجتماعات والمناسبات</div>
       </div>
 
-      {/* بطاقة لعبة الألقاب */}
-      <div onClick={() => setSelectedGame('nicknames')} style={{ background: 'linear-gradient(135deg,rgba(240,192,64,.12),rgba(255,140,0,.06))', border: '2px solid rgba(240,192,64,.3)', borderRadius: 16, padding: '18px 16px', marginBottom: 12, cursor: 'pointer', transition: 'all .2s' }}
-        onTouchStart={e => { e.currentTarget.style.transform = 'scale(.98)'; }}
-        onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
+      {/* بطاقة الألقاب */}
+      <div
+        className="home-game-card home-game-card--nicknames"
+        onClick={() => setSelectedGame('nicknames')}
+        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
+        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🎭</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--gold)' }}>لعبة الألقاب</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.6 }}>أخفِ هويتك واكشف الآخرين قبل أن يكشفوك</div>
+            <div className="home-game-card__title">الألقاب</div>
+            <div className="home-game-card__sub">أخفِ هويتك واكشف الآخرين قبل أن يكشفوك</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
-              {['6-50 لاعب', 'متعدد الجولات', 'إثارة وتشويق'].map(t => (
+              {['6-50 لاعب', 'متعدد الجولات', 'إثارة وتشويق'].map((t) => (
                 <span key={t} className="tag tg" style={{ fontSize: 10 }}>{t}</span>
               ))}
             </div>
           </div>
-          <div style={{ fontSize: 20, color: 'var(--gold)' }}>←</div>
+          <div className="home-game-card__arrow">←</div>
         </div>
       </div>
 
@@ -39,7 +42,7 @@ export default function Home({ setSelectedGame }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🦅</div>
           <div style={{ flex: 1 }}>
-            <div className="home-game-card__title">صيد القميري</div>
+            <div className="home-game-card__title">القميري</div>
             <div className="home-game-card__sub">وزّع القميري على الأشجار واهجم مجموعات الخصوم</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
               {['2-6 مجموعات', '100 قميري', 'استراتيجية'].map((t) => (
@@ -51,17 +54,17 @@ export default function Home({ setSelectedGame }) {
         </div>
       </div>
 
-      {/* بطاقة قناص الدرجات */}
+      {/* بطاقة حَسْبة */}
       <div
-        className="home-game-card home-game-card--sniper"
-        onClick={() => setSelectedGame('sniper')}
+        className="home-game-card home-game-card--hesbah"
+        onClick={() => setSelectedGame('hesbah')}
         onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
         onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🎯</div>
           <div style={{ flex: 1 }}>
-            <div className="home-game-card__title">قناص الدرجات</div>
+            <div className="home-game-card__title">حَسْبة</div>
             <div className="home-game-card__sub">
               اختر درجتك، أجب بذكاء، ونافس على التتويج
             </div>

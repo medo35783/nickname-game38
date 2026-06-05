@@ -1,4 +1,4 @@
-/** شرح سريع قبل دخول المشرف أو المتسابق — موحّد للألقاب والقميري */
+﻿/** شرح سريع قبل دخول المشرف أو المتسابق — موحّد للألقاب والقميري */
 
 const COPY = {
   titles: {
@@ -21,9 +21,9 @@ const COPY = {
       ],
     },
   },
-  sniper: {
+  hesbah: {
     admin: {
-      title: 'مشرف قناص الدرجات',
+      title: 'مشرف حَسْبة',
       sub: 'اختر الأسئلة وادفع الجولات',
       steps: [
         { icon: '🔢', text: 'أنشئ غرفة وشارك الرمز مع اللاعبين' },
@@ -32,7 +32,7 @@ const COPY = {
       ],
     },
     player: {
-      title: 'قناص درجات',
+      title: 'حَسْبة',
       sub: 'اربط كل سؤال برقم على لوحتك',
       steps: [
         { icon: '🎯', text: 'اختر درجة متاحة واكتب إجابة فريدة' },
@@ -68,7 +68,7 @@ export default function QuickOnboarding({ game, role, onDismiss }) {
   if (!pack) return null;
 
   const themeClass =
-    game === 'sniper' ? ' sniper-theme' : game === 'fameeri' || game === 'qumairi' ? ' fameeri-theme' : '';
+    game === 'hesbah' ? ' hesbah-theme' : game === 'fameeri' || game === 'qumairi' ? ' fameeri-theme' : '';
 
   return (
     <div className={`onb-bg${themeClass}`}>

@@ -1,6 +1,6 @@
-import { countdownColor } from './sniperHelpers';
+﻿import { countdownColor } from './hesbahHelpers';
 
-export default function SniperCountdown({ remaining, maxSeconds = 20, size = 72, waiting = false }) {
+export default function HesbahCountdown({ remaining, maxSeconds = 20, size = 72, waiting = false }) {
   const max = Math.max(1, maxSeconds);
   const waitingState = waiting || remaining === null || remaining === undefined;
   const rem = waitingState ? max : Math.max(0, remaining);
@@ -12,7 +12,7 @@ export default function SniperCountdown({ remaining, maxSeconds = 20, size = 72,
 
   return (
     <div
-      className="sniper-countdown"
+      className="hesbah-countdown"
       style={{ width: size, height: size, position: 'relative', flexShrink: 0 }}
       aria-label={`${rem} ثانية`}
     >

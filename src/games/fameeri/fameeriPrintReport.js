@@ -38,7 +38,7 @@ export function openFameeriPrintableReport({ qRoom, qGList, qAttacks }) {
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-  <title>تقرير صيد القميري #${esc(qRoom)}</title>
+  <title>تقرير لعبة القميري #${esc(qRoom)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box}
@@ -62,7 +62,7 @@ export function openFameeriPrintableReport({ qRoom, qGList, qAttacks }) {
 <body>
   <div class="wrap">
     <div class="head">
-      <h1>🦅 تقرير صيد القميري</h1>
+      <h1>🦅 تقرير لعبة القميري</h1>
       <div class="sub">غرفة رقم <strong style="color:#f0c040">#${esc(qRoom)}</strong></div>
       <div class="badge">استخدم «طباعة» ثم اختر «حفظ كـ PDF» من الوجهة</div>
       <p style="text-align:center;margin-top:14px"><button onclick="doPrint()" style="font-family:Cairo,sans-serif;padding:12px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,#f0c040,#c9a030);color:#1a1020;font-weight:900;cursor:pointer;font-size:14px">🖨️ طباعة / حفظ PDF</button></p>
@@ -77,7 +77,7 @@ export function openFameeriPrintableReport({ qRoom, qGList, qAttacks }) {
       <thead><tr><th>مهاجم</th><th>هدف</th><th>شجرة</th><th>النتيجة</th></tr></thead>
       <tbody>${logRows || '<tr><td colspan="4" style="text-align:center;color:#7a74a0">لا سجل</td></tr>'}</tbody>
     </table>
-    <div class="foot">صيد القميري — ساحة الألعاب</div>
+    <div class="foot">لعبة القميري — ساحة الألعاب</div>
   </div>
   <script>
     function doPrint(){ window.print(); }

@@ -1,4 +1,4 @@
-import { db } from '../firebase';
+﻿import { db } from '../firebase';
 import { ref, push, update, get, query, orderByChild, equalTo } from 'firebase/database';
 
 export const QB_CATEGORIES = [
@@ -16,7 +16,7 @@ export const QB_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 export const QB_TYPES = ['multiple_choice', 'true_false', 'open_question', 'written_text'];
 
-export const QB_GAME_TYPES = ['qumayri', 'titles', 'sniper', 'all'];
+export const QB_GAME_TYPES = ['qumayri', 'titles', 'hesbah', 'all'];
 
 export const QB_AUDIENCES = ['general', 'family', 'kids'];
 
@@ -36,13 +36,21 @@ function toQuestionsArray(snapshot) {
   }));
 }
 
+function questionMatchesGameType(question, gameType) {
+  if (gameType === 'all') return true;
+  const gameTypes = Array.isArray(question.gameTypes) ? question.gameTypes : [];
+  if (gameTypes.includes('all')) return true;
+  if (gameTypes.includes(gameType)) return true;
+  if (gameType === 'hesbah' && gameTypes.includes('sniper')) return true;
+  return false;
+}
+
 function matchesAdminFilters(question, filters) {
   if (filters.category && question.category !== filters.category) return false;
   if (filters.difficulty_level && question.difficulty_level !== filters.difficulty_level) return false;
   if (filters.status && question.status !== filters.status) return false;
   if (filters.audience && (question.audience || 'general') !== filters.audience) return false;
-  if (filters.gameType && !Array.isArray(question.gameTypes)) return false;
-  if (filters.gameType && !question.gameTypes.includes(filters.gameType)) return false;
+  if (filters.gameType && !questionMatchesGameType(question, filters.gameType)) return false;
 
   return true;
 }
@@ -51,10 +59,7 @@ function matchesGameFilters(question, { gameType, category, difficulty_level, au
   if (category && question.category !== category) return false;
   if (difficulty_level && question.difficulty_level !== difficulty_level) return false;
   if (audience && (question.audience || 'general') !== audience) return false;
-  if (gameType === 'all') return true;
-
-  const gameTypes = Array.isArray(question.gameTypes) ? question.gameTypes : [];
-  return gameTypes.includes(gameType) || gameTypes.includes('all');
+  return questionMatchesGameType(question, gameType);
 }
 
 function shuffleArray(arr) {
@@ -146,12 +151,8 @@ export async function fetchGameQuestionsAdvanced({
   const questions = toQuestionsArray(snapshot).filter((question) => {
     if (difficulty_level && question.difficulty_level !== difficulty_level) return false;
     if (audience && (question.audience || 'general') !== audience) return false;
-
-    const gameTypes = Array.isArray(question.gameTypes) ? question.gameTypes : [];
-    const gameOk = gameType === 'all' ? true : gameTypes.includes(gameType) || gameTypes.includes('all');
-    if (!gameOk) return false;
-
-    if (activeCategories.length) return activeCategories.includes(question.category);
+    if (!questionMatchesGameType(question, gameType)) return false;
+    if (activeCategories.length && !activeCategories.includes(question.category)) return false;
     return true;
   });
 

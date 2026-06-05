@@ -1,0 +1,2915 @@
+﻿/* ═══ حَسْبة — هوية اللعبة (مستقل عن القميري) ═══ */
+
+/* ── متغيرات الهوية: نهاري vs ليلي ── */
+:root,
+[data-theme='light'] {
+  --hesbah-accent: #e65100;
+  --hesbah-accent-light: #ff8f00;
+  --hesbah-secondary: #1565c0;
+  --hesbah-secondary-light: #42a5f5;
+  --hesbah-gold: #f9a825;
+  --hesbah-bg-deep: #fff8f0;
+  --hesbah-bg-mid: #e8f4fc;
+  --hesbah-glow: rgba(230, 81, 0, 0.35);
+  --hesbah-border: rgba(21, 101, 192, 0.28);
+  --hesbah-card-bg: rgba(255, 255, 255, 0.92);
+  --hesbah-muted: #5d4037;
+  --hesbah-inp-bg: #ffffff;
+  --hesbah-focus-ring: rgba(230, 81, 0, 0.18);
+  --hesbah-nav-bg: rgba(255, 248, 240, 0.97);
+  --hesbah-score-bg: rgba(21, 101, 192, 0.06);
+  --hesbah-score-text: #1a237e;
+  --hesbah-grid: rgba(230, 81, 0, 0.07);
+  --hesbah-hud-bg: rgba(255, 255, 255, 0.95);
+}
+
+[data-theme='dark'] {
+  --hesbah-accent: #ffab00;
+  --hesbah-accent-light: #ffd54f;
+  --hesbah-secondary: #00e5ff;
+  --hesbah-secondary-light: #84ffff;
+  --hesbah-gold: #ffe082;
+  --hesbah-bg-deep: #030810;
+  --hesbah-bg-mid: #0c1a32;
+  --hesbah-glow: rgba(255, 171, 0, 0.4);
+  --hesbah-border: rgba(0, 229, 255, 0.32);
+  --hesbah-card-bg: rgba(8, 20, 42, 0.9);
+  --hesbah-muted: #90caf9;
+  --hesbah-inp-bg: rgba(6, 14, 30, 0.85);
+  --hesbah-focus-ring: rgba(0, 229, 255, 0.2);
+  --hesbah-nav-bg: rgba(3, 8, 16, 0.97);
+  --hesbah-score-bg: rgba(0, 229, 255, 0.08);
+  --hesbah-score-text: #e3f2fd;
+  --hesbah-grid: rgba(0, 229, 255, 0.06);
+  --hesbah-hud-bg: rgba(8, 20, 42, 0.94);
+}
+
+/* بطاقة الساحة */
+.home-game-card--hesbah {
+  background: linear-gradient(135deg, var(--hesbah-bg-deep), var(--hesbah-bg-mid));
+  border: 2px solid var(--hesbah-accent);
+  border-radius: 16px;
+  padding: 18px 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.25s;
+  box-shadow: 0 6px 20px var(--hesbah-glow);
+}
+
+[data-theme='light'] .home-game-card--hesbah {
+  box-shadow: 0 6px 18px rgba(230, 81, 0, 0.2);
+}
+
+.home-game-card--hesbah:active {
+  transform: scale(0.98);
+}
+
+.home-game-card--hesbah .home-game-card__title {
+  font-family: Cairo, sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  background: linear-gradient(135deg, var(--hesbah-accent), var(--hesbah-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.home-game-card--hesbah .home-game-card__sub {
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.home-game-card--hesbah .home-game-card__arrow {
+  font-size: 20px;
+  color: var(--hesbah-accent);
+}
+
+.home-game-card--hesbah .tag {
+  background: var(--hesbah-score-bg);
+  color: var(--hesbah-secondary);
+  border: 1px solid var(--hesbah-border);
+}
+
+.app--in-hesbah .stars {
+  display: none;
+}
+
+.app--in-hesbah .hdr {
+  background: var(--hesbah-nav-bg);
+  border-bottom-color: var(--hesbah-border);
+}
+
+/* شريط التنقل أثناء اللعب */
+.app--in-hesbah .bnav {
+  background: var(--hesbah-nav-bg);
+  border-top-color: var(--hesbah-border);
+}
+
+.app--in-hesbah .bnav-item.active {
+  color: var(--hesbah-accent);
+}
+
+.app--in-hesbah .bnav-item.active .bnav-icon {
+  filter: drop-shadow(0 0 6px var(--hesbah-glow));
+}
+
+/* غلاف اللعبة */
+.hesbah-theme {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+/* خلفية — نهاري: سماء دافئة */
+[data-theme='light'] .hesbah-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 100% 70% at 50% 0%, rgba(255, 183, 77, 0.45), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(66, 165, 245, 0.25), transparent 50%),
+    linear-gradient(175deg, #fff8f0 0%, #ffe0b2 35%, #e3f2fd 100%);
+  pointer-events: none;
+}
+
+[data-theme='light'] .hesbah-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle at 20% 30%, var(--hesbah-grid) 0 1px, transparent 2px),
+    radial-gradient(circle at 80% 70%, var(--hesbah-grid) 0 1px, transparent 2px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+/* خلفية — ليلي: أرينا ليلية */
+[data-theme='dark'] .hesbah-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(0, 229, 255, 0.2), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 0% 100%, rgba(255, 171, 0, 0.15), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(0, 100, 180, 0.2), transparent 40%),
+    linear-gradient(165deg, #030810 0%, #0c1a32 50%, #061018 100%);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .hesbah-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(var(--hesbah-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hesbah-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  animation: hesbahGridPulse 10s ease-in-out infinite;
+}
+
+@keyframes hesbahGridPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.hesbah-theme .ptitle {
+  background: linear-gradient(135deg, var(--hesbah-accent), var(--hesbah-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='dark'] .hesbah-theme .ptitle {
+  filter: drop-shadow(0 0 14px var(--hesbah-glow));
+}
+
+.hesbah-theme .ctitle {
+  color: var(--hesbah-accent);
+}
+
+[data-theme='light'] .hesbah-theme .ctitle {
+  color: var(--hesbah-secondary);
+}
+
+.hesbah-theme .psub {
+  color: var(--hesbah-muted);
+}
+
+.hesbah-theme .room-code-big {
+  color: var(--hesbah-accent);
+  border: 2px dashed var(--hesbah-border);
+  background: var(--hesbah-score-bg);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+[data-theme='dark'] .hesbah-theme .room-code-big {
+  text-shadow: 0 0 20px var(--hesbah-glow);
+}
+
+.hesbah-theme .card,
+.hesbah-theme .card2 {
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='light'] .hesbah-theme .card,
+[data-theme='light'] .hesbah-theme .card2 {
+  box-shadow: 0 6px 20px rgba(21, 101, 192, 0.1), 0 2px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+[data-theme='dark'] .hesbah-theme .card,
+[data-theme='dark'] .hesbah-theme .card2 {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 229, 255, 0.06) inset;
+}
+
+.hesbah-theme .btn.bg {
+  background: linear-gradient(135deg, var(--hesbah-accent-light), var(--hesbah-accent));
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 18px var(--hesbah-glow);
+}
+
+[data-theme='dark'] .hesbah-theme .btn.bg {
+  background: linear-gradient(135deg, var(--hesbah-accent), var(--hesbah-secondary));
+}
+
+.hesbah-theme .btn.bo {
+  color: var(--hesbah-accent);
+  border-color: var(--hesbah-accent);
+}
+
+.hesbah-theme .btn.bo:hover:not(:disabled) {
+  background: var(--hesbah-score-bg);
+}
+
+.hesbah-theme .btn.bgh {
+  border-color: var(--hesbah-border);
+  color: var(--hesbah-muted);
+}
+
+.hesbah-theme .btn.bgh:hover:not(:disabled) {
+  border-color: var(--hesbah-accent);
+  color: var(--hesbah-accent);
+}
+
+.hesbah-theme .lbl {
+  color: var(--hesbah-muted);
+}
+
+.hesbah-theme .inp,
+.hesbah-theme textarea.inp,
+.hesbah-theme .tunit input {
+  background: var(--hesbah-inp-bg);
+  border-color: var(--hesbah-border);
+  color: var(--text);
+}
+
+.hesbah-theme .inp:focus,
+.hesbah-theme textarea.inp:focus,
+.hesbah-theme .tunit input:focus {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 0 3px var(--hesbah-focus-ring);
+}
+
+/* ── بطاقة السؤال (مشرف + متسابق) ── */
+.hesbah-question-panel {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--hesbah-border);
+  background: var(--hesbah-card-bg);
+}
+
+.hesbah-question-panel--host {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 18px var(--hesbah-glow);
+  background: linear-gradient(160deg, var(--hesbah-card-bg), var(--hesbah-score-bg));
+}
+
+.hesbah-question-panel--player.hesbah-question-panel--visible {
+  border-color: var(--hesbah-secondary);
+  box-shadow: 0 0 14px var(--hesbah-glow);
+}
+
+.hesbah-question-panel--masked {
+  border-color: #7c3aed;
+  background: linear-gradient(155deg, rgba(124, 58, 237, 0.14), rgba(99, 102, 241, 0.08));
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.22);
+}
+
+.hesbah-question-panel--pending {
+  border-color: var(--hesbah-gold);
+  background: linear-gradient(155deg, rgba(255, 200, 61, 0.12), rgba(249, 115, 22, 0.06));
+  box-shadow: 0 0 16px rgba(255, 200, 61, 0.2);
+}
+
+.hesbah-question-panel--pending .hesbah-question-panel__label-tag {
+  color: var(--hesbah-gold);
+  border-color: var(--hesbah-gold);
+  background: rgba(255, 200, 61, 0.12);
+}
+
+.hesbah-question-panel__row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.hesbah-question-panel__aside {
+  flex-shrink: 0;
+}
+
+.hesbah-question-panel__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.hesbah-question-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.hesbah-question-panel__label-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: Cairo, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 5px 12px;
+  border-radius: 10px;
+  color: var(--hesbah-accent);
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-accent);
+}
+
+.hesbah-question-panel--masked .hesbah-question-panel__label-tag {
+  color: #7c3aed;
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.hesbah-question-panel__role-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 8px;
+  color: var(--hesbah-accent);
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid var(--hesbah-accent);
+}
+
+.hesbah-question-panel__role-badge--player {
+  color: #7c3aed;
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.hesbah-question-panel__text {
+  margin: 0;
+  font-family: Cairo, sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.hesbah-question-panel--host .hesbah-question-panel__text {
+  font-size: 19px;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.06);
+  border-right: 4px solid var(--hesbah-accent);
+}
+
+.hesbah-question-panel__text--empty {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.hesbah-question-panel__wait {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-question-panel__masked {
+  text-align: center;
+  padding: 14px 10px;
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px dashed rgba(124, 58, 237, 0.45);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.hesbah-question-panel__masked-icon {
+  font-size: 32px;
+  line-height: 1;
+  display: block;
+}
+
+.hesbah-question-panel__masked-title {
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #6d28d9;
+}
+
+.hesbah-question-panel__masked-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+  line-height: 1.45;
+}
+
+.hesbah-question-panel__masked-note {
+  margin: 10px 0 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: #7c3aed;
+  opacity: 0.85;
+}
+
+.hesbah-question-panel__pending {
+  text-align: center;
+  padding: 14px 10px;
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 200, 61, 0.5);
+  background: rgba(255, 200, 61, 0.08);
+}
+
+.hesbah-question-panel__pending-icon {
+  font-size: 28px;
+  display: block;
+}
+
+.hesbah-question-panel__pending-title {
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--hesbah-gold);
+}
+
+.hesbah-question-panel__pending-hint,
+.hesbah-question-panel__pending-note {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+  line-height: 1.45;
+}
+
+.hesbah-question-panel__pending-note {
+  margin-top: 6px;
+  font-size: 10px;
+}
+
+.hesbah-question-panel__tag--reveal {
+  border-color: var(--hesbah-accent);
+  color: var(--hesbah-accent);
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.hesbah-question-panel__final {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hesbah-accent);
+}
+
+.hesbah-question-panel__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hesbah-question-panel__tag {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-secondary);
+}
+
+.hesbah-question-panel__tag--oral {
+  border-color: #7c3aed;
+  color: #6d28d9;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.hesbah-question-panel__notes {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--hesbah-muted);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--hesbah-score-bg);
+  border: 1px dashed var(--hesbah-border);
+}
+
+.hesbah-question-panel__host-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.hesbah-admin-timer-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--hesbah-accent);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-admin-timer-hint--oral {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.hesbah-q-card {
+  background: linear-gradient(135deg, var(--hesbah-score-bg), transparent);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 0 20px var(--hesbah-glow);
+}
+
+.hesbah-score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  gap: 6px;
+}
+
+.hesbah-score-btn {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid var(--hesbah-border);
+  background: var(--hesbah-score-bg);
+  font-family: Cairo, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--hesbah-score-text);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.hesbah-score-btn.active {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 14px var(--hesbah-glow);
+  color: var(--hesbah-accent);
+  background: var(--hesbah-focus-ring);
+}
+
+.hesbah-score-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.hesbah-score-btn__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+}
+
+.hesbah-score-btn__num {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hesbah-score-btn__badge {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.hesbah-score-btn--pending {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.25), rgba(100, 116, 139, 0.15));
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #94a3b8;
+  animation: hesbahCellPulse 1.4s ease-in-out infinite;
+}
+
+.hesbah-score-btn--pending .hesbah-score-btn__badge {
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+
+.hesbah-score-btn--won {
+  background: linear-gradient(145deg, #22c55e, #16a34a);
+  border-color: #4ade80;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.55);
+}
+
+.hesbah-score-btn--won .hesbah-score-btn__num {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.hesbah-score-btn--won .hesbah-score-btn__badge {
+  background: rgba(255, 255, 255, 0.28);
+  font-size: 9px;
+}
+
+.hesbah-score-btn--burned {
+  background: linear-gradient(145deg, #ef4444, #b91c1c);
+  border-color: #f87171;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.hesbah-score-btn--burned .hesbah-score-btn__badge {
+  background: rgba(255, 255, 255, 0.25);
+  font-size: 9px;
+}
+
+.hesbah-score-btn--timeout {
+  background: linear-gradient(145deg, #64748b, #475569);
+  border-color: #94a3b8;
+  color: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.hesbah-score-btn--timeout .hesbah-score-btn__badge {
+  font-size: 8px;
+}
+
+.hesbah-score-btn--double {
+  background: linear-gradient(145deg, #fbbf24, #d97706, #f59e0b);
+  background-size: 200% 200%;
+  border-color: #fde68a;
+  color: #1a1a1a;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.65);
+  animation: hesbahDoubleGlow 2s ease-in-out infinite;
+}
+
+.hesbah-score-btn--double .hesbah-score-btn__num {
+  font-weight: 900;
+}
+
+.hesbah-score-btn--double .hesbah-score-btn__badge {
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font-size: 7px;
+  letter-spacing: -0.5px;
+}
+
+@keyframes hesbahCellPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hesbahDoubleGlow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+    box-shadow: 0 0 14px rgba(251, 191, 36, 0.5);
+  }
+  50% {
+    background-position: 100% 50%;
+    box-shadow: 0 0 24px rgba(251, 191, 36, 0.85);
+  }
+}
+
+.hesbah-score-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--hesbah-border);
+  font-size: 10px;
+  color: var(--hesbah-muted);
+  justify-content: center;
+}
+
+.hesbah-score-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hesbah-score-legend__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.hesbah-score-legend__chip.hesbah-score-btn--won {
+  animation: none;
+  font-size: 11px;
+}
+
+.hesbah-score-legend__chip.hesbah-score-btn--burned {
+  font-size: 11px;
+}
+
+.hesbah-score-legend__chip.hesbah-score-btn--timeout {
+  font-size: 10px;
+}
+
+.hesbah-score-legend__chip.hesbah-score-btn--double {
+  animation: none;
+  font-size: 9px;
+}
+
+.hesbah-score-pill {
+  min-width: 36px;
+  text-align: center;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.hesbah-live-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  animation: hesbahCardIn 0.35s ease;
+}
+
+@keyframes hesbahCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hesbah-grade-box {
+  border: 1px solid var(--hesbah-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--hesbah-score-bg);
+}
+
+.hesbah-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hesbah-border);
+}
+
+.hesbah-result-row:last-child {
+  border-bottom: none;
+}
+
+.hesbah-final {
+  overflow: hidden;
+  position: relative;
+}
+
+.hesbah-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.hesbah-podium-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 110px;
+}
+
+.hesbah-podium-bar {
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hesbah-confetti {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.hesbah-confetti span {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: hesbahConfettiFall 2.8s ease-in forwards;
+}
+
+@keyframes hesbahConfettiFall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  to {
+    transform: translateY(110vh) rotate(720deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.hesbah-confetti--victory .hesbah-confetti__bit {
+  position: absolute;
+  top: -16px;
+  border-radius: 2px;
+  animation: hesbahConfettiFall ease-in forwards;
+}
+
+.hesbah-confetti__bit--1 {
+  border-radius: 50%;
+}
+
+.hesbah-confetti__bit--2 {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50%;
+}
+
+.hesbah-final--revealed .hesbah-final__hero {
+  animation: hesbahVictoryReveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hesbah-final--revealed .hesbah-podium--victory {
+  animation: hesbahVictoryReveal 0.7s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hesbah-final--revealed .hesbah-final__list {
+  animation: hesbahVictoryReveal 0.7s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hesbahVictoryReveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.hesbah-final__hero {
+  text-align: center;
+  padding: 12px 0 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.hesbah-final__trophy {
+  font-size: 52px;
+  filter: drop-shadow(0 0 18px var(--hesbah-glow));
+  animation: hesbahTrophyPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes hesbahTrophyPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.hesbah-final__title {
+  font-size: 28px !important;
+  margin-top: 4px;
+  background: linear-gradient(135deg, var(--hesbah-gold), var(--hesbah-accent-light), var(--hesbah-secondary-light));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hesbah-final__early-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hesbah-accent-light);
+  background: rgba(230, 81, 0, 0.14);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-final__winner-card {
+  margin: 16px auto 8px;
+  max-width: 280px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(249, 168, 37, 0.16), rgba(21, 101, 192, 0.1));
+  border: 1.5px solid var(--hesbah-gold);
+  box-shadow: 0 8px 32px var(--hesbah-glow);
+}
+
+.hesbah-final__winner-crown {
+  font-size: 22px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hesbah-final__winner-name {
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  margin-top: 8px;
+}
+
+.hesbah-final__winner-score {
+  font-family: Cairo, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--hesbah-accent);
+  margin-top: 4px;
+}
+
+.hesbah-podium-slot__medal {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.hesbah-result-row--winner {
+  background: rgba(249, 168, 37, 0.08);
+  border-radius: 10px;
+  margin: 0 -6px;
+  padding: 8px 6px;
+}
+
+.hesbah-victory-sparkles {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.hesbah-victory-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hesbah-gold);
+  box-shadow: 0 0 8px var(--hesbah-gold);
+  animation: hesbahSparkle 2.2s ease-in-out infinite;
+}
+
+@keyframes hesbahSparkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.hesbah-victory-share {
+  position: relative;
+  z-index: 2;
+  margin: 14px 0 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-victory-share__hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.hesbah-victory-share__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hesbah-victory-share__actions .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
+.hesbah-final__home {
+  position: relative;
+  z-index: 2;
+}
+
+.hesbah-final__list {
+  position: relative;
+  z-index: 2;
+}
+
+.hesbah-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: hesbahModalIn 0.2s ease-out;
+}
+
+@keyframes hesbahModalIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hesbah-modal {
+  width: 100%;
+  max-width: 360px;
+  padding: 22px 20px 18px;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1.5px solid var(--hesbah-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.hesbah-modal__icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.hesbah-modal__title {
+  font-family: Cairo, sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0 0 10px;
+}
+
+.hesbah-modal__msg {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+.hesbah-modal__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hesbah-modal__actions .btn {
+  flex: 1;
+}
+
+.hesbah-admin-early-end {
+  margin-right: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  font-family: Cairo, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hesbah-admin-early-end:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.hesbah-admin-cta--end {
+  margin-top: 8px;
+}
+
+.hesbah-admin-cta--end {
+  margin-top: 8px;
+}
+
+/* ── خروج / انسحاب — UX ── */
+.hesbah-exit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(4, 8, 18, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  animation: hesbahModalIn 0.22s ease-out;
+}
+
+@media (min-width: 480px) {
+  .hesbah-exit-overlay {
+    align-items: center;
+  }
+}
+
+.hesbah-exit-sheet {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px 18px 16px;
+  border-radius: 22px 22px 18px 18px;
+  background: var(--card);
+  border: 1.5px solid var(--hesbah-border);
+  box-shadow: 0 -8px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  position: relative;
+  animation: hesbahExitSheetUp 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 480px) {
+  .hesbah-exit-sheet {
+    border-radius: 22px;
+  }
+}
+
+@keyframes hesbahExitSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.hesbah-exit-sheet__close {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border-faint);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hesbah-exit-sheet__head {
+  text-align: center;
+  padding: 4px 8px 16px;
+}
+
+.hesbah-exit-sheet__emoji {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hesbah-exit-sheet__title {
+  font-family: Cairo, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0 0 8px;
+}
+
+.hesbah-exit-sheet__room {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-exit-sheet__room strong {
+  font-family: monospace;
+  letter-spacing: 0.15em;
+  color: var(--hesbah-accent);
+}
+
+.hesbah-exit-sheet__choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hesbah-exit-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 16px 10px 14px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border-faint);
+  background: var(--surface);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: Cairo, Tajawal, sans-serif;
+}
+
+.hesbah-exit-choice:active {
+  transform: scale(0.97);
+}
+
+.hesbah-exit-choice--continue {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: linear-gradient(160deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.02));
+}
+
+.hesbah-exit-choice--continue:hover {
+  border-color: rgba(34, 197, 94, 0.55);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.12);
+}
+
+.hesbah-exit-choice--leave {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(160deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.02));
+}
+
+.hesbah-exit-choice--leave:hover {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.1);
+}
+
+.hesbah-exit-choice__icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.hesbah-exit-choice__title {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.hesbah-exit-choice__sub {
+  font-size: 9px;
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 140px;
+}
+
+.hesbah-exit-sheet__cancel {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.hesbah-exit-bar {
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 25;
+}
+
+.hesbah-exit-bar--overlay {
+  position: relative;
+  z-index: 3;
+}
+
+/* شريط علوي ثابت — رجوع + HUD + تبويبات (يتماشى مع تدرج حَسْبة، لا لون المنصة) */
+.hesbah-sticky-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin-bottom: 10px;
+  padding-bottom: 2px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 248, 240, 0.94) 0%,
+    rgba(255, 248, 240, 0.72) 68%,
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .hesbah-theme .hesbah-sticky-chrome {
+  background: linear-gradient(
+    180deg,
+    rgba(3, 8, 16, 0.94) 0%,
+    rgba(3, 8, 16, 0.72) 68%,
+    transparent 100%
+  );
+}
+
+/* شاشات الإعداد/الانضمام — بدون شريط أبيض، الزر فوق التدرج مباشرة */
+.hesbah-setup-screen .hesbah-sticky-chrome {
+  background: transparent;
+  backdrop-filter: none;
+  margin-bottom: 14px;
+  padding-bottom: 0;
+}
+.hesbah-top-nav {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+.hesbah-exit-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--hesbah-border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: Cairo, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+/* زر الرجوع الموحّد — مثل شاشة الإعداد (مشرف + متسابق) */
+.hesbah-exit-trigger--nav {
+  width: auto;
+  min-height: 0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 63, 53, 0.32);
+  background: #fdfaf5;
+  color: #4a3f35;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.85),
+    inset 0 -1px 1px rgba(74, 63, 53, 0.06),
+    0 1px 3px rgba(74, 63, 53, 0.08);
+}
+
+.hesbah-exit-trigger--nav .hesbah-exit-trigger__icon {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 900;
+  color: #4a3f35;
+}
+
+.hesbah-exit-trigger--nav .hesbah-exit-trigger__label {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.hesbah-exit-trigger--nav:hover {
+  border-color: rgba(230, 81, 0, 0.45);
+  color: var(--hesbah-accent);
+  background: #fff9f2;
+}
+
+.hesbah-exit-trigger--nav:hover .hesbah-exit-trigger__icon {
+  color: var(--hesbah-accent);
+}
+
+.hesbah-exit-trigger--nav:active {
+  transform: scale(0.98);
+  box-shadow: inset 0 1px 3px rgba(74, 63, 53, 0.12);
+}
+
+.hesbah-exit-trigger--bar {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--hesbah-border);
+  background: linear-gradient(180deg, var(--card), var(--surface));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  justify-content: flex-start;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+  gap: 10px;
+}
+
+.hesbah-exit-trigger--bar .hesbah-exit-trigger__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(230, 81, 0, 0.18), rgba(249, 168, 37, 0.12));
+  border: 1px solid rgba(230, 81, 0, 0.35);
+  color: var(--hesbah-accent);
+  font-size: 20px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.hesbah-exit-trigger--bar .hesbah-exit-trigger__label {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.hesbah-exit-trigger--bar:active {
+  transform: scale(0.99);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.hesbah-exit-trigger:hover {
+  color: var(--text);
+  border-color: var(--hesbah-accent);
+  background: rgba(230, 81, 0, 0.06);
+}
+
+.hesbah-exit-trigger--bar:hover {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 4px 16px var(--hesbah-glow);
+}
+
+.hesbah-exit-trigger--compact {
+  margin-bottom: 0;
+  padding: 6px 10px;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.hesbah-exit-trigger__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.hesbah-player-screen {
+  padding-top: 0;
+}
+
+.hesbah-player-hud {
+  position: relative;
+  z-index: 20;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--hesbah-hud-bg);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 4px 20px var(--hesbah-glow);
+  backdrop-filter: blur(12px);
+}
+
+.hesbah-player-hud--compact {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.hesbah-player-hud__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hesbah-player-hud__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hesbah-player-hud__name {
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.hesbah-player-hud__score {
+  font-size: 12px;
+  margin-top: 2px;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-player-hud__ins {
+  font-size: 11px;
+}
+
+.hesbah-player-hud__phase {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-accent);
+}
+
+.hesbah-player-tabs {
+  position: relative;
+  z-index: 19;
+  margin-bottom: 6px;
+}
+
+.hesbah-player-main {
+  padding-bottom: 16px;
+}
+
+.hesbah-player-wait,
+.hesbah-player-hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--hesbah-muted);
+  margin-top: 12px;
+  padding: 0 8px;
+}
+
+.hesbah-player-hint {
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.hesbah-player-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hesbah-player-alert {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(249, 168, 37, 0.15);
+  border: 1px solid rgba(249, 168, 37, 0.45);
+  color: var(--hesbah-gold);
+}
+
+.hesbah-lb-modal {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.hesbah-trophy-fab {
+  position: fixed;
+  left: 16px;
+  bottom: 80px;
+  z-index: 10;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--hesbah-accent);
+  background: var(--hesbah-hud-bg);
+  font-size: 26px;
+  box-shadow: 0 4px 20px var(--hesbah-glow);
+  cursor: pointer;
+}
+
+.hesbah-countdown svg circle:first-of-type {
+  stroke: var(--hesbah-border);
+}
+
+.hesbah-theme.onb-bg .onb-card,
+.hesbah-theme .onb-card {
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-theme .onb-title {
+  color: var(--hesbah-accent);
+}
+
+.hesbah-theme .onb-sub {
+  color: var(--hesbah-muted);
+}
+
+.hesbah-hero-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-accent);
+  margin-top: 6px;
+}
+
+/* ═══ لوحة المشرف — أرينا القيادة ═══ */
+.hesbah-admin {
+  padding-bottom: 12px;
+}
+
+.hesbah-admin-hero {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 8px 32px var(--hesbah-glow), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  overflow: hidden;
+}
+
+[data-theme='dark'] .hesbah-admin-hero {
+  background: linear-gradient(145deg, rgba(8, 20, 42, 0.95), rgba(12, 28, 56, 0.88));
+}
+
+[data-theme='light'] .hesbah-admin-hero {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(232, 244, 252, 0.9));
+}
+
+.hesbah-admin-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--hesbah-glow), transparent);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.hesbah-admin-hero__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.hesbah-admin-hero__left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* رمز الغرفة + التاريخ */
+.hesbah-room-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.hesbah-room-meta__label {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--hesbah-muted);
+  letter-spacing: 0.02em;
+}
+
+.hesbah-room-meta__code {
+  font-family: monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--hesbah-accent);
+  line-height: 1.1;
+}
+
+[data-theme='dark'] .hesbah-room-meta__code {
+  text-shadow: 0 0 12px var(--hesbah-glow);
+}
+
+.hesbah-room-meta__time {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--hesbah-muted);
+  line-height: 1.35;
+}
+
+.hesbah-room-meta__q {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--hesbah-secondary);
+  margin-top: 2px;
+}
+
+.hesbah-room-meta--lb {
+  align-items: flex-end;
+  text-align: left;
+}
+
+.hesbah-room-meta--lb .hesbah-room-meta__code {
+  font-size: 22px;
+}
+
+.hesbah-room-meta--hero {
+  margin-top: 4px;
+}
+
+.hesbah-room-meta--lobby {
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.hesbah-room-meta--lobby .hesbah-room-meta__code {
+  font-size: 36px;
+  letter-spacing: 8px;
+}
+
+.hesbah-room-meta--player {
+  margin-top: 2px;
+}
+
+.hesbah-room-meta--player .hesbah-room-meta__code {
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.hesbah-room-meta--player .hesbah-room-meta__label,
+.hesbah-room-meta--player .hesbah-room-meta__time {
+  font-size: 9px;
+}
+
+.hesbah-admin-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hesbah-admin-tabs__btn {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--hesbah-border);
+  background: var(--hesbah-card-bg);
+  font-family: Cairo, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--hesbah-muted);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.hesbah-admin-tabs__btn.is-active {
+  border-color: var(--hesbah-accent);
+  color: var(--hesbah-accent);
+  box-shadow: 0 0 14px var(--hesbah-glow);
+  background: var(--hesbah-score-bg);
+}
+
+.hesbah-admin-hero__badge {
+  font-family: Cairo, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-accent);
+  color: var(--hesbah-accent);
+  box-shadow: 0 0 12px var(--hesbah-glow);
+}
+
+.hesbah-admin-hero__progress {
+  height: 4px;
+  margin: 12px 0 8px;
+  border-radius: 4px;
+  background: var(--hesbah-border);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.hesbah-admin-hero__progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--hesbah-secondary), var(--hesbah-accent));
+  box-shadow: 0 0 10px var(--hesbah-glow);
+  transition: width 0.4s ease;
+}
+
+.hesbah-admin-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.hesbah-admin-hero__q {
+  font-family: Cairo, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.hesbah-admin-hero__q strong {
+  color: var(--hesbah-accent);
+  font-size: 28px;
+}
+
+.hesbah-admin-hero__sep {
+  opacity: 0.45;
+  margin: 0 2px;
+}
+
+.hesbah-admin-hero__special {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(249, 168, 37, 0.2);
+  border: 1px solid var(--hesbah-gold);
+  color: var(--hesbah-gold);
+}
+
+/* ترتيب المشرف */
+.hesbah-admin-lb {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] .hesbah-admin-lb {
+  background: linear-gradient(160deg, rgba(6, 14, 30, 0.92), rgba(8, 22, 48, 0.85));
+  border-color: var(--hesbah-gold);
+  box-shadow: 0 0 24px rgba(255, 224, 130, 0.08);
+}
+
+.hesbah-admin-lb__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.hesbah-admin-lb__title {
+  margin: 0;
+  font-family: Cairo, sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--hesbah-gold);
+}
+
+[data-theme='light'] .hesbah-admin-lb__title {
+  color: var(--hesbah-secondary);
+}
+
+.hesbah-admin-lb__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-lb__row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.hesbah-admin-lb__row--top1 {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.22), transparent);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+}
+
+.hesbah-admin-lb__row--top2 {
+  background: linear-gradient(90deg, rgba(192, 192, 192, 0.18), transparent);
+}
+
+.hesbah-admin-lb__row--top3 {
+  background: linear-gradient(90deg, rgba(205, 127, 50, 0.18), transparent);
+}
+
+.hesbah-admin-lb__rank {
+  font-weight: 900;
+  color: var(--hesbah-muted);
+  text-align: center;
+}
+
+.hesbah-admin-lb__row--top1 .hesbah-admin-lb__rank {
+  color: var(--hesbah-gold);
+}
+
+.hesbah-admin-lb__name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hesbah-admin-lb__pts {
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+  min-width: 36px;
+  text-align: left;
+}
+
+.hesbah-admin-lb__more {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: var(--hesbah-score-bg);
+  color: var(--hesbah-muted);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.hesbah-admin-lb__full {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--hesbah-border);
+}
+
+.hesbah-admin-lb__empty {
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  text-align: center;
+  padding: 8px;
+}
+
+/* لوحات المحتوى */
+.hesbah-admin-panel {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-admin-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.hesbah-admin-panel__title {
+  margin: 0 0 4px;
+  font-family: Cairo, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+}
+
+.hesbah-admin-panel__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-question__text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.hesbah-admin-question__empty {
+  color: var(--hesbah-muted);
+  font-size: 14px;
+}
+
+.hesbah-admin-live-feed--ops {
+  border-color: var(--hesbah-secondary);
+  box-shadow: 0 0 20px var(--hesbah-glow);
+}
+
+.hesbah-admin-live-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hesbah-admin-live-feed__empty {
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+.hesbah-admin-submit-counter__bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 6px;
+  background: var(--hesbah-border);
+  overflow: hidden;
+}
+
+.hesbah-admin-submit-counter__fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--hesbah-secondary), var(--hesbah-accent));
+  transition: width 0.35s ease;
+}
+
+.hesbah-admin-question__cat {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-secondary);
+}
+
+.hesbah-admin-banner {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.hesbah-admin-banner--wait {
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-banner--run {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #16a34a;
+}
+
+[data-theme='dark'] .hesbah-admin-banner--run {
+  color: #4ade80;
+}
+
+.hesbah-admin-banner--grade {
+  background: rgba(249, 168, 37, 0.15);
+  border: 1px solid var(--hesbah-gold);
+  color: var(--hesbah-gold);
+}
+
+
+.hesbah-admin-status {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  text-align: center;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-status--run {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #16a34a;
+}
+
+.hesbah-admin-status--grade {
+  border-color: var(--hesbah-gold);
+  color: var(--hesbah-gold);
+}
+
+.hesbah-admin-notes {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  border-radius: 8px;
+  background: rgba(240, 192, 64, 0.1);
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  white-space: pre-wrap;
+}
+
+.hesbah-admin-micro {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-micro-btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.hesbah-admin-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hesbah-admin-split--solo {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 400px) {
+  .hesbah-admin-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hesbah-admin-split__col {
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+  min-width: 0;
+}
+
+.hesbah-admin-hero__timer-pill--wait {
+  border-color: var(--hesbah-gold);
+  color: var(--hesbah-gold);
+}
+
+.hesbah-admin-split__timer--attention {
+  border-color: var(--hesbah-gold) !important;
+  background: linear-gradient(160deg, rgba(255, 200, 61, 0.14), var(--hesbah-score-bg));
+  box-shadow: 0 0 22px rgba(255, 200, 61, 0.35);
+  animation: hesbahTimerColGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes hesbahTimerColGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 14px rgba(255, 200, 61, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(255, 200, 61, 0.5);
+  }
+}
+
+.hesbah-admin-start-timer {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12px;
+  padding: 10px 8px;
+}
+
+.hesbah-admin-start-timer--attention {
+  font-family: Cairo, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  padding: 14px 12px;
+  letter-spacing: 0.02em;
+  border: 2px solid var(--hesbah-gold);
+  box-shadow: 0 0 20px var(--hesbah-glow), 0 4px 0 rgba(230, 81, 0, 0.35);
+  animation: hesbahStartBtnShake 2.2s ease-in-out infinite;
+}
+
+@keyframes hesbahStartBtnShake {
+  0%,
+  78%,
+  100% {
+    transform: translateX(0) scale(1);
+  }
+  80% {
+    transform: translateX(-5px) scale(1.02);
+  }
+  84% {
+    transform: translateX(5px) scale(1.02);
+  }
+  88% {
+    transform: translateX(-4px) scale(1.01);
+  }
+  92% {
+    transform: translateX(4px) scale(1.01);
+  }
+  96% {
+    transform: translateX(0) scale(1.03);
+  }
+}
+
+.hesbah-input-locked {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hesbah-gold);
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.hesbah-play-hint {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hesbah-gold);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.hesbah-question-panel--blind-pick .hesbah-question-panel__pending-title {
+  color: #6d28d9;
+}
+
+.hesbah-admin-reset-secs {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.hesbah-admin-host-inp {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.hesbah-admin-host-send {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ── عناوين الأقسام + i صغير ── */
+.hesbah-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.hesbah-sec-head__label {
+  font-family: Cairo, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+  flex: 1;
+  min-width: 0;
+}
+
+.hesbah-i {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.hesbah-i__btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--hesbah-muted);
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 18px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.hesbah-i__btn:hover,
+.hesbah-i__btn.is-on {
+  opacity: 1;
+  color: var(--hesbah-accent);
+  background: var(--hesbah-score-bg);
+}
+
+.hesbah-i__pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 200px;
+  max-width: min(280px, 85vw);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--hesbah-muted);
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.hesbah-i__pop p {
+  margin: 0;
+}
+
+.hesbah-i__list {
+  margin: 0;
+  padding: 0 14px 0 0;
+}
+
+.hesbah-i__list li {
+  margin-bottom: 4px;
+}
+
+.hesbah-i__list li:last-child {
+  margin-bottom: 0;
+}
+
+/* ── أدوات الإثارة: صف واحد ── */
+.hesbah-admin-tools-panel .hesbah-admin-tools {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.hesbah-admin-controls {
+  padding: 8px 10px;
+}
+
+.hesbah-admin-timer-live {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hesbah-admin-hero__timer-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .hesbah-admin-hero__timer-pill {
+  color: #4ade80;
+}
+
+.hesbah-power-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.hesbah-power-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--hesbah-border);
+  background: var(--hesbah-card-bg);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.hesbah-power-btn:active {
+  transform: scale(0.97);
+}
+
+.hesbah-power-btn.is-on {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 12px var(--hesbah-glow);
+  background: var(--hesbah-score-bg);
+}
+
+.hesbah-power-btn__ico {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hesbah-power-btn__tag {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--hesbah-muted);
+  line-height: 1.2;
+}
+
+.hesbah-power-btn.is-on .hesbah-power-btn__tag {
+  color: var(--hesbah-accent);
+}
+
+.hesbah-power-btn__dot {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hesbah-accent);
+  box-shadow: 0 0 6px var(--hesbah-glow);
+}
+
+/* لوبي: أزرار مشاركة مضغوطة */
+.hesbah-lobby-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hesbah-lobby-toggle__btn {
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--hesbah-border);
+  background: var(--hesbah-card-bg);
+  font-family: Cairo, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hesbah-lobby-toggle__btn.is-on {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 10px var(--hesbah-glow);
+  color: var(--hesbah-accent);
+}
+
+.hesbah-submit-pill {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hesbah-accent);
+}
+
+.hesbah-submit-pill strong {
+  font-size: 15px;
+}
+
+.hesbah-admin-ref__answer {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.hesbah-admin-grade__row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.hesbah-admin-grade__name {
+  font-weight: 800;
+}
+
+.hesbah-admin-grade__answer {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.hesbah-admin-grade__score {
+  font-size: 11px;
+  color: var(--hesbah-accent);
+  margin-top: 4px;
+}
+
+.hesbah-admin-grade__who {
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  margin-top: 6px;
+}
+
+.hesbah-admin-grade__warn {
+  font-size: 10px;
+  color: var(--hesbah-accent);
+  margin: 6px 0;
+}
+
+.hesbah-admin-grade__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hesbah-admin-grade__actions .btn {
+  flex: 1;
+}
+
+.hesbah-admin-grade.is-correct {
+  border-color: #22c55e;
+}
+
+.hesbah-admin-grade.is-wrong {
+  border-color: var(--red);
+}
+
+.hesbah-admin-grade.is-marked-dup {
+  border-color: var(--red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.hesbah-admin-footnote {
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  text-align: center;
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.hesbah-admin-cta {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+}
+
+/* ═══ بطاقة الترتيب الفاخرة — حَسْبة ═══ */
+.hesbah-lb-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+  background: linear-gradient(165deg, var(--hesbah-card-bg) 0%, var(--hesbah-score-bg) 100%);
+  border: 1px solid var(--hesbah-border);
+  box-shadow: 0 10px 36px var(--hesbah-glow), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+[data-theme='dark'] .hesbah-lb-card {
+  background: linear-gradient(165deg, rgba(8, 20, 42, 0.98) 0%, rgba(12, 28, 56, 0.92) 55%, rgba(6, 14, 30, 0.98) 100%);
+}
+
+.hesbah-lb-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--hesbah-secondary), var(--hesbah-accent), var(--hesbah-gold));
+}
+
+.hesbah-lb-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hesbah-lb-card__brand {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.hesbah-lb-card__emoji {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px var(--hesbah-glow));
+}
+
+.hesbah-lb-card__arena {
+  margin: 0 0 2px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-lb-card__title {
+  margin: 0;
+  font-family: Cairo, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+  background: linear-gradient(135deg, var(--hesbah-accent), var(--hesbah-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.hesbah-lb-card__tagline {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-lb-card__meta {
+  flex-shrink: 0;
+}
+
+.hesbah-lb-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hesbah-lb-stat {
+  flex: 1 1 calc(33% - 6px);
+  min-width: 72px;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-lb-stat--round {
+  border-color: var(--hesbah-secondary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.hesbah-lb-stat--lead {
+  border-color: var(--hesbah-gold);
+  background: rgba(255, 200, 61, 0.1);
+}
+
+.hesbah-lb-stat--fire {
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+.hesbah-lb-stat__val {
+  display: block;
+  font-family: Cairo, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+}
+
+.hesbah-lb-stat__lbl {
+  display: block;
+  font-size: 9px;
+  color: var(--hesbah-muted);
+  margin-top: 2px;
+}
+
+.hesbah-lb-stat__sub {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--hesbah-text);
+  margin-top: 3px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hesbah-lb-card__my-rank {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-accent);
+  color: var(--hesbah-accent);
+}
+
+.hesbah-lb-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 14px;
+  padding: 8px 4px 0;
+}
+
+.hesbah-lb-podium__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 100px;
+  min-width: 0;
+}
+
+.hesbah-lb-podium__medal {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.hesbah-lb-podium__name {
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 6px 0 4px;
+}
+
+.hesbah-lb-podium__bar {
+  width: 100%;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Cairo, sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.hesbah-lb-podium__slot--gold .hesbah-lb-podium__bar {
+  background: linear-gradient(180deg, #ffd54f, #f9a825);
+  box-shadow: 0 0 16px rgba(255, 193, 7, 0.45);
+}
+
+.hesbah-lb-podium__slot--silver .hesbah-lb-podium__bar {
+  background: linear-gradient(180deg, #e0e0e0, #9e9e9e);
+}
+
+.hesbah-lb-podium__slot--bronze .hesbah-lb-podium__bar {
+  background: linear-gradient(180deg, #d7a86e, #a1887f);
+}
+
+.hesbah-lb-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hesbah-lb-card__list--rest {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--hesbah-border);
+}
+
+.hesbah-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+}
+
+.hesbah-lb-row--me {
+  border-color: var(--hesbah-accent);
+  box-shadow: 0 0 12px var(--hesbah-glow);
+}
+
+.hesbah-lb-row__rank {
+  width: 22px;
+  font-weight: 900;
+  font-size: 13px;
+  color: var(--hesbah-muted);
+  text-align: center;
+}
+
+.hesbah-lb-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hesbah-lb-row__name {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hesbah-lb-row__fire {
+  flex-shrink: 0;
+}
+
+.hesbah-lb-row__you {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--hesbah-accent);
+  color: #fff;
+}
+
+.hesbah-lb-row__pts {
+  font-family: Cairo, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--hesbah-accent);
+  min-width: 32px;
+  text-align: left;
+}
+
+.hesbah-lb-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hesbah-border);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--hesbah-muted);
+}
+
+.hesbah-lb-card__foot-dot {
+  opacity: 0.5;
+}
+
+.hesbah-lb-card__empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--hesbah-muted);
+  padding: 16px;
+}
+
+.hesbah-lb-modal {
+  max-width: 400px;
+  width: calc(100% - 24px);
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.hesbah-lb-modal .hesbah-lb-card {
+  margin: 0;
+}
+

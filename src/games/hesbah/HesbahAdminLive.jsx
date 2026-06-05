@@ -1,29 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
-import SniperCountdown from './SniperCountdown';
-import SniperRoomMeta from './SniperRoomMeta';
-import SniperAdminTools from './SniperAdminTools';
-import SniperAdminLeaderboard from './SniperAdminLeaderboard';
+import HesbahCountdown from './HesbahCountdown';
+import HesbahRoomMeta from './HesbahRoomMeta';
+import HesbahAdminTools from './HesbahAdminTools';
+import HesbahAdminLeaderboard from './HesbahAdminLeaderboard';
 import {
   groupDuplicateAnswers,
   uniqueAnswerEntries,
   normalizeAnswer,
   questionDurationSec,
   activeRoundSecs,
-  SNIPER_SPECIAL_TOOLS,
-  SNIPER_ACCENT_CSS,
-  SNIPER_SCORE_BG_CSS,
-  SNIPER_BORDER_CSS,
-  sniperHostQuestionFlags,
-} from './sniperHelpers';
-import SniperQuestionPanel from './SniperQuestionPanel';
-import SniperTimerPicker from './SniperTimerPicker';
-import { SniperPanelTitle, SNIPER_HOST_ANSWER_HELP, SNIPER_LIVE_HOST_HELP, SNIPER_LIVE_OPS_HELP, SNIPER_SUBMIT_COUNTER_HELP } from './SniperHelpTip';
-import SniperLiveAnswersPanel, {
-  SniperAdminSubmitCounter,
-  useSniperLiveAnswers,
-} from './SniperLiveAnswers';
+  HESBAH_SPECIAL_TOOLS,
+  HESBAH_ACCENT_CSS,
+  HESBAH_SCORE_BG_CSS,
+  HESBAH_BORDER_CSS,
+  hesbahHostQuestionFlags,
+} from './hesbahHelpers';
+import HesbahQuestionPanel from './HesbahQuestionPanel';
+import HesbahTimerPicker from './HesbahTimerPicker';
+import { HesbahPanelTitle, HESBAH_HOST_ANSWER_HELP, HESBAH_LIVE_HOST_HELP, HESBAH_LIVE_OPS_HELP, HESBAH_SUBMIT_COUNTER_HELP } from './HesbahHelpTip';
+import HesbahLiveAnswersPanel, {
+  HesbahAdminSubmitCounter,
+  useHesbahLiveAnswers,
+} from './HesbahLiveAnswers';
+import HesbahConfirmModal from './HesbahConfirmModal';
+import HesbahTopNav from './HesbahTopNav';
 
 const PHASE_LABELS = {
   question: 'جولة سؤال',
@@ -33,10 +35,10 @@ const PHASE_LABELS = {
 };
 
 function activeSpecialLabel(id) {
-  return SNIPER_SPECIAL_TOOLS.find((t) => t.id === id)?.title;
+  return HESBAH_SPECIAL_TOOLS.find((t) => t.id === id)?.title;
 }
 
-export default function SniperAdminLive({
+export default function HesbahAdminLive({
   roomCode,
   game,
   players,
@@ -59,9 +61,13 @@ export default function SniperAdminLive({
   onEndTimer,
   onRoundSecsChange,
   onClearRoundSecs,
+  onRequestEarlyEnd,
+  canEarlyEnd = false,
+  onExitRequest,
   hostParticipates,
 }) {
   const [adminTab, setAdminTab] = useState('round');
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const phase = game?.phase || 'question';
   const grading = phase === 'grading';
   const timerWaiting = phase === 'question' && !game?.deadline;
@@ -75,7 +81,7 @@ export default function SniperAdminLive({
   const progressPct = Math.min(100, Math.round((currentQ / totalQ) * 100));
   const hostQuestion =
     game?.hostQuestionText?.trim() || game?.questionText?.trim() || '';
-  const hostFlags = sniperHostQuestionFlags(game);
+  const hostFlags = hesbahHostQuestionFlags(game);
 
   useEffect(() => {
     if (phase === 'question' || phase === 'grading') setAdminTab('round');
@@ -115,7 +121,7 @@ export default function SniperAdminLive({
     setDuplicateMarked((prev) => ({ ...prev, [answerKey]: marked }));
   };
 
-  const { liveCards, totalContestants, submittedCount, hostSent } = useSniperLiveAnswers(
+  const { liveCards, totalContestants, submittedCount, hostSent } = useHesbahLiveAnswers(
     answers,
     players,
     hostAnswer,
@@ -126,24 +132,24 @@ export default function SniperAdminLive({
 
   const timerColumn = (
     <div
-      className={`sniper-admin-split__col sniper-admin-split__timer ${
-        timerNeedsStart ? 'sniper-admin-split__timer--attention' : ''
+      className={`hesbah-admin-split__col hesbah-admin-split__timer ${
+        timerNeedsStart ? 'hesbah-admin-split__timer--attention' : ''
       }`}
     >
-      <SniperPanelTitle>⏱ المؤقت</SniperPanelTitle>
+      <HesbahPanelTitle>⏱ المؤقت</HesbahPanelTitle>
       {timerWaiting ? (
         <>
           {hostFlags.oralHidden ? (
-            <p className="sniper-admin-timer-hint sniper-admin-timer-hint--oral">🎙️ بدون نص للاعبين — استمعوا لك</p>
+            <p className="hesbah-admin-timer-hint hesbah-admin-timer-hint--oral">🎙️ بدون نص للاعبين — استمعوا لك</p>
           ) : hostFlags.revealsOnTimer ? (
-            <p className="sniper-admin-timer-hint">📱 السؤال يظهر للاعبين بعد «بدء المؤقت»</p>
+            <p className="hesbah-admin-timer-hint">📱 السؤال يظهر للاعبين بعد «بدء المؤقت»</p>
           ) : null}
-          <p className="sniper-admin-micro">افتراضي {game?.questionSecs ?? 20} ث</p>
+          <p className="hesbah-admin-micro">افتراضي {game?.questionSecs ?? 20} ث</p>
           {game?.specialRound !== 'speed' && (
             <>
-              <SniperTimerPicker compact activeSecs={roundSecsUi} onSelect={onRoundSecsChange} />
+              <HesbahTimerPicker compact activeSecs={roundSecsUi} onSelect={onRoundSecsChange} />
               {hasRoundOverride && (
-                <button type="button" className="btn bgh bsm sniper-admin-reset-secs" onClick={onClearRoundSecs}>
+                <button type="button" className="btn bgh bsm hesbah-admin-reset-secs" onClick={onClearRoundSecs}>
                   ↩ افتراضي
                 </button>
               )}
@@ -151,21 +157,21 @@ export default function SniperAdminLive({
           )}
           <button
             type="button"
-            className="btn bg sniper-admin-start-timer sniper-admin-start-timer--attention"
+            className="btn bg hesbah-admin-start-timer hesbah-admin-start-timer--attention"
             onClick={onStartTimer}
           >
             ▶ بدء المؤقت ({maxSec} ث)
           </button>
         </>
       ) : (
-        <div className="sniper-admin-timer-live">
-          <SniperCountdown
+        <div className="hesbah-admin-timer-live">
+          <HesbahCountdown
             remaining={countdown}
             maxSeconds={maxSec}
             size={44}
             waiting={false}
           />
-          <p className="sniper-admin-micro">
+          <p className="hesbah-admin-micro">
             {timerRunning ? 'العدّ جارٍ' : 'انتهى الوقت'}
           </p>
         </div>
@@ -174,19 +180,19 @@ export default function SniperAdminLive({
   );
 
   const hostColumn = hostParticipates && (
-    <div className="sniper-admin-split__col sniper-admin-split__host">
-      <SniperPanelTitle help={SNIPER_HOST_ANSWER_HELP} helpLabel="إجابة العرض">
+    <div className="hesbah-admin-split__col hesbah-admin-split__host">
+      <HesbahPanelTitle help={HESBAH_HOST_ANSWER_HELP} helpLabel="إجابة العرض">
         👑 إجابتك
-      </SniperPanelTitle>
+      </HesbahPanelTitle>
       <input
-        className="inp sniper-admin-host-inp"
+        className="inp hesbah-admin-host-inp"
         placeholder="إجابتك…"
         value={hostDraft.answer}
         onChange={(e) => setHostDraft((d) => ({ ...d, answer: e.target.value }))}
       />
       <button
         type="button"
-        className="btn bgh bsm sniper-admin-host-send"
+        className="btn bgh bsm hesbah-admin-host-send"
         disabled={!hostDraft.answer?.trim()}
         onClick={onHostSubmit}
       >
@@ -196,65 +202,78 @@ export default function SniperAdminLive({
   );
 
   return (
-    <div className="scr sniper-theme sniper-admin">
-      <LiveConnectionBar connected roomCode={roomCode} />
+    <div className="scr hesbah-theme hesbah-admin">
+      <div className="hesbah-sticky-chrome">
+        <LiveConnectionBar connected roomCode={roomCode} />
+        {typeof onExitRequest === 'function' && (
+          <HesbahTopNav onBack={onExitRequest} />
+        )}
+        <nav className="hesbah-admin-tabs hesbah-player-tabs" aria-label="لوحة المشرف">
+          <button
+            type="button"
+            className={`hesbah-admin-tabs__btn ${adminTab === 'round' ? 'is-active' : ''}`}
+            onClick={() => setAdminTab('round')}
+          >
+            🎯 الجولة
+          </button>
+          <button
+            type="button"
+            className={`hesbah-admin-tabs__btn ${adminTab === 'rank' ? 'is-active' : ''}`}
+            onClick={() => setAdminTab('rank')}
+          >
+            🏆 الترتيب
+          </button>
+        </nav>
+      </div>
 
-      <header className="sniper-admin-hero">
-        <div className="sniper-admin-hero__top">
-          <div className="sniper-admin-hero__left">
-            <div className="sniper-admin-hero__badge">{PHASE_LABELS[phase] || phase}</div>
+      <header className="hesbah-admin-hero">
+        <div className="hesbah-admin-hero__top">
+          <div className="hesbah-admin-hero__left">
+            <div className="hesbah-admin-hero__badge">{PHASE_LABELS[phase] || phase}</div>
             {roomCode && (
-              <SniperRoomMeta roomCode={roomCode} className="sniper-room-meta--hero" />
+              <HesbahRoomMeta roomCode={roomCode} className="hesbah-room-meta--hero" />
             )}
           </div>
           {timerWaiting && phase === 'question' && (
-            <span className="sniper-admin-hero__timer-pill sniper-admin-hero__timer-pill--wait">
+            <span className="hesbah-admin-hero__timer-pill hesbah-admin-hero__timer-pill--wait">
               ⏸ لم يبدأ
             </span>
           )}
           {timerRunning && (
-            <span className="sniper-admin-hero__timer-pill">⏱ {countdown ?? maxSec} ث</span>
+            <span className="hesbah-admin-hero__timer-pill">⏱ {countdown ?? maxSec} ث</span>
           )}
         </div>
-        <div className="sniper-admin-hero__progress" aria-hidden>
-          <div className="sniper-admin-hero__progress-fill" style={{ width: `${progressPct}%` }} />
+        <div className="hesbah-admin-hero__progress" aria-hidden>
+          <div className="hesbah-admin-hero__progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
-        <div className="sniper-admin-hero__meta">
-          <span className="sniper-admin-hero__q">
+        <div className="hesbah-admin-hero__meta">
+          <span className="hesbah-admin-hero__q">
             جولة <strong>{currentQ}</strong>
-            <span className="sniper-admin-hero__sep">/</span>
+            <span className="hesbah-admin-hero__sep">/</span>
             {totalQ}
           </span>
           {special && (
-            <span className="sniper-admin-hero__special">{activeSpecialLabel(special)}</span>
+            <span className="hesbah-admin-hero__special">{activeSpecialLabel(special)}</span>
+          )}
+          {canEarlyEnd && (
+            <button
+              type="button"
+              className="hesbah-admin-early-end"
+              onClick={() => setConfirmEndOpen(true)}
+            >
+              🏁 إنهاء وإعلان الفائز
+            </button>
           )}
         </div>
       </header>
 
-      <nav className="sniper-admin-tabs" aria-label="لوحة المشرف">
-        <button
-          type="button"
-          className={`sniper-admin-tabs__btn ${adminTab === 'round' ? 'is-active' : ''}`}
-          onClick={() => setAdminTab('round')}
-        >
-          🎯 الجولة
-        </button>
-        <button
-          type="button"
-          className={`sniper-admin-tabs__btn ${adminTab === 'rank' ? 'is-active' : ''}`}
-          onClick={() => setAdminTab('rank')}
-        >
-          🏆 الترتيب
-        </button>
-      </nav>
-
       {adminTab === 'rank' ? (
-        <SniperAdminLeaderboard players={players} roomCode={roomCode} game={game} />
+        <HesbahAdminLeaderboard players={players} roomCode={roomCode} game={game} />
       ) : (
         <>
           {phase === 'question' && (
-            <section className="sniper-admin-panel sniper-admin-tools-panel">
-              <SniperAdminTools
+            <section className="hesbah-admin-panel hesbah-admin-tools-panel">
+              <HesbahAdminTools
                 activeSpecial={special}
                 timerRunning={timerRunning}
                 onSetSpecial={onSetSpecial}
@@ -263,7 +282,7 @@ export default function SniperAdminLive({
             </section>
           )}
 
-          <SniperQuestionPanel
+          <HesbahQuestionPanel
             role="host"
             questionText={hostQuestion}
             hostOralHidden={hostFlags.oralHidden}
@@ -271,8 +290,8 @@ export default function SniperAdminLive({
             status={
               timerRunning || grading ? (
                 <div
-                  className={`sniper-admin-status ${
-                    grading ? 'sniper-admin-status--grade' : 'sniper-admin-status--run'
+                  className={`hesbah-admin-status ${
+                    grading ? 'hesbah-admin-status--grade' : 'hesbah-admin-status--run'
                   }`}
                 >
                   {grading ? '✋ تصحيح' : '⏱ جارٍ'}
@@ -282,9 +301,9 @@ export default function SniperAdminLive({
           />
 
           {phase === 'question' && (
-            <section className="sniper-admin-panel sniper-admin-controls">
+            <section className="hesbah-admin-panel hesbah-admin-controls">
               <div
-                className={`sniper-admin-split ${!hostParticipates ? 'sniper-admin-split--solo' : ''}`}
+                className={`hesbah-admin-split ${!hostParticipates ? 'hesbah-admin-split--solo' : ''}`}
               >
                 {timerColumn}
                 {hostColumn}
@@ -293,10 +312,10 @@ export default function SniperAdminLive({
           )}
 
           {phase === 'question' && !hostParticipates && (
-            <SniperLiveAnswersPanel
+            <HesbahLiveAnswersPanel
               highlight
               title="📡 مباشر"
-              help={SNIPER_LIVE_OPS_HELP}
+              help={HESBAH_LIVE_OPS_HELP}
               cards={liveCards}
               emptyMessage={
                 timerRunning
@@ -307,17 +326,17 @@ export default function SniperAdminLive({
           )}
 
           {phase === 'question' && hostParticipates && !hostSent && (
-            <SniperAdminSubmitCounter
+            <HesbahAdminSubmitCounter
               submitted={submittedCount}
               total={totalContestants}
-              help={SNIPER_SUBMIT_COUNTER_HELP}
+              help={HESBAH_SUBMIT_COUNTER_HELP}
             />
           )}
 
           {phase === 'question' && hostParticipates && hostSent && (
-            <SniperLiveAnswersPanel
+            <HesbahLiveAnswersPanel
               title="📡 حيّ"
-              help={SNIPER_LIVE_HOST_HELP}
+              help={HESBAH_LIVE_HOST_HELP}
               cards={liveCards}
               emptyMessage="بانتظار إجابات الآخرين…"
             />
@@ -327,30 +346,30 @@ export default function SniperAdminLive({
             <>
               {hostParticipates && hostAnswer?.answer?.trim() && (
                 <section
-                  className="sniper-admin-panel sniper-admin-ref"
+                  className="hesbah-admin-panel hesbah-admin-ref"
                   style={{
-                    borderColor: SNIPER_ACCENT_CSS,
-                    background: SNIPER_SCORE_BG_CSS,
+                    borderColor: HESBAH_ACCENT_CSS,
+                    background: HESBAH_SCORE_BG_CSS,
                   }}
                 >
-                  <h3 className="sniper-admin-panel__title">👑 مرجع المشرف</h3>
-                  <p className="sniper-admin-ref__answer">{hostAnswer.answer}</p>
+                  <h3 className="hesbah-admin-panel__title">👑 مرجع المشرف</h3>
+                  <p className="hesbah-admin-ref__answer">{hostAnswer.answer}</p>
                 </section>
               )}
 
               {dupGroups.length > 0 && (
-                <section className="sniper-admin-panel">
-                  <h3 className="sniper-admin-panel__title">🔁 إجابات مكررة</h3>
+                <section className="hesbah-admin-panel">
+                  <h3 className="hesbah-admin-panel__title">🔁 إجابات مكررة</h3>
                   {dupGroups.map((g) => {
                     const key = normalizeAnswer(g.answer);
                     const marked = duplicateMarked[key];
                     return (
                       <div
                         key={key}
-                        className={`sniper-grade-box sniper-admin-grade ${marked ? 'is-marked-dup' : ''}`}
+                        className={`hesbah-grade-box hesbah-admin-grade ${marked ? 'is-marked-dup' : ''}`}
                       >
-                        <div className="sniper-admin-grade__answer">{g.answer}</div>
-                        <div className="sniper-admin-grade__who">
+                        <div className="hesbah-admin-grade__answer">{g.answer}</div>
+                        <div className="hesbah-admin-grade__who">
                           {g.items.map((it) =>
                             it.isHost
                               ? `👑 ${it.name} (عرض)`
@@ -358,7 +377,7 @@ export default function SniperAdminLive({
                           ).join(' · ')}
                         </div>
                         {g.items.some((it) => it.isHost) && (
-                          <div className="sniper-admin-grade__warn">⚠ تطابق مع المشرف</div>
+                          <div className="hesbah-admin-grade__warn">⚠ تطابق مع المشرف</div>
                         )}
                         <button
                           type="button"
@@ -374,29 +393,29 @@ export default function SniperAdminLive({
                 </section>
               )}
 
-              <section className="sniper-admin-panel">
-                <h3 className="sniper-admin-panel__title">✨ إجابات فريدة</h3>
+              <section className="hesbah-admin-panel">
+                <h3 className="hesbah-admin-panel__title">✨ إجابات فريدة</h3>
                 {uniques.length === 0 ? (
-                  <p className="sniper-admin-panel__hint">لا توجد إجابات فريدة</p>
+                  <p className="hesbah-admin-panel__hint">لا توجد إجابات فريدة</p>
                 ) : (
                   uniques.map((u) => {
                     const v = verdicts[u.playerId];
                     return (
                       <div
                         key={u.playerId}
-                        className={`sniper-grade-box sniper-admin-grade ${
+                        className={`hesbah-grade-box hesbah-admin-grade ${
                           v === 'correct' ? 'is-correct' : v === 'wrong' ? 'is-wrong' : ''
                         }`}
                       >
-                        <div className="sniper-admin-grade__row">
+                        <div className="hesbah-admin-grade__row">
                           <Av p={u.player} sz={36} />
                           <div>
-                            <div className="sniper-admin-grade__name">{u.player?.name}</div>
-                            <div className="sniper-admin-grade__answer">{u.answer}</div>
-                            <div className="sniper-admin-grade__score">درجة: {u.chosenScore}</div>
+                            <div className="hesbah-admin-grade__name">{u.player?.name}</div>
+                            <div className="hesbah-admin-grade__answer">{u.answer}</div>
+                            <div className="hesbah-admin-grade__score">درجة: {u.chosenScore}</div>
                           </div>
                         </div>
-                        <div className="sniper-admin-grade__actions">
+                        <div className="hesbah-admin-grade__actions">
                           <button
                             type="button"
                             className={`btn bsm ${v === 'correct' ? 'bg' : 'bgh'}`}
@@ -420,27 +439,52 @@ export default function SniperAdminLive({
               </section>
 
               {!allGraded && (
-                <p className="sniper-admin-footnote">صنّف الكل ثم أظهر النتيجة</p>
+                <p className="hesbah-admin-footnote">صنّف الكل ثم أظهر النتيجة</p>
               )}
-              <button type="button" className="btn bg sniper-admin-cta" disabled={!allGraded} onClick={onShowResult}>
+              <button type="button" className="btn bg hesbah-admin-cta" disabled={!allGraded} onClick={onShowResult}>
                 📊 إظهار النتيجة
               </button>
             </>
           )}
 
           {phase === 'roundResult' && (
-            <button type="button" className="btn bg sniper-admin-cta" onClick={onLeaderboard}>
+            <button type="button" className="btn bg hesbah-admin-cta" onClick={onLeaderboard}>
               🏆 عرض الترتيب للجميع
             </button>
           )}
 
           {phase === 'leaderboard' && (
-            <button type="button" className="btn bg sniper-admin-cta" onClick={onNextQuestion}>
-              ➡ السؤال التالي
-            </button>
+            <>
+              <button type="button" className="btn bg hesbah-admin-cta" onClick={onNextQuestion}>
+                ➡ السؤال التالي
+              </button>
+              {canEarlyEnd && (
+                <button
+                  type="button"
+                  className="btn br hesbah-admin-cta hesbah-admin-cta--end"
+                  onClick={() => setConfirmEndOpen(true)}
+                >
+                  🏁 إنهاء المسابقة وإعلان الفائز
+                </button>
+              )}
+            </>
           )}
         </>
       )}
+
+      <HesbahConfirmModal
+        open={confirmEndOpen}
+        title="إنهاء المسابقة؟"
+        message={`هل أنت متأكد من إنهاء المسابقة وإعلان الفائز؟${currentQ < totalQ ? ` (تبقّى ${totalQ - currentQ} جولة)` : ''}`}
+        confirmLabel="نعم، أعلن الفائز"
+        cancelLabel="متابعة اللعب"
+        danger
+        onCancel={() => setConfirmEndOpen(false)}
+        onConfirm={() => {
+          setConfirmEndOpen(false);
+          onRequestEarlyEnd?.();
+        }}
+      />
     </div>
   );
 }

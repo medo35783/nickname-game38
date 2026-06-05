@@ -1,14 +1,14 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
-  SNIPER_ACCENT_CSS,
+  HESBAH_ACCENT_CSS,
   TIMER_PRESET_SECS,
   clampCustomQuestionSecs,
   MIN_QUESTION_SECS,
   MAX_QUESTION_SECS,
-} from './sniperHelpers';
+} from './hesbahHelpers';
 
 /** اختيار مدة المؤقت — افتراضي في اللوبي أو لهذه الجولة في لوحة المشرف */
-export default function SniperTimerPicker({
+export default function HesbahTimerPicker({
   activeSecs,
   onSelect,
   compact = false,
@@ -33,7 +33,7 @@ export default function SniperTimerPicker({
             key={s}
             type="button"
             className={`btn ${compact ? 'bsm' : ''} ${activeSecs === s && isPreset ? 'bg' : 'bgh'}`}
-            style={{ flex: compact ? '1 1 22%' : '1 1 40%', borderColor: activeSecs === s ? SNIPER_ACCENT_CSS : undefined }}
+            style={{ flex: compact ? '1 1 22%' : '1 1 40%', borderColor: activeSecs === s ? HESBAH_ACCENT_CSS : undefined }}
             onClick={() => onSelect(s)}
           >
             {s} ث
@@ -57,7 +57,7 @@ export default function SniperTimerPicker({
           </button>
         </div>
         {!isPreset && (
-          <div style={{ fontSize: 11, color: SNIPER_ACCENT_CSS, marginTop: 6 }}>المفعّل: {activeSecs} ث</div>
+          <div style={{ fontSize: 11, color: HESBAH_ACCENT_CSS, marginTop: 6 }}>المفعّل: {activeSecs} ث</div>
         )}
       </div>
     </div>

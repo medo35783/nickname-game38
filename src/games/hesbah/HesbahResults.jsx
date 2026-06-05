@@ -1,6 +1,7 @@
-import Av from '../../shared/Av';
-import SniperPlayerHud from './SniperPlayerHud';
-export default function SniperResults({
+﻿import Av from '../../shared/Av';
+import HesbahPlayerHud from './HesbahPlayerHud';
+import HesbahTopNav from './HesbahTopNav';
+export default function HesbahResults({
   roomCode,
   game,
   players,
@@ -9,6 +10,7 @@ export default function SniperResults({
   roundSummary,
   onContinue,
   showHud = true,
+  onExitRequest,
 }) {
   const content = (
     <>
@@ -22,7 +24,7 @@ export default function SniperResults({
       {Array.isArray(roundSummary) && roundSummary.length > 0 && (
         <div className="card">
           {roundSummary.map((row) => (
-            <div key={row.playerId} className="sniper-result-row">
+            <div key={row.playerId} className="hesbah-result-row">
               <Av p={row.player} sz={32} />
               <span style={{ flex: 1 }}>{row.name}</span>
               <span style={{ fontWeight: 900, color: row.delta >= 0 ? '#22c55e' : 'var(--red)' }}>
@@ -37,17 +39,33 @@ export default function SniperResults({
       <button type="button" className="btn bg" onClick={onContinue}>
         متابعة →
       </button>
-      <p className="sniper-player-hint">🏆 الترتيب الكامل من تبويب «الترتيب» أعلى الشاشة</p>
+      <p className="hesbah-player-hint">🏆 الترتيب الكامل من تبويب «الترتيب» أعلى الشاشة</p>
     </>
   );
 
   if (!showHud) {
-    return <div className="scr sniper-theme">{content}</div>;
+    return (
+      <div className="scr hesbah-theme hesbah-admin">
+        {typeof onExitRequest === 'function' && (
+          <div className="hesbah-sticky-chrome">
+            <HesbahTopNav onBack={onExitRequest} />
+          </div>
+        )}
+        {content}
+      </div>
+    );
   }
 
   return (
-    <SniperPlayerHud roomCode={roomCode} me={me} myId={myId} game={game} players={players}>
+    <HesbahPlayerHud
+      roomCode={roomCode}
+      me={me}
+      myId={myId}
+      game={game}
+      players={players}
+      onExitRequest={onExitRequest}
+    >
       {content}
-    </SniperPlayerHud>
+    </HesbahPlayerHud>
   );
 }

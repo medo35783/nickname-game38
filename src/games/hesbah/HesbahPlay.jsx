@@ -1,19 +1,19 @@
-import SniperCountdown from './SniperCountdown';
-import SniperQuestionPanel from './SniperQuestionPanel';
-import SniperPlayerHud from './SniperPlayerHud';
-import SniperScoreGrid from './SniperScoreGrid';
-import { LiveAnswerCard, useSniperLiveAnswers } from './SniperLiveAnswers';
+﻿import HesbahCountdown from './HesbahCountdown';
+import HesbahQuestionPanel from './HesbahQuestionPanel';
+import HesbahPlayerHud from './HesbahPlayerHud';
+import HesbahScoreGrid from './HesbahScoreGrid';
+import { LiveAnswerCard, useHesbahLiveAnswers } from './HesbahLiveAnswers';
 import {
   questionDurationSec,
   isTimerRunning,
   isTimerWaiting,
-  sniperPlayerQuestionView,
+  hesbahPlayerQuestionView,
   FINAL_VOTE_OPTIONS,
   FINAL_VOTE_SECONDS,
-  SNIPER_ACCENT_CSS,
-} from './sniperHelpers';
+  HESBAH_ACCENT_CSS,
+} from './hesbahHelpers';
 
-export default function SniperPlay({
+export default function HesbahPlay({
   roomCode,
   game,
   me,
@@ -33,10 +33,11 @@ export default function SniperPlay({
   myVote,
   onVote,
   voteCountdown,
+  onExitRequest,
 }) {
   const phase = game?.phase;
   const isFinalBet = !!game?.finalVoteResult && game?.currentQ > (game?.totalQ || 0);
-  const qView = sniperPlayerQuestionView(game);
+  const qView = hesbahPlayerQuestionView(game);
   const maxSec = questionDurationSec(game);
   const submitted = !!me?.submitted;
   const timerWaiting = isTimerWaiting(game);
@@ -47,7 +48,7 @@ export default function SniperPlay({
   const inputLocked = timerWaiting && !submitted;
   const canUseInsurance = (me?.insuranceLeft || 0) > 0 && !submitted && timerActive;
 
-  const { liveCards } = useSniperLiveAnswers(
+  const { liveCards } = useHesbahLiveAnswers(
     answers,
     players,
     hostAnswer,
@@ -55,9 +56,16 @@ export default function SniperPlay({
   );
 
   const hud = (body) => (
-    <SniperPlayerHud roomCode={roomCode} me={me} myId={myId} game={game} players={players}>
+    <HesbahPlayerHud
+      roomCode={roomCode}
+      me={me}
+      myId={myId}
+      game={game}
+      players={players}
+      onExitRequest={onExitRequest}
+    >
       {body}
-    </SniperPlayerHud>
+    </HesbahPlayerHud>
   );
 
   if (finalVoteActive && phase !== 'final') {
@@ -65,7 +73,7 @@ export default function SniperPlay({
       <>
         <div className="card" style={{ textAlign: 'center' }}>
           <div className="ctitle">🗳️ السؤال الحاسم — صوّت للدرجة</div>
-          <SniperCountdown remaining={voteCountdown} maxSeconds={FINAL_VOTE_SECONDS} size={64} />
+          <HesbahCountdown remaining={voteCountdown} maxSeconds={FINAL_VOTE_SECONDS} size={64} />
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>الأغلبية تحدد قيمة الرهان الأخير</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -84,7 +92,7 @@ export default function SniperPlay({
             );
           })}
         </div>
-        {myVote && <div style={{ textAlign: 'center', fontSize: 12, color: SNIPER_ACCENT_CSS }}>✅ صوّتت بـ {myVote}</div>}
+        {myVote && <div style={{ textAlign: 'center', fontSize: 12, color: HESBAH_ACCENT_CSS }}>✅ صوّتت بـ {myVote}</div>}
       </>
     );
   }
@@ -100,7 +108,7 @@ export default function SniperPlay({
 
   return hud(
     <>
-      <SniperQuestionPanel
+      <HesbahQuestionPanel
         role="player"
         playerMode={qView.mode}
         maskReason={qView.reason}
@@ -110,20 +118,20 @@ export default function SniperPlay({
         isFinalBet={isFinalBet}
         finalBetScore={game?.finalVoteResult}
         aside={
-          <SniperCountdown remaining={remaining} maxSeconds={maxSec} waiting={timerWaiting} />
+          <HesbahCountdown remaining={remaining} maxSeconds={maxSec} waiting={timerWaiting} />
         }
       />
 
       <div className="card">
         {timerWaiting && (
-          <p className="sniper-play-hint">
+          <p className="hesbah-play-hint">
             🎯 اختر درجتك أولاً — يظهر السؤال وتُكتب الإجابة بعد بدء المؤقت
           </p>
         )}
         {!isFinalBet && (
           <>
             <div className="ctitle">🎯 اختر درجتك</div>
-            <SniperScoreGrid
+            <HesbahScoreGrid
               totalQ={game?.totalQ}
               board={me?.board}
               chosenScore={chosenScore}
@@ -134,7 +142,7 @@ export default function SniperPlay({
         )}
         <div className="ctitle" style={{ marginTop: isFinalBet ? 0 : 12 }}>✍️ إجابتك</div>
         {inputLocked && (
-          <p className="sniper-input-locked">🔒 الإجابة تُفتح بعد بدء المؤقت</p>
+          <p className="hesbah-input-locked">🔒 الإجابة تُفتح بعد بدء المؤقت</p>
         )}
         <input
           className="inp"

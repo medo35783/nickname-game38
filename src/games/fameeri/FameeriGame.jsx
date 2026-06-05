@@ -1251,7 +1251,7 @@ const FameeriGame = forwardRef(function FameeriGame(
           <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setSelectedGame(null)}>← ساحة الألعاب</button>
           <div className="fameeri-hero" style={{ textAlign: 'center', padding: '10px 0 12px' }}>
             <div style={{ fontSize: 46, marginBottom: 6 }}>🦅</div>
-            <div className="ptitle" style={{ fontSize: 22 }}>صيد القميري</div>
+            <div className="ptitle" style={{ fontSize: 22 }}>لعبة القميري</div>
             <div className="psub" style={{ color: 'var(--fameeri-muted)' }}>
               وزّع القميري على الأشجار واهجم مجموعات الخصوم
             </div>

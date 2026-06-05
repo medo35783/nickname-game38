@@ -1,26 +1,33 @@
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { ref as dbRef, set, get, update, push, onValue, off, remove } from 'firebase/database';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../../firebase';
 import { genCode, playSound } from '../../core/helpers';
-import '../../styles/sniper.css';
+import '../../styles/hesbah.css';
 import { buildGameSessionTracking, recordRoundCompleted, recordSessionEnd } from '../../core/sessionStats';
 import { AV_COLORS } from '../../core/constants';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import { ROOM_CODE_PLACEHOLDER, PLAYER_DISPLAY_NAME_PLACEHOLDER } from '../../core/formLabels';
-import SniperSetup from './SniperSetup';
-import SniperLobby from './SniperLobby';
-import SniperPlay from './SniperPlay';
-import SniperAdminLive from './SniperAdminLive';
-import SniperResults from './SniperResults';
-import SniperFinal from './SniperFinal';
-import SniperPlayerHud from './SniperPlayerHud';
-import SniperLeaderboardList from './SniperLeaderboardList';
+import HesbahSetup from './HesbahSetup';
+import HesbahLobby from './HesbahLobby';
+import HesbahPlay from './HesbahPlay';
+import HesbahAdminLive from './HesbahAdminLive';
+import HesbahResults from './HesbahResults';
+import HesbahFinal from './HesbahFinal';
+import HesbahConfirmModal from './HesbahConfirmModal';
+import HesbahExitSheet from './HesbahExitSheet';
+import HesbahPlayerHud from './HesbahPlayerHud';
+import HesbahLeaderboardList from './HesbahLeaderboardList';
+import HesbahTopNav from './HesbahTopNav';
 import {
-  readSavedSniper,
-  persistSniperSession,
-  SNIPER_STORAGE_KEY,
-  sniperPlayerPayload,
+  readSavedHesbah,
+  persistHesbahSession,
+  clearHesbahSession,
+  isActiveHesbahPlayer,
+  findActivePlayerByName,
+  findLeftPlayerByName,
+  HESBAH_STORAGE_KEY,
+  hesbahPlayerPayload,
   buildScoreBoard,
   questionDurationSec,
   clampCustomQuestionSecs,
@@ -36,33 +43,34 @@ import {
   gradedPoints,
   BOARD_CELL,
   QB_GAME_TYPE,
-} from './sniperHelpers';
+} from './hesbahHelpers';
 import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
 import { QSOURCE } from '../../question-bank/questionSession';
 import {
-  flattenSniperPool,
+  flattenHesbahPool,
   createQuestionCursor,
-  countSniperPool,
-  sniperGameQuestionText,
-} from './sniperQuestions';
+  countHesbahPool,
+  hesbahGameQuestionText,
+} from './hesbahQuestions';
+import { markHesbahQuestionAsUsed } from './hesbahBankProgress';
 
 function poolStorageKey(room) {
-  return `ng_sniper_pool_${room}`;
+  return `ng_hesbah_pool_${room}`;
 }
 
-const SniperGame = forwardRef(function SniperGame(
-  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd },
+const HesbahGame = forwardRef(function HesbahGame(
+  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd, onHesbahHeaderMeta },
   ref
 ) {
   void setTab;
-  const saved = readSavedSniper();
+  const [savedSession, setSavedSession] = useState(() => readSavedHesbah());
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
-  const [roomCode, setRoomCode] = useState(saved.roomCode || '');
-  const [role, setRole] = useState(saved.role ?? null);
-  const [myId, setMyId] = useState(saved.myId ?? null);
+  const [roomCode, setRoomCode] = useState('');
+  const [role, setRole] = useState(null);
+  const [myId, setMyId] = useState(null);
   const [joinInput, setJoinInput] = useState('');
-  const [joinName, setJoinName] = useState(saved.myName || '');
+  const [joinName, setJoinName] = useState(savedSession.myName || '');
   const [joinErr, setJoinErr] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -87,13 +95,20 @@ const SniperGame = forwardRef(function SniperGame(
   const [roundSummary, setRoundSummary] = useState([]);
 
   const qCursorRef = useRef(null);
+  const qBankMetaRef = useRef(null);
   const [adminQMeta, setAdminQMeta] = useState(null);
+  const [confirmEarlyEndOpen, setConfirmEarlyEndOpen] = useState(false);
+  const [exitSheetOpen, setExitSheetOpen] = useState(false);
   const endPromptRef = useRef(false);
   const pendingOnboardingRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     handleHeaderBack: () => {
-      if (gameScreen !== 'home' && roomCode) {
+      if (roomCode && gameScreen !== 'setup' && gameScreen !== 'join') {
+        setExitSheetOpen(true);
+        return true;
+      }
+      if (gameScreen === 'join' || gameScreen === 'setup') {
         setGameScreen('home');
         return true;
       }
@@ -154,8 +169,9 @@ const SniperGame = forwardRef(function SniperGame(
     try {
       const raw = localStorage.getItem(poolStorageKey(room));
       if (!raw) return null;
-      const { pool } = JSON.parse(raw);
-      const flat = flattenSniperPool(normalizePoolToStructured(pool));
+      const { pool, bankMeta } = JSON.parse(raw);
+      if (bankMeta) qBankMetaRef.current = bankMeta;
+      const flat = flattenHesbahPool(normalizePoolToStructured(pool));
       if (!flat.length) return null;
       return createQuestionCursor(flat);
     } catch {
@@ -164,7 +180,7 @@ const SniperGame = forwardRef(function SniperGame(
   }, []);
 
   const gameQuestionPatch = (q, questionSource = game?.questionSource) => ({
-    questionText: sniperGameQuestionText(q, questionSource),
+    questionText: hesbahGameQuestionText(q, questionSource),
     hostQuestionText: q.hostText || '',
     questionCategory: q.categoryLabel || q.category || 'عام',
     questionType: q.type || 'open_question',
@@ -201,6 +217,12 @@ const SniperGame = forwardRef(function SniperGame(
       off(vRef, 'value', onV);
     };
   }, [roomCode]);
+
+  useEffect(() => {
+    const inRoom = !!roomCode && gameScreen !== 'setup' && gameScreen !== 'join';
+    onHesbahHeaderMeta?.({ inRoom });
+    return () => onHesbahHeaderMeta?.({ inRoom: false });
+  }, [roomCode, gameScreen, onHesbahHeaderMeta]);
 
   /* ── Screen sync from phase ── */
   useEffect(() => {
@@ -264,13 +286,13 @@ const SniperGame = forwardRef(function SniperGame(
 
   const shareRoomInvite = async (preferWhatsApp = false) => {
     const inviteText = [
-      '🎮 ساحة الألعاب — قناص الدرجات',
+      '🎮 ساحة الألعاب — حَسْبة',
       `رمز الغرفة: ${roomCode}`,
       'https://nickname-game38.vercel.app/',
     ].join('\n');
     if (!preferWhatsApp && navigator.share) {
       try {
-        await navigator.share({ title: 'قناص الدرجات', text: inviteText });
+        await navigator.share({ title: 'حَسْبة', text: inviteText });
         notify('تم فتح المشاركة ✓', 'success');
         return;
       } catch (e) {
@@ -286,7 +308,7 @@ const SniperGame = forwardRef(function SniperGame(
     return s.includes('permission');
   };
 
-  const createRoom = async ({ source, pool, totalQ }) => {
+  const createRoom = async ({ source, pool, totalQ, bankMeta = null }) => {
     if (!canCreateRoom) {
       onRequestActivation?.();
       return;
@@ -306,7 +328,7 @@ const SniperGame = forwardRef(function SniperGame(
 
       const code = genCode();
       const poolNorm = normalizePoolToStructured(pool || {});
-      if (source !== QSOURCE.EXTERNAL && countSniperPool(poolNorm) === 0) {
+      if (source !== QSOURCE.EXTERNAL && countHesbahPool(poolNorm) === 0) {
         notify('لا توجد أسئلة صالحة — حمّل البنك أو أضف أسئلة ثم أنشئ الغرفة', 'error');
         return;
       }
@@ -328,24 +350,25 @@ const SniperGame = forwardRef(function SniperGame(
           hostParticipates: false,
           questionSecs: 20,
           questionSource: source,
-          ...buildGameSessionTracking('sniper'),
+          ...buildGameSessionTracking('hesbah'),
         },
         [`srooms/${code}/players/${adminPid}`]: {
-          ...sniperPlayerPayload('المشرف', 0),
+          ...hesbahPlayerPayload('المشرف', 0),
           board,
           isHost: true,
         },
       });
-      localStorage.setItem(poolStorageKey(code), JSON.stringify({ source, pool: poolNorm }));
-      qCursorRef.current = createQuestionCursor(flattenSniperPool(poolNorm));
+      localStorage.setItem(poolStorageKey(code), JSON.stringify({ source, pool: poolNorm, bankMeta }));
+      qBankMetaRef.current = bankMeta;
+      qCursorRef.current = createQuestionCursor(flattenHesbahPool(poolNorm));
       setRoomCode(code);
       setRole('admin');
       setMyId(adminPid);
-      persistSniperSession({ roomCode: code, role: 'admin', myId: adminPid });
+      persistHesbahSession({ roomCode: code, role: 'admin', myId: adminPid });
       setGameScreen('lobby');
       notify(`✅ الغرفة: ${code}`, 'gold');
     } catch (err) {
-      console.error('[sniper] createRoom', err);
+      console.error('[hesbah] createRoom', err);
       if (isPermissionErr(err)) {
         notify(
           'رفض الخادم حفظ الغرفة (صلاحيات). من Firebase Console → Realtime Database → Rules انسخ محتوى «firebase-database-rules.json» من المشروع واضغط Publish، ثم حدّث الصفحة.',
@@ -382,25 +405,96 @@ const SniperGame = forwardRef(function SniperGame(
       const totalQ = data.game?.totalQ || 20;
       const board = buildScoreBoard(totalQ);
       const colorIdx = Math.floor(Math.random() * AV_COLORS.length);
-      let pid = myId;
-      const existing = Object.entries(data.players || {}).find(([, p]) => p.name?.trim() === name);
-      if (existing) {
-        pid = existing[0];
+      let pid;
+
+      const activeMatch = findActivePlayerByName(data.players, name);
+      if (activeMatch) {
+        pid = activeMatch[0];
       } else {
+        const leftMatch = findLeftPlayerByName(data.players, name);
+        if (leftMatch) {
+          const [leftId] = leftMatch;
+          await remove(dbRef(db, `srooms/${code}/players/${leftId}`));
+          await remove(dbRef(db, `srooms/${code}/answers/${leftId}`));
+          await remove(dbRef(db, `srooms/${code}/votes/${leftId}`));
+        }
         const newRef = push(dbRef(db, `srooms/${code}/players`));
         pid = newRef.key;
-        await set(newRef, { ...sniperPlayerPayload(name, colorIdx), board });
+        await set(newRef, { ...hesbahPlayerPayload(name, colorIdx), board });
       }
+
       setRoomCode(code);
       setRole('player');
       setMyId(pid);
-      persistSniperSession({ roomCode: code, role: 'player', myId: pid, myName: name });
+      persistHesbahSession({ roomCode: code, role: 'player', myId: pid, myName: name });
+      setSavedSession(readSavedHesbah());
       setGameScreen('lobby');
-      notify('✅ انضممت للغرفة', 'success');
+      notify(
+        activeMatch ? '✅ عدت للغرفة — تُتابع من حيث نقاطك' : '✅ انضممت للغرفة — بداية جديدة',
+        'success'
+      );
     } catch {
       setJoinErr('خطأ في الاتصال');
     } finally {
       setJoinLoading(false);
+    }
+  };
+
+  const reconnectToSavedRoom = async () => {
+    const saved = readSavedHesbah();
+    const code = saved.roomCode;
+    const pid = saved.myId;
+    const savedRole = saved.role;
+    if (!code || !pid || !savedRole) return;
+
+    try {
+      const snap = await get(dbRef(db, `srooms/${code}`));
+      if (!snap.exists()) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify('الغرفة لم تعد موجودة', 'error');
+        return;
+      }
+      const data = snap.val();
+      const player = data.players?.[pid];
+      if (!isActiveHesbahPlayer(player)) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify('انتهت جلستك السابقة — انضم من جديد برمز الغرفة', 'info');
+        return;
+      }
+      if (savedRole === 'admin' && data.adminId !== pid) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify('لا يمكن استعادة جلسة المشرف — أنشئ غرفة جديدة', 'info');
+        return;
+      }
+      setRoomCode(code);
+      setRole(savedRole);
+      setMyId(pid);
+      setGameScreen('lobby');
+      notify('✅ عدت للغرفة', 'success');
+    } catch {
+      notify('تعذّر العودة للغرفة', 'error');
+    }
+  };
+
+  const purgePlayerFromRoom = async (code, pid) => {
+    if (!code || !pid) return;
+    try {
+      await update(dbRef(db, `srooms/${code}/players/${pid}`), {
+        left: true,
+        leftAt: Date.now(),
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      await remove(dbRef(db, `srooms/${code}/players/${pid}`));
+      await remove(dbRef(db, `srooms/${code}/answers/${pid}`));
+      await remove(dbRef(db, `srooms/${code}/votes/${pid}`));
+    } catch {
+      /* left flag يبقى — joinRoom يتجاهل left */
     }
   };
 
@@ -422,6 +516,9 @@ const SniperGame = forwardRef(function SniperGame(
       };
     }
     setAdminQMeta(q);
+    if (q?.id && qBankMetaRef.current?.filterKey) {
+      void markHesbahQuestionAsUsed(qBankMetaRef.current.filterKey, q.id);
+    }
     return q;
   };
 
@@ -722,9 +819,9 @@ const SniperGame = forwardRef(function SniperGame(
         [`srooms/${roomCode}/game/specialRound`]: null,
       });
       setRoundSummary(summary);
-      await recordRoundCompleted('sniper', roomCode);
+      await recordRoundCompleted('hesbah', roomCode);
     } catch (err) {
-      console.error('[sniper] applyGrading', err);
+      console.error('[hesbah] applyGrading', err);
       notify('تعذّر حفظ النتيجة. تحقق من الاتصال ثم أعد المحاولة.', 'error');
     }
   };
@@ -749,14 +846,34 @@ const SniperGame = forwardRef(function SniperGame(
   };
 
   const endGame = async () => {
-    await update(dbRef(db, `srooms/${roomCode}/game`), { phase: 'final' });
-    await recordSessionEnd('sniper', roomCode, true);
+    if (endPromptRef.current && phase === 'final') return;
+    await recordSessionEnd('hesbah', roomCode, true);
     if (!endPromptRef.current) {
       endPromptRef.current = true;
-      onGameEnd?.({ game: 'sniper', roomCode });
+      onGameEnd?.({ game: 'hesbah', roomCode });
     }
-    playSound('applause');
+    playSound('victory');
   };
+
+  const requestEarlyEnd = async () => {
+    try {
+      await update(dbRef(db, `srooms/${roomCode}/game`), {
+        phase: 'final',
+        endedEarly: true,
+        endedAt: Date.now(),
+      });
+      notify('🏆 تم إعلان الفائز — استمتعوا بالاحتفال!', 'gold');
+    } catch {
+      notify('تعذّر إنهاء المسابقة', 'error');
+    }
+  };
+
+  const canEarlyEnd =
+    !!roomCode &&
+    role === 'admin' &&
+    phase !== 'final' &&
+    phase !== 'lobby' &&
+    (game?.currentQ || 0) >= 1;
 
   const onVote = async (value) => {
     if (!myId || votes[myId]) return;
@@ -764,7 +881,8 @@ const SniperGame = forwardRef(function SniperGame(
   };
 
   const leaveToArena = () => {
-    localStorage.removeItem(SNIPER_STORAGE_KEY);
+    clearHesbahSession();
+    setSavedSession({});
     setRoomCode('');
     setRole(null);
     setMyId(null);
@@ -772,15 +890,59 @@ const SniperGame = forwardRef(function SniperGame(
     setGameScreen('home');
   };
 
+  const openExitSheet = () => setExitSheetOpen(true);
+
+  const withdrawFromGame = async () => {
+    setExitSheetOpen(false);
+    const code = roomCode;
+    const withdrawingRole = role;
+    const pid = myId;
+
+    try {
+      if (pid && code) {
+        await purgePlayerFromRoom(code, pid);
+      }
+      if (withdrawingRole === 'admin' && code) {
+        await recordSessionEnd('hesbah', code, false);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    if (code) {
+      try {
+        localStorage.removeItem(poolStorageKey(code));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    clearHesbahSession();
+    setSavedSession({});
+    setRoomCode('');
+    setRole(null);
+    setMyId(null);
+    setGame(null);
+    setPlayers({});
+    setGameScreen('home');
+    setSelectedGame(null);
+    notify(
+      withdrawingRole === 'admin'
+        ? 'غادرت الغرفة — اللاعبون ما زالوا متصلين'
+        : 'انسحبت — عند العودة تبدأ من جديد بنفس الاسم',
+      'info'
+    );
+  };
+
   useEffect(() => {
     if (phase === 'final' && role === 'admin') void endGame();
-  }, [phase]);
+  }, [phase, role]);
 
   const renderMain = () => {
     if (showOnboarding) {
       return (
         <QuickOnboarding
-          game="sniper"
+          game="hesbah"
           role={showOnboarding}
           onDismiss={() => {
             const r = showOnboarding;
@@ -794,19 +956,19 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'home') {
       return (
-        <div className="scr sniper-theme">
-          <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setSelectedGame(null)}>
-            ← ساحة الألعاب
-          </button>
+        <div className="scr hesbah-theme hesbah-setup-screen">
+          <div className="hesbah-sticky-chrome">
+            <HesbahTopNav onBack={() => setSelectedGame(null)} />
+          </div>
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <div style={{ fontSize: 48 }}>🎯</div>
-            <div className="ptitle">قناص الدرجات</div>
-            <span className="sniper-hero-badge">🎯 ساحة القناص — كل درجة رهان</span>
+            <div className="ptitle">حَسْبة</div>
+            <span className="hesbah-hero-badge">🎯 ساحة حَسْبة — كل درجة رهان</span>
             <div className="psub">اربط السؤال برقم درجة — صوّب بذكاء قبل أن يُسرق أحد درجتك</div>
           </div>
-          {saved.roomCode && (
-            <button type="button" className="btn bo" onClick={() => { setRoomCode(saved.roomCode); setRole(saved.role); setMyId(saved.myId); setGameScreen('lobby'); }}>
-              🔙 العودة للغرفة ({saved.roomCode})
+          {savedSession.roomCode && !roomCode && (
+            <button type="button" className="btn bo" onClick={() => void reconnectToSavedRoom()}>
+              🔙 العودة للغرفة ({savedSession.roomCode})
             </button>
           )}
           <button type="button" className="btn bg" onClick={() => (canCreateRoom ? setShowOnboarding('admin') : onRequestActivation?.())}>
@@ -821,7 +983,7 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'setup') {
       return (
-        <SniperSetup
+        <HesbahSetup
           totalQ={totalQSetup}
           setTotalQ={setTotalQSetup}
           creating={creating}
@@ -836,11 +998,11 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'join') {
       return (
-        <div className="scr sniper-theme">
-          <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
-            ← رجوع
-          </button>
-          <div className="ptitle">انضمام — قناص الدرجات</div>
+        <div className="scr hesbah-theme hesbah-setup-screen">
+          <div className="hesbah-sticky-chrome">
+            <HesbahTopNav onBack={() => setGameScreen('home')} />
+          </div>
+          <div className="ptitle">انضمام — حَسْبة</div>
           <div className="card">
             <label className="lbl">رمز الغرفة</label>
             <input
@@ -863,7 +1025,7 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'lobby') {
       return (
-        <SniperLobby
+        <HesbahLobby
           roomCode={roomCode}
           role={role}
           players={players}
@@ -876,13 +1038,14 @@ const SniperGame = forwardRef(function SniperGame(
           onQuestionSecsChange={(s) => void setQuestionSecs(s)}
           onStart={() => void startGame()}
           onShare={shareRoomInvite}
+          onExitRequest={openExitSheet}
         />
       );
     }
 
     if (gameScreen === 'play') {
       return (
-        <SniperPlay
+        <HesbahPlay
           roomCode={roomCode}
           game={game}
           me={me}
@@ -903,13 +1066,14 @@ const SniperGame = forwardRef(function SniperGame(
           myVote={votes[myId]}
           onVote={(v) => void onVote(v)}
           voteCountdown={voteCountdown}
+          onExitRequest={openExitSheet}
         />
       );
     }
 
     if (gameScreen === 'adminLive') {
       return (
-        <SniperAdminLive
+        <HesbahAdminLive
           roomCode={roomCode}
           game={game}
           players={players}
@@ -933,6 +1097,9 @@ const SniperGame = forwardRef(function SniperGame(
           onEndTimer={() => void onEndTimer()}
           onRoundSecsChange={(s) => void setRoundSecs(s)}
           onClearRoundSecs={() => void clearRoundSecs()}
+          onRequestEarlyEnd={() => void requestEarlyEnd()}
+          canEarlyEnd={canEarlyEnd}
+          onExitRequest={openExitSheet}
           notify={notify}
         />
       );
@@ -940,7 +1107,7 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'roundResult') {
       return (
-        <SniperResults
+        <HesbahResults
           roomCode={roomCode}
           game={game}
           players={players}
@@ -948,6 +1115,7 @@ const SniperGame = forwardRef(function SniperGame(
           myId={myId}
           roundSummary={roundSummary}
           showHud={role !== 'admin'}
+          onExitRequest={openExitSheet}
           onContinue={() => (role === 'admin' ? void onLeaderboard() : setGameScreen('leaderboard'))}
         />
       );
@@ -956,8 +1124,11 @@ const SniperGame = forwardRef(function SniperGame(
     if (gameScreen === 'leaderboard') {
       if (role === 'admin') {
         return (
-          <div className="scr sniper-theme">
-            <SniperLeaderboardList
+          <div className="scr hesbah-theme hesbah-admin">
+            <div className="hesbah-sticky-chrome">
+              <HesbahTopNav onBack={openExitSheet} />
+            </div>
+            <HesbahLeaderboardList
               players={players}
               myId={myId}
               roomCode={roomCode}
@@ -966,19 +1137,25 @@ const SniperGame = forwardRef(function SniperGame(
             <button type="button" className="btn bg" onClick={() => void onNextQuestion()}>
               ➡️ السؤال التالي
             </button>
+            {canEarlyEnd && (
+              <button type="button" className="btn br mt2" onClick={() => setConfirmEarlyEndOpen(true)}>
+                🏁 إنهاء المسابقة وإعلان الفائز
+              </button>
+            )}
           </div>
         );
       }
       return (
-        <SniperPlayerHud
+        <HesbahPlayerHud
           roomCode={roomCode}
           me={me}
           myId={myId}
           game={game}
           players={players}
           initialTab="rank"
+          onExitRequest={openExitSheet}
           rankFooter={
-            <p className="sniper-player-wait">⏳ انتظر المشرف للجولة التالية…</p>
+            <p className="hesbah-player-wait">⏳ انتظر المشرف للجولة التالية…</p>
           }
         />
       );
@@ -986,20 +1163,79 @@ const SniperGame = forwardRef(function SniperGame(
 
     if (gameScreen === 'final' && role === 'player') {
       return (
-        <SniperPlayerHud roomCode={roomCode} me={me} myId={myId} game={game} players={players}>
-          <SniperFinal players={players} onHome={leaveToArena} />
-        </SniperPlayerHud>
+        <HesbahPlayerHud
+          roomCode={roomCode}
+          me={me}
+          myId={myId}
+          game={game}
+          players={players}
+          onExitRequest={openExitSheet}
+          hideTabs
+        >
+          <HesbahFinal
+            players={players}
+            roomCode={roomCode}
+            game={game}
+            notify={notify}
+            hideExitBar
+            onHome={leaveToArena}
+          />
+        </HesbahPlayerHud>
       );
     }
 
     if (gameScreen === 'final') {
-      return <SniperFinal players={players} onHome={leaveToArena} />;
+      return (
+        <div className="scr hesbah-theme hesbah-admin">
+          <div className="hesbah-sticky-chrome">
+            <HesbahTopNav onBack={openExitSheet} />
+          </div>
+          <HesbahFinal
+            players={players}
+            roomCode={roomCode}
+            game={game}
+            notify={notify}
+            hideExitBar
+            onHome={leaveToArena}
+          />
+        </div>
+      );
     }
 
     return null;
   };
 
-  return <>{renderMain()}</>;
+  return (
+    <>
+      {renderMain()}
+      <HesbahConfirmModal
+        open={confirmEarlyEndOpen}
+        title="إنهاء المسابقة؟"
+        message={`هل أنت متأكد من إنهاء المسابقة وإعلان الفائز؟${
+          (game?.currentQ || 0) < (game?.totalQ || 0)
+            ? ` (تبقّى ${(game?.totalQ || 0) - (game?.currentQ || 0)} جولة)`
+            : ''
+        }`}
+        confirmLabel="نعم، أعلن الفائز"
+        cancelLabel="متابعة اللعب"
+        danger
+        onCancel={() => setConfirmEarlyEndOpen(false)}
+        onConfirm={() => {
+          setConfirmEarlyEndOpen(false);
+          void requestEarlyEnd();
+        }}
+      />
+      <HesbahExitSheet
+        open={exitSheetOpen}
+        role={role}
+        roomCode={roomCode}
+        phase={phase}
+        onContinue={() => setExitSheetOpen(false)}
+        onWithdraw={() => void withdrawFromGame()}
+        onClose={() => setExitSheetOpen(false)}
+      />
+    </>
+  );
 });
 
-export default SniperGame;
+export default HesbahGame;

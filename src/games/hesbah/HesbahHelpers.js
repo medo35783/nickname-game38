@@ -1,8 +1,8 @@
-import { mkInitials } from '../../core/helpers';
+﻿import { mkInitials } from '../../core/helpers';
 import { QSOURCE } from '../../question-bank/questionSession';
 
-/** هوية قناص الدرجات — برتقالي/أزرق (مستقل عن القميري). للـ inline يُستخدم لون النهار؛ CSS يبدّل تلقائياً */
-export const SNIPER_THEME = {
+/** هوية حَسْبة — برتقالي/أزرق (مستقل عن القميري). للـ inline يُستخدم لون النهار؛ CSS يبدّل تلقائياً */
+export const HESBAH_THEME = {
   accent: '#e65100',
   accentLight: '#ff8f00',
   secondary: '#1565c0',
@@ -12,24 +12,30 @@ export const SNIPER_THEME = {
   secondaryDark: '#00e5ff',
 };
 
-export const SNIPER_ACCENT = SNIPER_THEME.accent;
+export const HESBAH_ACCENT = HESBAH_THEME.accent;
 /** يتبع الوضع النهاري/الليلي عبر CSS */
-export const SNIPER_ACCENT_CSS = 'var(--sniper-accent)';
-export const SNIPER_GLOW_CSS = 'var(--sniper-glow)';
-export const SNIPER_BORDER_CSS = 'var(--sniper-border)';
-export const SNIPER_SCORE_BG_CSS = 'var(--sniper-score-bg)';
-export const SNIPER_STORAGE_KEY = 'ng_sniper';
-export const QB_GAME_TYPE = 'sniper';
+export const HESBAH_ACCENT_CSS = 'var(--hesbah-accent)';
+export const HESBAH_GLOW_CSS = 'var(--hesbah-glow)';
+export const HESBAH_BORDER_CSS = 'var(--hesbah-border)';
+export const HESBAH_SCORE_BG_CSS = 'var(--hesbah-score-bg)';
+export const HESBAH_STORAGE_KEY = 'ng_hesbah';
+export const QB_GAME_TYPE = 'hesbah';
 
-export const SNIPER_BRAND = {
-  title: 'قناص الدرجات',
-  tagline: 'أرينا الدرجات — رهانك يحدد مصيرك',
+/** مفتاح سجل الأسئلة المستخدمة — يعتمد على التصنيفات والفلاتر المختارة. */
+export function hesbahBankFilterKey({ categories = [], audience = '', difficulty = '' } = {}) {
+  const cats = [...categories].sort().join(',');
+  return `hesbah|${cats}|${audience || 'all'}|${difficulty || 'all'}`;
+}
+
+export const HESBAH_BRAND = {
+  title: 'حَسْبة',
+  tagline: 'حَسْبة ذكية — رهانك يحدد مصيرك',
   emoji: '🎯',
   arena: 'ساحة الألعاب',
 };
 
 /** تقدم الجولات (نفس عدد الأسئلة — المصطلح «جولة» في الواجهة) */
-export function sniperRoundDisplay(currentQ, totalQ) {
+export function hesbahRoundDisplay(currentQ, totalQ) {
   const total = Number(totalQ) || 0;
   const cur = Number(currentQ) || 0;
   if (!total) return null;
@@ -40,7 +46,7 @@ export function sniperRoundDisplay(currentQ, totalQ) {
 }
 
 /** تاريخ ووقت الجلسة — عربي للترويج والمشاركة */
-export function formatSniperDateTime(date = new Date()) {
+export function formatHesbahDateTime(date = new Date()) {
   try {
     return new Intl.DateTimeFormat('ar-SA', {
       weekday: 'long',
@@ -56,10 +62,10 @@ export function formatSniperDateTime(date = new Date()) {
   }
 }
 
-export function sortedSniperPlayers(players) {
+export function sortedHesbahPlayers(players) {
   return Object.entries(players || {})
     .map(([id, p]) => ({ ...p, id }))
-    .filter((p) => !p.isHost)
+    .filter((p) => !p.isHost && isActiveHesbahPlayer(p))
     .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 }
 
@@ -73,7 +79,7 @@ export const SPEED_QUESTION_SECONDS = 10;
 export const FINAL_VOTE_SECONDS = 15;
 
 /** أدوات الإثارة — للمشرف (شرح + تفعيل) */
-export const SNIPER_SPECIAL_TOOLS = [
+export const HESBAH_SPECIAL_TOOLS = [
   {
     id: 'blind',
     icon: '🙈',
@@ -112,21 +118,21 @@ export const BOARD_CELL = {
   TIMEOUT: 'timeout',
 };
 
-/** وصف خلية اللوحة للعرض والـ CSS */
+/** وصف خلية اللوحة للعرض والـ CSS — الرقم يبقى ظاهراً والشارة توضّح الحالة */
 export function boardCellMeta(state) {
   switch (state) {
     case BOARD_CELL.USED:
-      return { className: 'sniper-score-btn--pending', label: '···', title: 'بانتظار التصحيح' };
+      return { className: 'hesbah-score-btn--pending', badge: '···', title: 'بانتظار التصحيح' };
     case BOARD_CELL.WON:
-      return { className: 'sniper-score-btn--won', label: '✓', title: 'إجابة صحيحة!' };
+      return { className: 'hesbah-score-btn--won', badge: '✓', title: 'إجابة صحيحة!' };
     case BOARD_CELL.DOUBLE_WON:
-      return { className: 'sniper-score-btn--double', label: '×2', title: 'صحيح — درجة مضاعفة!' };
+      return { className: 'hesbah-score-btn--double', badge: '×2', title: 'صحيح — درجة مضاعفة!' };
     case BOARD_CELL.BURNED:
-      return { className: 'sniper-score-btn--burned', label: '✕', title: 'إجابة خاطئة' };
+      return { className: 'hesbah-score-btn--burned', badge: '✕', title: 'إجابة خاطئة' };
     case BOARD_CELL.TIMEOUT:
-      return { className: 'sniper-score-btn--timeout', label: '⏱', title: 'انتهى الوقت — لم تُرسل' };
+      return { className: 'hesbah-score-btn--timeout', badge: '⏱', title: 'انتهى الوقت — لم تُرسل' };
     default:
-      return { className: '', label: null, title: 'متاحة' };
+      return { className: '', badge: null, title: 'متاحة' };
   }
 }
 
@@ -134,18 +140,51 @@ export function isBoardCellSelectable(state) {
   return state === BOARD_CELL.AVAILABLE;
 }
 
-export function readSavedSniper() {
+export function readSavedHesbah() {
   try {
-    const raw = localStorage.getItem(SNIPER_STORAGE_KEY);
+    let raw = localStorage.getItem(HESBAH_STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem('ng_sniper');
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
 }
 
-export function persistSniperSession(patch) {
-  const next = { ...readSavedSniper(), ...patch };
-  localStorage.setItem(SNIPER_STORAGE_KEY, JSON.stringify(next));
+export function persistHesbahSession(patch) {
+  const next = { ...readSavedHesbah(), ...patch };
+  localStorage.setItem(HESBAH_STORAGE_KEY, JSON.stringify(next));
+}
+
+export function clearHesbahSession() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(HESBAH_STORAGE_KEY);
+    localStorage.removeItem('ng_sniper');
+  } catch {
+    /* ignore */
+  }
+}
+
+/** لاعب نشط — لم ينسحب من الغرفة */
+export function isActiveHesbahPlayer(player) {
+  return !!(player && !player.left && String(player.name || '').trim());
+}
+
+export function findActivePlayerByName(players, name) {
+  const norm = String(name || '').trim();
+  if (!norm) return null;
+  return (
+    Object.entries(players || {}).find(([, p]) => isActiveHesbahPlayer(p) && p.name?.trim() === norm) ||
+    null
+  );
+}
+
+export function findLeftPlayerByName(players, name) {
+  const norm = String(name || '').trim();
+  if (!norm) return null;
+  return (
+    Object.entries(players || {}).find(([, p]) => p?.left && p.name?.trim() === norm) || null
+  );
 }
 
 export function buildScoreBoard(totalQ) {
@@ -156,7 +195,7 @@ export function buildScoreBoard(totalQ) {
   return board;
 }
 
-export function sniperPlayerPayload(name, colorIdx) {
+export function hesbahPlayerPayload(name, colorIdx) {
   const idx = Number(colorIdx) || 0;
   return {
     name: name.trim(),
@@ -240,15 +279,15 @@ export function isTimerRunning(game) {
 }
 
 /** مصدر «الأسئلة معي فقط» — شفهي دائماً */
-export function isSniperExternalSource(game) {
+export function isHesbahExternalSource(game) {
   return game?.questionSource === QSOURCE.EXTERNAL;
 }
 
 /** نص السؤال على جهاز المتسابق (مع إصلاح غرف قديمة) */
-export function sniperResolvePlayerQuestionText(game) {
+export function hesbahResolvePlayerQuestionText(game) {
   const direct = (game?.questionText || '').trim();
   if (direct) return direct;
-  if (game?.questionAdminOnly || isSniperExternalSource(game)) return '';
+  if (game?.questionAdminOnly || isHesbahExternalSource(game)) return '';
   return (game?.hostQuestionText || '').trim();
 }
 
@@ -258,11 +297,11 @@ export function sniperResolvePlayerQuestionText(game) {
  * - عميان → اختر درجة قبل المؤقت، ينكشف السؤال بعد البدء
  * - بنك/يدوي → ذهبي قبل المؤقت، النص بعد البدء
  */
-export function sniperPlayerQuestionView(game) {
+export function hesbahPlayerQuestionView(game) {
   const blind = game?.specialRound === 'blind';
-  const oral = isSniperExternalSource(game);
+  const oral = isHesbahExternalSource(game);
   const hostOnly = oral || !!game?.questionAdminOnly;
-  const text = sniperResolvePlayerQuestionText(game);
+  const text = hesbahResolvePlayerQuestionText(game);
   const timerActive = isTimerRunning(game);
 
   if (hostOnly) {
@@ -286,10 +325,10 @@ export function sniperPlayerQuestionView(game) {
 }
 
 /** وسوم السؤال في لوحة المشرف */
-export function sniperHostQuestionFlags(game) {
-  const external = isSniperExternalSource(game);
+export function hesbahHostQuestionFlags(game) {
+  const external = isHesbahExternalSource(game);
   const adminOnly = !!game?.questionAdminOnly;
-  const hasPlayerText = !!sniperResolvePlayerQuestionText(game);
+  const hasPlayerText = !!hesbahResolvePlayerQuestionText(game);
   return {
     oralHidden: external || adminOnly,
     revealsOnTimer: !external && !adminOnly && hasPlayerText,

@@ -76,6 +76,13 @@ export const playSound = type => {
     } else if (type === 'poison_hit') {
       play(200, 0.2, 0.4, 'sawtooth');
       play(100, 0.4, 0.3, 'sine', 0.1);
+    } else if (type === 'victory') {
+      [392, 494, 587, 784, 988].forEach((f, i) => play(f, 0.28, 0.22, 'sine', i * 0.1));
+      play(1175, 0.55, 0.18, 'triangle', 0.55);
+    } else if (type === 'victory_chime') {
+      play(659, 0.18, 0.16, 'sine');
+      play(880, 0.22, 0.14, 'sine', 0.12);
+      play(1047, 0.35, 0.12, 'triangle', 0.24);
     }
   } catch (e) {
     /* ignore */

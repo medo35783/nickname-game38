@@ -18,7 +18,7 @@ export default function FameeriGuideModal({ onClose }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--fameeri-primary)' }}>📖 دليل صيد القميري</div>
+          <div style={{ fontFamily: 'Cairo', fontSize: 18, fontWeight: 900, color: 'var(--fameeri-primary)' }}>📖 دليل لعبة القميري</div>
           <button type="button" className="btn bgh bxs" onClick={onClose}>
             ✕
           </button>

@@ -1006,6 +1006,37 @@ textarea.inp{resize:vertical;min-height:80px}
   --fameeri-border:rgba(77,182,172,.35);
 }
 
+.home-game-card--nicknames{
+  background:linear-gradient(135deg,rgba(240,192,64,.12),rgba(255,140,0,.06));
+  border:2px solid rgba(240,192,64,.3);
+  border-radius:16px;
+  padding:18px 16px;
+  margin-bottom:12px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.home-game-card--nicknames .home-game-card__title{
+  font-family:'Cairo',sans-serif;
+  font-size:26px;
+  font-weight:900;
+  letter-spacing:.5px;
+  line-height:1.2;
+  background:linear-gradient(135deg,var(--gold),#ff8c00);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.home-game-card--nicknames .home-game-card__sub{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px;
+  line-height:1.6;
+}
+.home-game-card--nicknames .home-game-card__arrow{
+  font-size:20px;
+  color:var(--gold);
+}
+
 .home-game-card--fameeri{
   background:linear-gradient(135deg,var(--fameeri-bg),rgba(178,223,219,.35));
   border:2px solid var(--fameeri-border);
@@ -1017,14 +1048,19 @@ textarea.inp{resize:vertical;min-height:80px}
 }
 .home-game-card--fameeri .home-game-card__title{
   font-family:'Cairo',sans-serif;
-  font-size:18px;
+  font-size:26px;
   font-weight:900;
-  color:var(--fameeri-primary);
+  letter-spacing:.5px;
+  line-height:1.2;
+  background:linear-gradient(135deg,var(--fameeri-primary),var(--fameeri-primary-light));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
 }
 .home-game-card--fameeri .home-game-card__sub{
   font-size:12px;
   color:var(--fameeri-muted);
-  margin-top:3px;
+  margin-top:4px;
   line-height:1.6;
 }
 .home-game-card--fameeri .home-game-card__arrow{color:var(--fameeri-primary)}

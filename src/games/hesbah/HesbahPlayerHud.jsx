@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
-import SniperLeaderboardList from './SniperLeaderboardList';
-import { SNIPER_ACCENT_CSS, sniperPlayerQuestionView } from './sniperHelpers';
+import HesbahLeaderboardList from './HesbahLeaderboardList';
+import { HESBAH_ACCENT_CSS, hesbahPlayerQuestionView } from './hesbahHelpers';
+import HesbahTopNav from './HesbahTopNav';
 
-export function getSniperPlayerAlerts(game, me) {
+export function getHesbahPlayerAlerts(game, me) {
   const alerts = [];
   if (game?.phase === 'question' && !game?.deadline) {
-    const qv = sniperPlayerQuestionView(game);
+    const qv = hesbahPlayerQuestionView(game);
     if (qv.mode === 'blind-pick') {
       alerts.push({ key: 'blind-pick', text: '🙈 عميان — اختر درجتك ثم ينكشف السؤال' });
     } else if (qv.mode === 'pending') {
@@ -46,9 +47,9 @@ const PHASE_BADGE = {
 };
 
 /**
- * غلاف المتسابق — تبويبان مثل المشرف: الجولة + الترتيب (نفس البطاقة الفاخرة)
+ * غلاف المتسابق — تبويبان: الجولة + الترتيب (شريط رجوع ثابت دائماً)
  */
-export default function SniperPlayerHud({
+export default function HesbahPlayerHud({
   roomCode,
   me,
   myId,
@@ -57,9 +58,11 @@ export default function SniperPlayerHud({
   children,
   rankFooter,
   initialTab = 'round',
+  onExitRequest,
+  hideTabs = false,
 }) {
   const [playerTab, setPlayerTab] = useState(initialTab);
-  const alerts = getSniperPlayerAlerts(game, me);
+  const alerts = getHesbahPlayerAlerts(game, me);
   const phase = game?.phase;
   const phaseBadge = PHASE_BADGE[phase] || 'انتظار';
 
@@ -69,66 +72,71 @@ export default function SniperPlayerHud({
   }, [phase, game?.currentQ]);
 
   return (
-    <div className="scr sniper-theme sniper-player-screen">
-      <LiveConnectionBar connected roomCode={roomCode} />
+    <div className="scr hesbah-theme hesbah-player-screen">
+      <div className="hesbah-sticky-chrome">
+        <LiveConnectionBar connected roomCode={roomCode} />
+        <HesbahTopNav onBack={onExitRequest} />
 
-      <header className="sniper-player-hud sniper-player-hud--compact">
-        <div className="sniper-player-hud__main">
-          <Av p={me} sz={40} />
-          <div className="sniper-player-hud__info">
-            <div className="sniper-player-hud__name">{me?.name || 'متسابق'}</div>
-            <div className="sniper-player-hud__score">
-              نقاطك{' '}
-              <strong style={{ color: SNIPER_ACCENT_CSS }}>{me?.totalScore ?? 0}</strong>
-              {me?.insuranceLeft > 0 && (
-                <span className="sniper-player-hud__ins"> · 🛡️ {me.insuranceLeft}</span>
-              )}
+        <header className="hesbah-player-hud hesbah-player-hud--compact">
+          <div className="hesbah-player-hud__main">
+            <Av p={me} sz={40} />
+            <div className="hesbah-player-hud__info">
+              <div className="hesbah-player-hud__name">{me?.name || 'متسابق'}</div>
+              <div className="hesbah-player-hud__score">
+                نقاطك{' '}
+                <strong style={{ color: HESBAH_ACCENT_CSS }}>{me?.totalScore ?? 0}</strong>
+                {me?.insuranceLeft > 0 && (
+                  <span className="hesbah-player-hud__ins"> · 🛡️ {me.insuranceLeft}</span>
+                )}
+              </div>
             </div>
+            <span className="hesbah-player-hud__phase">{phaseBadge}</span>
           </div>
-          <span className="sniper-player-hud__phase">{phaseBadge}</span>
-        </div>
-      </header>
+        </header>
 
-      <nav className="sniper-admin-tabs sniper-player-tabs" aria-label="المتسابق">
-        <button
-          type="button"
-          className={`sniper-admin-tabs__btn ${playerTab === 'round' ? 'is-active' : ''}`}
-          onClick={() => setPlayerTab('round')}
-        >
-          🎯 الجولة
-        </button>
-        <button
-          type="button"
-          className={`sniper-admin-tabs__btn ${playerTab === 'rank' ? 'is-active' : ''}`}
-          onClick={() => setPlayerTab('rank')}
-        >
-          🏆 الترتيب
-        </button>
-      </nav>
+        {!hideTabs && (
+          <nav className="hesbah-admin-tabs hesbah-player-tabs" aria-label="المتسابق">
+            <button
+              type="button"
+              className={`hesbah-admin-tabs__btn ${playerTab === 'round' ? 'is-active' : ''}`}
+              onClick={() => setPlayerTab('round')}
+            >
+              🎯 الجولة
+            </button>
+            <button
+              type="button"
+              className={`hesbah-admin-tabs__btn ${playerTab === 'rank' ? 'is-active' : ''}`}
+              onClick={() => setPlayerTab('rank')}
+            >
+              🏆 الترتيب
+            </button>
+          </nav>
+        )}
+      </div>
 
-      <main className="sniper-player-main">
-        {playerTab === 'rank' ? (
+      <main className="hesbah-player-main">
+        {hideTabs || playerTab === 'round' ? (
           <>
-            <SniperLeaderboardList
-              players={players}
-              myId={myId}
-              roomCode={roomCode}
-              game={game}
-            />
-            {rankFooter}
-          </>
-        ) : (
-          <>
-            {alerts.length > 0 && (
-              <div className="sniper-player-alerts">
+            {!hideTabs && alerts.length > 0 && (
+              <div className="hesbah-player-alerts">
                 {alerts.map((a) => (
-                  <div key={a.key} className="sniper-player-alert">
+                  <div key={a.key} className="hesbah-player-alert">
                     {a.text}
                   </div>
                 ))}
               </div>
             )}
             {children}
+          </>
+        ) : (
+          <>
+            <HesbahLeaderboardList
+              players={players}
+              myId={myId}
+              roomCode={roomCode}
+              game={game}
+            />
+            {rankFooter}
           </>
         )}
       </main>

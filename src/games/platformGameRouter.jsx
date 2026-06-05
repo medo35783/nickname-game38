@@ -1,6 +1,6 @@
-import TitlesGame from './titles/TitlesGame';
+﻿import TitlesGame from './titles/TitlesGame';
 import FameeriGame from './fameeri/FameeriGame';
-import SniperGame from './sniper/SniperGame';
+import HesbahGame from './hesbah/HesbahGame';
 
 /**
  * موجّه ألعاب المنصة — يُستورد من App دون توسيع renderGame يدوياً لكل لعبة جديدة.
@@ -9,12 +9,13 @@ export function renderPlatformGame(selectedGame, props) {
   const {
     titlesRef,
     fameeriRef,
-    sniperRef,
+    hesbahRef,
     notify,
     setTab,
     setSelectedGame,
-    onHeaderMeta,
-    canHostRoom,
+  onHeaderMeta,
+  onHesbahHeaderMeta,
+  canHostRoom,
     onRequestActivation,
     onGameEnd,
     onGoAccount,
@@ -50,13 +51,14 @@ export function renderPlatformGame(selectedGame, props) {
     );
   }
 
-  if (selectedGame === 'sniper') {
+  if (selectedGame === 'hesbah') {
     return (
-      <SniperGame
-        ref={sniperRef}
+      <HesbahGame
+        ref={hesbahRef}
         notify={notify}
         setTab={setTab}
         setSelectedGame={setSelectedGame}
+        onHesbahHeaderMeta={onHesbahHeaderMeta}
         canCreateRoom={canHostRoom}
         onRequestActivation={onRequestActivation}
         onGameEnd={onGameEnd}
@@ -79,8 +81,8 @@ export function handlePlatformGameBack(selectedGame, refs, fallbacks) {
     setSelectedGame(null);
     return true;
   }
-  if (selectedGame === 'sniper') {
-    if (refs.sniperRef?.current?.handleHeaderBack?.()) return true;
+  if (selectedGame === 'hesbah') {
+    if (refs.hesbahRef?.current?.handleHeaderBack?.()) return true;
     setSelectedGame(null);
     return true;
   }

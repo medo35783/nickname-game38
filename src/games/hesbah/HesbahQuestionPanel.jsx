@@ -1,4 +1,4 @@
-/** بطاقة السؤال — نفس الإطار للمشرف والمتسابق */
+﻿/** بطاقة السؤال — نفس الإطار للمشرف والمتسابق */
 function maskedPlayerCopy({ blind, oral, reason }) {
   if (blind) {
     return {
@@ -49,7 +49,7 @@ function pendingPlayerCopy(blindPick) {
   };
 }
 
-export default function SniperQuestionPanel({
+export default function HesbahQuestionPanel({
   role = 'host',
   questionText = '',
   playerMode,
@@ -74,69 +74,69 @@ export default function SniperQuestionPanel({
   const emptyHost = isHost && !questionText?.trim();
 
   const panelClass = [
-    'sniper-question-panel',
-    isHost ? 'sniper-question-panel--host' : 'sniper-question-panel--player',
-    masked ? 'sniper-question-panel--masked' : '',
-    pending ? 'sniper-question-panel--pending' : '',
-    blindPick ? 'sniper-question-panel--blind-pick' : '',
-    showText && !isHost ? 'sniper-question-panel--visible' : '',
+    'hesbah-question-panel',
+    isHost ? 'hesbah-question-panel--host' : 'hesbah-question-panel--player',
+    masked ? 'hesbah-question-panel--masked' : '',
+    pending ? 'hesbah-question-panel--pending' : '',
+    blindPick ? 'hesbah-question-panel--blind-pick' : '',
+    showText && !isHost ? 'hesbah-question-panel--visible' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   const inner = (
-    <div className="sniper-question-panel__main">
-      <div className="sniper-question-panel__head">
-        <span className="sniper-question-panel__label">
-          <span className="sniper-question-panel__label-tag">❓ السؤال</span>
+    <div className="hesbah-question-panel__main">
+      <div className="hesbah-question-panel__head">
+        <span className="hesbah-question-panel__label">
+          <span className="hesbah-question-panel__label-tag">❓ السؤال</span>
         </span>
-        {isHost && <span className="sniper-question-panel__role-badge">للمشرف</span>}
-        {!isHost && <span className="sniper-question-panel__role-badge sniper-question-panel__role-badge--player">للمتسابق</span>}
+        {isHost && <span className="hesbah-question-panel__role-badge">للمشرف</span>}
+        {!isHost && <span className="hesbah-question-panel__role-badge hesbah-question-panel__role-badge--player">للمتسابق</span>}
       </div>
 
       {status}
 
       {showText && !emptyHost && (
-        <p className="sniper-question-panel__text">{questionText.trim()}</p>
+        <p className="hesbah-question-panel__text">{questionText.trim()}</p>
       )}
 
       {emptyHost && (
-        <p className="sniper-question-panel__text sniper-question-panel__text--empty">
+        <p className="hesbah-question-panel__text hesbah-question-panel__text--empty">
           لا يوجد نص سؤال — تحقق من بنك الأسئلة أو اقرأ من ملاحظات المشرف
         </p>
       )}
 
       {masked && copy && (
-        <div className="sniper-question-panel__masked" aria-hidden="true">
-          <span className="sniper-question-panel__masked-icon">{copy.icon}</span>
-          <p className="sniper-question-panel__masked-title">{copy.title}</p>
-          <p className="sniper-question-panel__masked-hint">{copy.hint}</p>
-          {copy.note && <p className="sniper-question-panel__masked-note">{copy.note}</p>}
+        <div className="hesbah-question-panel__masked" aria-hidden="true">
+          <span className="hesbah-question-panel__masked-icon">{copy.icon}</span>
+          <p className="hesbah-question-panel__masked-title">{copy.title}</p>
+          <p className="hesbah-question-panel__masked-hint">{copy.hint}</p>
+          {copy.note && <p className="hesbah-question-panel__masked-note">{copy.note}</p>}
         </div>
       )}
 
       {pending && pendingCopy && (
-        <div className="sniper-question-panel__pending">
-          <span className="sniper-question-panel__pending-icon">{pendingCopy.icon}</span>
-          <p className="sniper-question-panel__pending-title">{pendingCopy.title}</p>
-          <p className="sniper-question-panel__pending-hint">{pendingCopy.hint}</p>
-          <p className="sniper-question-panel__pending-note">{pendingCopy.note}</p>
+        <div className="hesbah-question-panel__pending">
+          <span className="hesbah-question-panel__pending-icon">{pendingCopy.icon}</span>
+          <p className="hesbah-question-panel__pending-title">{pendingCopy.title}</p>
+          <p className="hesbah-question-panel__pending-hint">{pendingCopy.hint}</p>
+          <p className="hesbah-question-panel__pending-note">{pendingCopy.note}</p>
         </div>
       )}
 
       {isFinalBet && finalBetScore != null && (
-        <p className="sniper-question-panel__final">🎲 رهان حاسم: {finalBetScore} نقطة للجميع</p>
+        <p className="hesbah-question-panel__final">🎲 رهان حاسم: {finalBetScore} نقطة للجميع</p>
       )}
 
       {isHost && hostOralHidden && (
-        <p className="sniper-question-panel__host-note">🎙️ الأسئلة معك — لا نص على شاشة اللاعبين</p>
+        <p className="hesbah-question-panel__host-note">🎙️ الأسئلة معك — لا نص على شاشة اللاعبين</p>
       )}
       {masked && oral && (
-        <span className="sniper-question-panel__tag sniper-question-panel__tag--oral">مع المشرف</span>
+        <span className="hesbah-question-panel__tag hesbah-question-panel__tag--oral">مع المشرف</span>
       )}
 
       {isHost && supervisorNotes?.trim() && (
-        <p className="sniper-question-panel__notes">{supervisorNotes.trim()}</p>
+        <p className="hesbah-question-panel__notes">{supervisorNotes.trim()}</p>
       )}
     </div>
   );
@@ -144,8 +144,8 @@ export default function SniperQuestionPanel({
   return (
     <section className={panelClass}>
       {aside ? (
-        <div className="sniper-question-panel__row">
-          <div className="sniper-question-panel__aside">{aside}</div>
+        <div className="hesbah-question-panel__row">
+          <div className="hesbah-question-panel__aside">{aside}</div>
           {inner}
         </div>
       ) : (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useRef } from 'react';
 import { ref, update } from 'firebase/database';
 import { db } from '../firebase';
 import { COLORS } from '../core/constants';
@@ -65,7 +65,7 @@ const STATUS_LABELS = {
 const GAME_TYPE_LABELS = {
   qumayri: 'القميري',
   titles: 'الألقاب',
-  sniper: 'قناص الدرجات',
+  hesbah: 'حَسْبة',
   all: 'كل الألعاب',
 };
 
@@ -1060,7 +1060,7 @@ export default function QBankManager({ notify }) {
             placeholder="مثال: ذئب، wolf&#10;أو: اقرأ الحرف «ر» فقط للجميع"
           />
           <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.6 }}>
-            في القميري وقناص الدرجات يظهر للاعبين حقل كتابة واعتماد فقط — هذه الملاحظة للمشرف وحده.
+            في القميري وحَسْبة يظهر للاعبين حقل كتابة واعتماد فقط — هذه الملاحظة للمشرف وحده.
           </p>
         </div>
       );

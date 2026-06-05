@@ -1,4 +1,4 @@
-import { shuffle } from '../../core/helpers';
+﻿import { shuffle } from '../../core/helpers';
 import { flattenSessionPool } from '../../question-bank/customQuestionPool';
 import {
   QSOURCE,
@@ -23,13 +23,13 @@ export function playerVisibleQuestionText(q) {
 }
 
 /** نص يُحفظ في Firebase للمتسابقين (بنك / يدوي) */
-export function sniperGameQuestionText(q, questionSource) {
+export function hesbahGameQuestionText(q, questionSource) {
   if (!q) return '';
   if (q.adminOnly || questionSource === QSOURCE.EXTERNAL) return '';
   return (q.playerText || q.hostText || '').trim();
 }
 
-export function mapSniperQuestion(raw) {
+export function mapHesbahQuestion(raw) {
   const hostText = resolveHostText(raw);
   const playerText = playerVisibleQuestionText(raw);
   const type = raw.type || 'open_question';
@@ -47,7 +47,7 @@ export function mapSniperQuestion(raw) {
   };
 }
 
-export function flattenSniperPool(poolStructured) {
+export function flattenHesbahPool(poolStructured) {
   const flat = flattenSessionPool(poolStructured);
   return flat
     .map((q, i) => ({
@@ -61,12 +61,12 @@ export function flattenSniperPool(poolStructured) {
       correct_answer: q.correct_answer || '',
       options: q.options || [],
     }))
-    .map(mapSniperQuestion)
+    .map(mapHesbahQuestion)
     .filter((q) => q.hostText.trim() && !q.adminOnly);
 }
 
-export function countSniperPool(poolStructured) {
-  return flattenSniperPool(poolStructured).length;
+export function countHesbahPool(poolStructured) {
+  return flattenHesbahPool(poolStructured).length;
 }
 
 export function createQuestionCursor(poolFlat) {

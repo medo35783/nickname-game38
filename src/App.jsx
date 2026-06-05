@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+﻿import { useState, useRef, useEffect, useCallback } from "react";
 import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import Packages from './pages/Packages';
@@ -46,10 +46,11 @@ export default function App() {
 
   const fameeriRef = useRef(null);
   const titlesRef = useRef(null);
-  const sniperRef = useRef(null);
+  const hesbahRef = useRef(null);
 
   /* ── معلومات تأتي من TitlesGame لرسم زر 👑 في الهيدر ── */
   const [titlesMeta, setTitlesMeta] = useState({ inRoom: false, showAdminBtn: false, gameScreen: 'home' });
+  const [hesbahMeta, setHesbahMeta] = useState({ inRoom: false });
   const [isAdmin, setIsAdmin] = useState(false);
   const adminLogoTapRef = useRef({ count: 0, last: 0 });
   const [activeCode, setActiveCode] = useState(null);
@@ -214,15 +215,26 @@ export default function App() {
   /** التذييل أثناء التصفح فقط — يختفي داخل غرف الألعاب */
   const showSiteFooter = !selectedGame;
 
+  /** زر «رجوع» في الهيدر — حَسْبة تدير الرجوع داخلياً (زر واحد موحّد) */
+  const hidePlatformBack =
+    selectedGame === 'hesbah' ||
+    (selectedGame === 'nicknames' && titlesMeta.inRoom);
+
+  const showHeaderBack =
+    tab !== 'game' || selectedGame || gameScreen !== 'home'
+      ? !hidePlatformBack
+      : false;
+
   const renderGame = () => {
     const mounted = renderPlatformGame(selectedGame, {
       titlesRef,
       fameeriRef,
-      sniperRef,
+      hesbahRef,
       notify,
       setTab,
       setSelectedGame,
       onHeaderMeta: setTitlesMeta,
+      onHesbahHeaderMeta: setHesbahMeta,
       canHostRoom,
       onRequestActivation: () => setShowCodeActivation(true),
       onGameEnd,
@@ -240,7 +252,7 @@ export default function App() {
   const renderVoice = () => {
     const typeConfig = {
       suggest: { icon: '💡', label: 'اقتراح', emailSubject: `اقتراح [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة', 'تصميم', 'إحصائيات', 'أسعار', 'أخرى'] },
-      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة الألقاب', 'صيد القميري', 'تسجيل دخول', 'أخرى'] },
+      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة الألقاب', 'لعبة القميري', 'حَسْبة', 'تسجيل دخول', 'أخرى'] },
       ask: { icon: '💬', label: 'استفسار', emailSubject: `استفسار — ${PLATFORM_NAME}`, cats: ['عام', 'الأسعار', 'طريقة اللعب', 'أخرى'] },
     };
 
@@ -389,7 +401,7 @@ export default function App() {
   }
 
   return(
-    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}${selectedGame === 'sniper' ? ' app--in-sniper' : ''}`}>
+    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}${selectedGame === 'hesbah' ? ' app--in-hesbah' : ''}`}>
       <Stars/>
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
@@ -451,7 +463,7 @@ export default function App() {
         </div>
 
         <div className="hdr-left">
-          {tab !== 'game' || selectedGame || gameScreen !== 'home' ? (
+          {showHeaderBack ? (
             <button
               className="btn bgh bsm"
               style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
@@ -461,7 +473,7 @@ export default function App() {
                   return;
                 }
                 if (
-                  handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, sniperRef }, {
+                  handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, hesbahRef }, {
                     setSelectedGame,
                     setGameScreen,
                     gameScreen,

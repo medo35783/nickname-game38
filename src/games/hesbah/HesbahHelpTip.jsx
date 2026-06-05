@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 
 /** أيقونة معلومات صغيرة — شرح عند الطلب فقط */
-export function SniperInfoBtn({ content, label = 'معلومات' }) {
+export function HesbahInfoBtn({ content, label = 'معلومات' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -17,10 +17,10 @@ export function SniperInfoBtn({ content, label = 'معلومات' }) {
   if (!content) return null;
 
   return (
-    <span className="sniper-i" ref={ref}>
+    <span className="hesbah-i" ref={ref}>
       <button
         type="button"
-        className={`sniper-i__btn ${open ? 'is-on' : ''}`}
+        className={`hesbah-i__btn ${open ? 'is-on' : ''}`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={label}
@@ -29,7 +29,7 @@ export function SniperInfoBtn({ content, label = 'معلومات' }) {
         i
       </button>
       {open && (
-        <div className="sniper-i__pop" role="tooltip">
+        <div className="hesbah-i__pop" role="tooltip">
           {typeof content === 'string' ? <p>{content}</p> : content}
         </div>
       )}
@@ -38,19 +38,19 @@ export function SniperInfoBtn({ content, label = 'معلومات' }) {
 }
 
 /** عنوان مختصر + i */
-export function SniperPanelTitle({ children, help, helpLabel = 'معلومات', className = '' }) {
+export function HesbahPanelTitle({ children, help, helpLabel = 'معلومات', className = '' }) {
   return (
-    <div className={`sniper-sec-head ${className}`.trim()}>
-      <span className="sniper-sec-head__label">{children}</span>
-      {help && <SniperInfoBtn content={help} label={helpLabel} />}
+    <div className={`hesbah-sec-head ${className}`.trim()}>
+      <span className="hesbah-sec-head__label">{children}</span>
+      {help && <HesbahInfoBtn content={help} label={helpLabel} />}
     </div>
   );
 }
 
-export default SniperInfoBtn;
+export default HesbahInfoBtn;
 
-export const SNIPER_TOOLS_HELP = (
-  <ul className="sniper-i__list">
+export const HESBAH_TOOLS_HELP = (
+  <ul className="hesbah-i__list">
     <li>اضغط للتفعيل/الإلغاء — لا يبدأ المؤقت.</li>
     <li>
       <strong>🙈</strong> عميان: التصنيف فقط للاعبين.
@@ -64,8 +64,8 @@ export const SNIPER_TOOLS_HELP = (
   </ul>
 );
 
-export const SNIPER_HOST_PARTICIPATE_HELP = (
-  <ul className="sniper-i__list">
+export const HESBAH_HOST_PARTICIPATE_HELP = (
+  <ul className="hesbah-i__list">
     <li>
       <strong>إدارة فقط:</strong> ترى كل الإجابات فوراً.
     </li>
@@ -76,10 +76,10 @@ export const SNIPER_HOST_PARTICIPATE_HELP = (
   </ul>
 );
 
-export const SNIPER_LIVE_OPS_HELP = 'إرسال اللاعبين يظهر هنا فوراً — هم يرون بعضهم بعد إرسالهم.';
+export const HESBAH_LIVE_OPS_HELP = 'إرسال اللاعبين يظهر هنا فوراً — هم يرون بعضهم بعد إرسالهم.';
 
-export const SNIPER_LIVE_HOST_HELP = 'بعد إرسال إجابتك تُفعَّل البطاقات الحية.';
+export const HESBAH_LIVE_HOST_HELP = 'بعد إرسال إجابتك تُفعَّل البطاقات الحية.';
 
-export const SNIPER_HOST_ANSWER_HELP = 'للعرض والمقارنة — لا تُحسب نقاطاً.';
+export const HESBAH_HOST_ANSWER_HELP = 'للعرض والمقارنة — لا تُحسب نقاطاً.';
 
-export const SNIPER_SUBMIT_COUNTER_HELP = 'أرسل إجابتك أولاً لتفعيل البطاقات.';
+export const HESBAH_SUBMIT_COUNTER_HELP = 'أرسل إجابتك أولاً لتفعيل البطاقات.';
