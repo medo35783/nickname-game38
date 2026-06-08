@@ -65,22 +65,57 @@ export function flattenHesbahPool(poolStructured) {
     .filter((q) => q.hostText.trim() && !q.adminOnly);
 }
 
-export function countHesbahPool(poolStructured) {
-  return flattenHesbahPool(poolStructured).length;
+/** إزالة تكرار النص داخل جلسة واحدة (نفس السؤال بمعرّفات مختلفة). */
+export function dedupeHesbahPool(poolFlat) {
+  const seen = new Set();
+  return poolFlat.filter((q) => {
+    const key = (q.hostText || q.text || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
-export function createQuestionCursor(poolFlat) {
-  const order = shuffle(poolFlat.map((_, i) => i));
-  let ptr = 0;
+/** اختيار أسئلة الجلسة من البنك: بدون تكرار نص، خلط عشوائي، بعدد الجولات. */
+export function pickHesbahSessionQuestions(rawList, want) {
+  const target = Math.max(1, parseInt(want, 10) || 30);
+  const seen = new Set();
+  const unique = [];
+  for (const q of rawList || []) {
+    const key = (q.question_text || q.text || q.question || '').trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(q);
+  }
+  return shuffle(unique).slice(0, target);
+}
+
+export function countHesbahPool(poolStructured) {
+  return dedupeHesbahPool(flattenHesbahPool(poolStructured)).length;
+}
+
+export function createQuestionCursor(poolFlat, { startPtr = 0, savedOrder = null } = {}) {
+  const unique = dedupeHesbahPool(poolFlat);
+  const order =
+    Array.isArray(savedOrder) && savedOrder.length === unique.length
+      ? savedOrder
+      : shuffle(unique.map((_, i) => i));
+  let ptr = Math.max(0, Math.min(startPtr, order.length));
   return {
     next() {
-      if (!order.length) return null;
-      const item = poolFlat[order[ptr % order.length]];
+      if (ptr >= order.length) return null;
+      const item = unique[order[ptr]];
       ptr += 1;
       return item;
     },
     remaining() {
       return Math.max(0, order.length - ptr);
+    },
+    total() {
+      return order.length;
+    },
+    snapshot() {
+      return { ptr, order, total: order.length };
     },
   };
 }

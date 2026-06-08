@@ -1,7 +1,7 @@
 ﻿import { useMemo } from 'react';
 import Av from '../../shared/Av';
 import { HesbahInfoBtn, HesbahPanelTitle } from './HesbahHelpTip';
-import { HESBAH_ACCENT_CSS, HESBAH_GLOW_CSS } from './HesbahHelpers';
+import { HESBAH_ACCENT_CSS, HESBAH_GLOW_CSS, isActiveHesbahPlayer } from './HesbahHelpers';
 
 export function LiveAnswerCard({ entry, isHost }) {
   return (
@@ -74,6 +74,21 @@ export function countSubmittedAnswers(answers, players) {
   }).length;
 }
 
+/** قائمة المتسابقين مع حالة الإرسال — للمشرف */
+export function buildParticipantRoster(answers, players) {
+  return Object.entries(players || {})
+    .filter(([, p]) => !p.isHost && isActiveHesbahPlayer(p))
+    .map(([id, p]) => {
+      const row = answers?.[id];
+      const submitted = !!(row?.answer?.trim() || p.submitted);
+      return { id, name: p.name, player: p, submitted };
+    })
+    .sort((a, b) => {
+      if (a.submitted !== b.submitted) return a.submitted ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '', 'ar');
+    });
+}
+
 export default function HesbahLiveAnswersPanel({
   title = '📡 البطاقات الحية',
   help,
@@ -95,20 +110,58 @@ export default function HesbahLiveAnswersPanel({
   );
 }
 
-/** عداد الإرسال للمشرف المشارك قبل إرسال إجابته */
-export function HesbahAdminSubmitCounter({ submitted, total, help }) {
+/** أسماء المتسابقين + مؤشر الإرسال — قبل/أثناء الجولة */
+export function HesbahParticipantRoster({ roster, help, hostPending = false }) {
+  const total = roster.length;
+  const submitted = roster.filter((r) => r.submitted).length;
   const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+  const waitingNames = roster.filter((r) => !r.submitted).map((r) => r.name);
+
+  if (!total) {
+    return (
+      <section className="hesbah-admin-panel hesbah-participant-roster">
+        <HesbahPanelTitle help={help} helpLabel="المتسابقون">👥 المتسابقون</HesbahPanelTitle>
+        <p className="hesbah-admin-live-feed__empty">لا يوجد متسابقون بعد</p>
+      </section>
+    );
+  }
+
   return (
-    <section className="hesbah-admin-panel hesbah-admin-submit-counter">
+    <section className="hesbah-admin-panel hesbah-participant-roster">
       <div className="hesbah-sec-head">
-        <span className="hesbah-sec-head__label">📨 وصول</span>
+        <span className="hesbah-sec-head__label">👥 المتسابقون</span>
         <span className="hesbah-submit-pill">
           <strong>{submitted}</strong>/{total}
         </span>
-        {help && <HesbahInfoBtn content={help} label="الوصول" />}
+        {help && <HesbahInfoBtn content={help} label="المتسابقون" />}
       </div>
       <div className="hesbah-admin-submit-counter__bar" aria-hidden>
         <div className="hesbah-admin-submit-counter__fill" style={{ width: `${pct}%` }} />
+      </div>
+      {hostPending && (
+        <p className="hesbah-participant-roster__host-hint">📤 أرسل إجابتك أولاً لرؤية نصوص الإجابات</p>
+      )}
+      {waitingNames.length > 0 && (
+        <p className="hesbah-participant-roster__waiting">
+          ⏳ لم يرسل: {waitingNames.join(' · ')}
+        </p>
+      )}
+      <div className="hesbah-participant-roster__list">
+        {roster.map((r) => (
+          <div
+            key={r.id}
+            className={`hesbah-participant-row ${r.submitted ? 'is-sent' : 'is-pending'}`}
+          >
+            <Av p={r.player} sz={34} />
+            <span className="hesbah-participant-row__name">{r.name}</span>
+            <span
+              className={`hesbah-participant-row__badge ${r.submitted ? 'is-sent' : 'is-pending'}`}
+              aria-label={r.submitted ? 'أرسل' : 'ينتظر'}
+            >
+              {r.submitted ? '✓' : '⏳'}
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -119,6 +172,10 @@ export function useHesbahLiveAnswers(answers, players, hostAnswer, hostParticipa
     () => buildLiveAnswerCards(answers, players, hostAnswer, hostParticipates),
     [answers, players, hostAnswer, hostParticipates]
   );
+  const roster = useMemo(
+    () => buildParticipantRoster(answers, players),
+    [answers, players]
+  );
   const totalContestants = useMemo(() => countContestants(players), [players]);
   const submittedCount = useMemo(
     () => countSubmittedAnswers(answers, players),
@@ -126,5 +183,5 @@ export function useHesbahLiveAnswers(answers, players, hostAnswer, hostParticipa
   );
   const hostSent = !!(hostParticipates && hostAnswer?.answer?.trim());
 
-  return { liveCards, totalContestants, submittedCount, hostSent };
+  return { liveCards, roster, totalContestants, submittedCount, hostSent };
 }

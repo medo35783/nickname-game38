@@ -28,6 +28,7 @@ import {
   clearUsedHesbahQuestionIds,
 } from '../games/hesbah/hesbahBankProgress';
 import { hesbahBankFilterKey } from '../games/hesbah/HesbahHelpers';
+import { pickHesbahSessionQuestions } from '../games/hesbah/HesbahQuestions';
 import CustomQuestionBuilder from './CustomQuestionBuilder';
 import { flattenSessionPool } from './customQuestionPool';
 
@@ -277,17 +278,25 @@ export default function QuestionSourceSetup({
         }
 
         const want = Math.max(1, parseInt(count, 10) || 30);
-        if (sessionPool.length < want) {
-          notifyMsg(`⚠️ متاح ${sessionPool.length} سؤال فقط — سيتم استخدامها كلها`, 'gold');
+        const uniquePool = pickHesbahSessionQuestions(sessionPool, sessionPool.length);
+        if (uniquePool.length < want) {
+          notifyMsg(
+            `⚠️ متاح ${uniquePool.length} سؤالاً فريداً فقط (بعد إزالة التكرار) — سيتم استخدامها كلها`,
+            'gold'
+          );
         }
-        sessionPool = sessionPool.slice(0, want);
+        sessionPool = pickHesbahSessionQuestions(sessionPool, want);
+        if (!sessionPool.length) {
+          notifyMsg('لا توجد أسئلة فريدة مطابقة — جرّب تصنيفاً آخر أو «إعادة السابقة»', 'error');
+          return;
+        }
 
         onApply({
           source: QSOURCE.BANK,
           pool: sessionPool,
-          bankMeta: { filterKey, replayMode: hesbahReplayMode },
+          bankMeta: { filterKey, replayMode: hesbahReplayMode, sessionCount: sessionPool.length },
         });
-        notifyMsg(`✅ تم تجهيز ${sessionPool.length} سؤال من البنك`, 'success');
+        notifyMsg(`✅ تم تجهيز ${sessionPool.length} سؤالاً فريداً من البنك`, 'success');
         return;
       }
 
@@ -608,17 +617,25 @@ export default function QuestionSourceSetup({
 
           {isHesbah && bankMode === 'auto' && (
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.55 }}>
-              سيتم تجهيز <strong style={{ color: 'var(--text)' }}>{count} سؤالاً</strong> حسب اختيارك في شاشة
-              الإعداد.
+              سيتم تجهيز <strong style={{ color: 'var(--text)' }}>{count} سؤالاً فريداً</strong> — حسب العدد
+              الذي اخترته في الخطوة الأولى (لا يمكن تغييره من هنا).
             </div>
           )}
 
-          {isHesbah && bankMode === 'auto' && hesbahBankStats && hesbahBankStats.usedCount > 0 && (
+          {isHesbah && bankMode === 'auto' && hesbahBankStats && (
             <div className="card2" style={{ marginTop: 10, padding: 10, fontSize: 11 }}>
-              <div style={{ fontWeight: 800, color: accent, marginBottom: 6 }}>📊 سجل أسئلتك</div>
+              <div style={{ fontWeight: 800, color: accent, marginBottom: 6 }}>📊 بنك الأسئلة — اختر روح المسابقة</div>
               <div style={{ color: 'var(--muted)', lineHeight: 1.6, marginBottom: 8 }}>
-                ظهرت سابقاً: {hesbahBankStats.usedCount} · جديدة متاحة: {hesbahBankStats.freshCount} ·
-                الإجمالي في البنك: {hesbahBankStats.totalMatching}
+                {hesbahBankStats.usedCount > 0 ? (
+                  <>
+                    ظهرت سابقاً: {hesbahBankStats.usedCount} · جديدة متاحة: {hesbahBankStats.freshCount} ·
+                    الإجمالي في البنك: {hesbahBankStats.totalMatching}
+                  </>
+                ) : (
+                  <>
+                    🆕 كل الأسئلة ({hesbahBankStats.totalMatching}) جديدة — لم تُستخدم بعد في هذا التصنيف
+                  </>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button

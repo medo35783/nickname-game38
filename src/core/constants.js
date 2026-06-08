@@ -34,3 +34,6 @@ export const SUPPORT_WHATSAPP_URL = 'https://wa.me/966539999010';
 
 /** اسم المنصة المؤقت حتى اعتماد براند نهائي */
 export const PLATFORM_NAME = 'ساحة الألعاب';
+
+/** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
+export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';

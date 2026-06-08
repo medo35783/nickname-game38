@@ -7,12 +7,16 @@ import {
   suggestQuestion,
   getAdminQuestions,
   approveQuestion,
+  rejectQuestion,
   deleteQuestion,
+  QB_SOURCE,
   QB_CATEGORIES,
   QB_DIFFICULTIES,
   QB_TYPES,
   QB_GAME_TYPES,
   QB_AUDIENCES,
+  normalizeGameTypes,
+  assertGameTypesValid,
 } from './qbank.helpers';
 
 const EMPTY_FORM = {
@@ -108,7 +112,10 @@ function questionMatchesFilters(question, filters) {
   if (filters.status && question.status !== filters.status) return false;
   if (filters.audience && (question.audience || 'general') !== filters.audience) return false;
   if (filters.gameType && !Array.isArray(question.gameTypes)) return false;
-  if (filters.gameType && !question.gameTypes.includes(filters.gameType)) return false;
+  if (filters.gameType) {
+    const normalized = normalizeGameTypes(question.gameTypes);
+    if (!normalized.includes(filters.gameType) && filters.gameType !== 'all') return false;
+  }
   return true;
 }
 
@@ -291,7 +298,7 @@ function csvRowToQuestion(row) {
     category: normalizeCsvToken(row.category),
     difficulty_level: normalizeCsvToken(row.difficulty_level),
     type,
-    gameTypes: splitListValue(row.gameTypes),
+    gameTypes: normalizeGameTypes(splitListValue(row.gameTypes)),
     options,
     tags: splitListValue(row.tags),
     audience: normalizeCsvToken(row.audience) || 'general',
@@ -305,8 +312,8 @@ function validateQuestionPayload(payload) {
   if (!QB_CATEGORIES.includes(payload.category)) return 'التصنيف غير صحيح';
   if (!QB_DIFFICULTIES.includes(payload.difficulty_level)) return 'الصعوبة غير صحيحة';
   if (!QB_TYPES.includes(payload.type)) return 'نوع السؤال غير صحيح';
-  if (!payload.gameTypes?.length) return 'الألعاب مفقودة';
-  if (payload.gameTypes.some((gameType) => !QB_GAME_TYPES.includes(gameType))) return 'قيمة اللعبة غير صحيحة';
+  const gameTypesError = assertGameTypesValid(payload.gameTypes);
+  if (gameTypesError) return gameTypesError;
   if (!QB_AUDIENCES.includes(payload.audience || 'general')) return 'الفئة المستهدفة غير صحيحة';
   if (payload.type === 'multiple_choice' && payload.options.length !== 4) return 'اختيار متعدد يحتاج 4 خيارات';
   if (payload.type === 'multiple_choice' && !payload.options.includes(payload.correct_answer)) {
@@ -581,7 +588,7 @@ export default function QBankManager({ notify }) {
       difficulty_level: form.difficulty_level,
       audience: form.audience || 'general',
       type,
-      gameTypes: form.gameTypes,
+      gameTypes: normalizeGameTypes(form.gameTypes),
       options,
       tags: splitTags(form.tagsText),
       status,
@@ -660,7 +667,7 @@ export default function QBankManager({ notify }) {
       difficulty_level: question.difficulty_level || '',
       audience: question.audience || 'general',
       type: question.type || '',
-      gameTypes: Array.isArray(question.gameTypes) ? question.gameTypes : [],
+      gameTypes: normalizeGameTypes(Array.isArray(question.gameTypes) ? question.gameTypes : []),
       options: normalizeOptions(question.options),
       correctOptionIndex: getCorrectOptionIndex(question.options, question.correct_answer),
       tagsText: Array.isArray(question.tags) ? question.tags.join(', ') : '',
@@ -678,7 +685,7 @@ export default function QBankManager({ notify }) {
       difficulty_level: question.difficulty_level || '',
       audience: question.audience || 'general',
       type: question.type || '',
-      gameTypes: Array.isArray(question.gameTypes) ? question.gameTypes : [],
+      gameTypes: normalizeGameTypes(Array.isArray(question.gameTypes) ? question.gameTypes : []),
       options: normalizeOptions(question.options),
       correctOptionIndex: getCorrectOptionIndex(question.options, question.correct_answer),
       tagsText: Array.isArray(question.tags) ? question.tags.join(', ') : '',
@@ -688,7 +695,20 @@ export default function QBankManager({ notify }) {
     setTimeout(() => questionTextRef.current?.focus(), 0);
   }
 
+  function communityNeedsClassification(question) {
+    if (question?.source !== QB_SOURCE.COMMUNITY) return false;
+    const gameTypes = normalizeGameTypes(Array.isArray(question.gameTypes) ? question.gameTypes : []);
+    return !question.category || !question.difficulty_level || !gameTypes.length;
+  }
+
   async function handleApprove(questionId) {
+    const question = pendingQuestions.find((item) => item.id === questionId);
+    if (communityNeedsClassification(question)) {
+      showNotice('حدّد التصنيف والصعوبة واللعبة عبر «تصنيف واعتماد»', 'info');
+      handleEditAndApprove(question);
+      return;
+    }
+
     try {
       await approveQuestion(questionId);
       showNotice('تم اعتماد السؤال', 'success');
@@ -698,13 +718,26 @@ export default function QBankManager({ notify }) {
     }
   }
 
+  async function handleReject(questionId) {
+    const reason = window.prompt('سبب الرفض (يظهر للمساهم):', 'يحتاج مراجعة أو تعديل');
+    if (reason === null) return;
+
+    try {
+      await rejectQuestion(questionId, reason);
+      showNotice('تم رفض المقترح', 'success');
+      await reloadQuestions();
+    } catch (rejectError) {
+      showNotice(rejectError?.message || 'تعذر رفض السؤال', 'error');
+    }
+  }
+
   async function handleDelete(questionId, actionLabel = 'حذف') {
     const ok = window.confirm(`هل تريد ${actionLabel} هذا السؤال؟`);
     if (!ok) return;
 
     try {
       await deleteQuestion(questionId);
-      showNotice(actionLabel === 'رفض' ? 'تم رفض المقترح' : 'تم حذف السؤال', 'success');
+      showNotice('تم حذف السؤال', 'success');
       await reloadQuestions();
     } catch (deleteError) {
       showNotice(deleteError?.message || 'تعذر حذف السؤال', 'error');
@@ -716,7 +749,7 @@ export default function QBankManager({ notify }) {
       ...question,
       status: 'approved',
     });
-    showNotice('عدّل السؤال ثم اضغط حفظ التعديل لاعتماده', 'info');
+    showNotice('صنّف السؤال (تصنيف، صعوبة، فئة، لعبة) ثم احفظ لاعتماده', 'info');
   }
 
   async function handleCsvFileChange(event) {
@@ -1369,36 +1402,74 @@ export default function QBankManager({ notify }) {
         </div>
         {loading && <div style={styles.emptyState}>جاري تحميل المقترحات...</div>}
         {!loading && pendingQuestions.length === 0 && <div style={styles.emptyState}>لا توجد مقترحات معلقة</div>}
-        {!loading && pendingQuestions.map((question) => (
+        {!loading && pendingQuestions.map((question) => {
+          const awaitingClass = communityNeedsClassification(question);
+          return (
           <div key={question.id} className="card2" style={{ borderColor: 'rgba(240,192,64,.26)' }}>
             <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.7, color: 'var(--text)' }}>
               {question.question_text || '—'}
             </div>
+            {question.correct_answer ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                الإجابة: <span style={{ color: 'var(--text-soft)' }}>{question.correct_answer}</span>
+              </div>
+            ) : null}
+            {question.type === 'multiple_choice' && Array.isArray(question.options) && question.options.length > 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.6 }}>
+                الخيارات: {question.options.join(' · ')}
+              </div>
+            ) : null}
+            {question.type === 'written_text' && question.supervisor_notes ? (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.6 }}>
+                ملاحظات المشرف: <span style={{ color: 'var(--text-soft)' }}>{question.supervisor_notes}</span>
+              </div>
+            ) : null}
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
-              <span style={badgeStyle(COLORS.blue)}>{CATEGORY_LABELS[question.category] || question.category || '—'}</span>
-              <span style={badgeStyle(getDifficultyColor(question.difficulty_level))}>
-                {DIFFICULTY_LABELS[question.difficulty_level] || question.difficulty_level || '—'}
+              <span style={badgeStyle(COLORS.gold)}>{TYPE_LABELS[question.type] || question.type || '—'}</span>
+              {awaitingClass ? (
+                <span style={badgeStyle(COLORS.gold)}>بانتظار التصنيف</span>
+              ) : (
+                <>
+                  <span style={badgeStyle(COLORS.blue)}>{CATEGORY_LABELS[question.category] || question.category}</span>
+                  <span style={badgeStyle(getDifficultyColor(question.difficulty_level))}>
+                    {DIFFICULTY_LABELS[question.difficulty_level] || question.difficulty_level}
+                  </span>
+                  <span style={badgeStyle(COLORS.purple)}>
+                    {AUDIENCE_LABELS[question.audience || 'general'] || 'عام'}
+                  </span>
+                </>
+              )}
+              <span style={badgeStyle(COLORS.muted)}>
+                {question.source === QB_SOURCE.COMMUNITY ? '👥 مجتمع' : '🛠️ أدمن'}
               </span>
               <span style={badgeStyle(COLORS.purple)}>
-                {AUDIENCE_LABELS[question.audience || 'general'] || 'عام'}
-              </span>
-              <span style={badgeStyle(COLORS.muted)}>
-                بواسطة: {question.created_by || 'system'}
+                {question.contributor_name || question.created_by || 'system'}
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+            {question.rejection_reason ? (
+              <div style={{ marginTop: 8, fontSize: 11, color: COLORS.red }}>
+                سبب الرفض: {question.rejection_reason}
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
               <button type="button" className="btn bsm bb" onClick={() => handleEditAndApprove(question)}>
-                تعديل واعتماد
+                {awaitingClass ? 'تصنيف واعتماد' : 'تعديل واعتماد'}
               </button>
+              {!awaitingClass ? (
               <button type="button" className="btn bsm bv" onClick={() => handleApprove(question.id)}>
                 موافقة
               </button>
-              <button type="button" className="btn bsm br" onClick={() => handleDelete(question.id, 'رفض')}>
+              ) : null}
+              <button type="button" className="btn bsm br" onClick={() => handleReject(question.id)}>
                 رفض
+              </button>
+              <button type="button" className="btn bsm bgh" onClick={() => handleDelete(question.id)}>
+                حذف
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     );
   }

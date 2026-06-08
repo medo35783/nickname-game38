@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import {
   SUBSCRIPTION_PACKAGES,
   SUBSCRIPTION_FEATURES,
+  getEffectivePrice,
+  hasActivePromo,
+  promoDiscountPercent,
   savingsPercent
 } from '../../core/subscriptionPackages';
 import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
@@ -19,6 +22,7 @@ import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
  * @param {(pkg: SubscriptionPackage) => void} props.onSubscribe
  * @param {() => void} props.onTryFree
  * @param {() => void} [props.onNewGame] — إن لم يُمرَّر، يُستدعى `onClose` عند «لعبة جديدة»
+ * @param {() => void} [props.onContribute] — فتح بنك الأسئلة
  */
 
 const SUB_FEATURES = SUBSCRIPTION_FEATURES;
@@ -41,7 +45,8 @@ export default function EndGameJoinPrompt({
   onClose,
   onSubscribe,
   onTryFree,
-  onNewGame
+  onNewGame,
+  onContribute,
 }) {
   const handleNewGame = onNewGame ?? onClose;
 
@@ -166,7 +171,10 @@ export default function EndGameJoinPrompt({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
           {PACKAGES.map((pkg) => {
-            const save = savingsPercent(pkg.days, pkg.price);
+            const promo = hasActivePromo(pkg);
+            const effective = getEffectivePrice(pkg);
+            const save = savingsPercent(pkg.days, effective);
+            const promoPct = promoDiscountPercent(pkg);
             return (
               <div
                 key={pkg.id}
@@ -183,10 +191,19 @@ export default function EndGameJoinPrompt({
                   <div className="plan-name" style={{ marginTop: 6 }}>
                     {pkg.durationLabel}
                   </div>
-                  <div style={{ fontFamily: "'Cairo', sans-serif", fontSize: 28, fontWeight: 900, color: 'var(--gold)', marginTop: 4 }}>
-                    {pkg.price}{' '}
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted)' }}>ريال</span>
+                  <div className="pkg-price-row" style={{ marginTop: 4 }}>
+                    {promo && (
+                      <>
+                        <span className="pkg-price-original">{pkg.price}</span>
+                        {promoPct != null && (
+                          <span className="pkg-promo-badge">-{promoPct}%</span>
+                        )}
+                      </>
+                    )}
+                    <span className="pkg-price-num" style={{ fontSize: 28 }}>{effective}</span>
+                    <span className="pkg-price-currency">ريال</span>
                   </div>
+                  {promo && <div className="pkg-promo-note">عرض مؤقت</div>}
                   {save != null && save > 0 ? (
                     <div className="tag tv" style={{ marginTop: 8 }}>
                       وفر {save}% مقارنة باليومي
@@ -234,6 +251,17 @@ export default function EndGameJoinPrompt({
             لا نخزّن بيانات بطاقتك على خوادمنا. المعاملة تتم عبر بوابة دفع معتمدة — تفعيل فوري بعد الإتمام.
           </div>
         </div>
+
+        {onContribute ? (
+          <button
+            type="button"
+            className="btn bgh"
+            style={{ width: '100%', marginBottom: 12, fontSize: 12 }}
+            onClick={onContribute}
+          >
+            📋 اقترح سؤالاً لبنك الأسئلة
+          </button>
+        ) : null}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button type="button" className="btn bg" style={{ width: '100%' }} onClick={onTryFree}>

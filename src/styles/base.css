@@ -411,7 +411,10 @@ textarea.inp{resize:vertical;min-height:80px}
 .pkg-plan-head{text-align:center;margin-bottom:8px}
 .pkg-plan-icon{font-size:40px;line-height:1;display:block}
 .pkg-days-pill{display:inline-block;margin-top:6px;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:800;color:var(--muted);background:var(--surface);border:1px solid var(--border-subtle)}
-.pkg-price-row{margin-top:8px;display:flex;align-items:baseline;justify-content:center;gap:4px}
+.pkg-price-row{margin-top:8px;display:flex;align-items:baseline;justify-content:center;gap:6px;flex-wrap:wrap}
+.pkg-price-original{font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;color:var(--muted);text-decoration:line-through;opacity:.75}
+.pkg-promo-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;color:#fff;background:var(--red);line-height:1.4}
+.pkg-promo-note{font-size:10px;font-weight:700;color:var(--red);margin-top:4px}
 .pkg-price-num{font-family:'Cairo',sans-serif;font-size:32px;font-weight:900;color:var(--gold)}
 .pkg-price-currency{font-size:14px;font-weight:700;color:var(--muted)}
 .pkg-per-day{font-size:11px;color:var(--muted);margin-top:4px}

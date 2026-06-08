@@ -9,6 +9,8 @@ import { auth, db } from '../../firebase';
 import { formatCodeForDisplay } from '../../firebaseHelpers';
 import PlayerAuthScreen from '../auth/PlayerAuthScreen';
 import ThemeToggle from '../layout/ThemeToggle';
+import MyContributions from '../../question-bank/MyContributions';
+import '../../styles/knowledge-chest.css';
 
 function formatTs(ts) {
   if (!ts) return '—';
@@ -43,6 +45,7 @@ export default function AccountPage({
   isAdmin,
   onActivateCode,
   onGoPricing,
+  onOpenContribute,
   theme = 'dark',
   followSystem = true,
   onSetTheme,
@@ -133,6 +136,16 @@ export default function AccountPage({
           {isGuest ? 'ضيف — يمكنك اللعب وتفعيل الكود بدون بريد' : user.email}
         </p>
       )}
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="ctitle">📋 بنك الأسئلة</div>
+        <p className="psub" style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
+          مقترحاتك المرسلة وحالتها
+        </p>
+        <div style={{ marginTop: 12 }}>
+          <MyContributions compact onContribute={onOpenContribute} />
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="ctitle">🌓 المظهر</div>

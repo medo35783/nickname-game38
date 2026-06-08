@@ -1,10 +1,24 @@
-﻿import Av from '../../shared/Av';
+﻿import { useState } from 'react';
+import Av from '../../shared/Av';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import { HesbahPanelTitle, HESBAH_HOST_PARTICIPATE_HELP } from './HesbahHelpTip';
 import { HESBAH_ACCENT_CSS, HESBAH_BORDER_CSS, isActiveHesbahPlayer } from './HesbahHelpers';
 import HesbahRoomMeta from './HesbahRoomMeta';
 import HesbahTimerPicker from './HesbahTimerPicker';
 import HesbahTopNav from './HesbahTopNav';
+
+const START_MODE_COPY = {
+  participate: {
+    icon: '✅',
+    label: 'أشارك بإجابات',
+    hint: 'ترى الأسماء والمؤشرات — وبعد إرسالك تظهر إجابات الجميع (عرضية بلا نقاط).',
+  },
+  admin: {
+    icon: '🎛️',
+    label: 'إدارة فقط',
+    hint: 'ترى الأسماء والإجابات فوراً — بدون إرسال إجابة.',
+  },
+};
 
 export default function HesbahLobby({
   roomCode,
@@ -21,11 +35,19 @@ export default function HesbahLobby({
   onShare,
   onExitRequest,
 }) {
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const list = Object.entries(players || {})
     .filter(([, p]) => isActiveHesbahPlayer(p))
     .map(([id, p]) => ({ ...p, id }));
   const isAdmin = role === 'admin';
   const defaultSecs = questionSecs ?? 20;
+  const startMode = hostParticipates ? 'participate' : 'admin';
+  const startCopy = START_MODE_COPY[startMode];
+
+  const confirmStart = () => {
+    setStartConfirmOpen(false);
+    onStart();
+  };
 
   return (
     <div className="scr hesbah-theme">
@@ -140,13 +162,59 @@ export default function HesbahLobby({
       )}
 
       {isAdmin && (
-        <button type="button" className="btn bg" disabled={list.length < 2} onClick={onStart}>
+        <button type="button" className="btn bg" disabled={list.length < 2} onClick={() => setStartConfirmOpen(true)}>
           ▶️ بدء اللعبة
         </button>
       )}
       {isAdmin && list.length < 2 && (
         <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
           يفضّل انضمام لاعبين اثنين على الأقل
+        </div>
+      )}
+
+      {startConfirmOpen && (
+        <div className="hesbah-modal-overlay" role="presentation" onClick={() => setStartConfirmOpen(false)}>
+          <div
+            className="hesbah-modal hesbah-modal--start"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hesbah-start-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="hesbah-modal__icon">🚀</div>
+            <h2 id="hesbah-start-title" className="hesbah-modal__title">
+              بدء المسابقة؟
+            </h2>
+            <p className="hesbah-modal__msg">تأكّد من وضعك قبل الانطلاق:</p>
+            <div className="hesbah-lobby-toggle hesbah-modal__toggle">
+              <button
+                type="button"
+                className={`hesbah-lobby-toggle__btn ${hostParticipates ? 'is-on' : ''}`}
+                onClick={() => onHostParticipatesChange(true)}
+              >
+                ✅ أشارك
+              </button>
+              <button
+                type="button"
+                className={`hesbah-lobby-toggle__btn ${!hostParticipates ? 'is-on' : ''}`}
+                onClick={() => onHostParticipatesChange(false)}
+              >
+                🎛️ إدارة
+              </button>
+            </div>
+            <div className="hesbah-start-mode-pill">
+              {startCopy.icon} {startCopy.label}
+            </div>
+            <p className="hesbah-start-mode-hint">{startCopy.hint}</p>
+            <div className="hesbah-modal__actions">
+              <button type="button" className="btn bgh" onClick={() => setStartConfirmOpen(false)}>
+                ليس بعد
+              </button>
+              <button type="button" className="btn bg" onClick={confirmStart}>
+                ▶ ابدأ الآن
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

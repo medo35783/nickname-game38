@@ -1360,35 +1360,18 @@
   z-index: 3;
 }
 
-/* شريط علوي ثابت — رجوع + HUD + تبويبات (يتماشى مع تدرج حَسْبة، لا لون المنصة) */
+/* شريط علوي — شفاف (الزر زجاجي عبر game-ui.css) */
 .hesbah-sticky-chrome {
   position: sticky;
   top: 0;
   z-index: 40;
-  margin-bottom: 10px;
-  padding-bottom: 2px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 248, 240, 0.94) 0%,
-    rgba(255, 248, 240, 0.72) 68%,
-    transparent 100%
-  );
-  backdrop-filter: blur(8px);
-}
-
-[data-theme='dark'] .hesbah-theme .hesbah-sticky-chrome {
-  background: linear-gradient(
-    180deg,
-    rgba(3, 8, 16, 0.94) 0%,
-    rgba(3, 8, 16, 0.72) 68%,
-    transparent 100%
-  );
-}
-
-/* شاشات الإعداد/الانضمام — بدون شريط أبيض، الزر فوق التدرج مباشرة */
-.hesbah-setup-screen .hesbah-sticky-chrome {
+  margin: 0 0 10px;
+  padding: 8px 0 6px;
   background: transparent;
   backdrop-filter: none;
+}
+
+.hesbah-setup-screen .hesbah-sticky-chrome {
   margin-bottom: 14px;
   padding-bottom: 0;
 }
@@ -2091,6 +2074,104 @@
   border-radius: 6px;
   background: linear-gradient(90deg, var(--hesbah-secondary), var(--hesbah-accent));
   transition: width 0.35s ease;
+}
+
+.hesbah-participant-roster__host-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hesbah-accent);
+  text-align: center;
+}
+
+.hesbah-participant-roster__waiting {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hesbah-muted);
+  text-align: center;
+}
+
+.hesbah-participant-roster__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hesbah-participant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hesbah-card-bg);
+  border: 1px solid var(--hesbah-border);
+  transition: border-color 0.2s, opacity 0.2s;
+}
+
+.hesbah-participant-row.is-sent {
+  border-color: color-mix(in srgb, var(--hesbah-accent) 45%, var(--hesbah-border));
+}
+
+.hesbah-participant-row.is-pending {
+  opacity: 0.82;
+}
+
+.hesbah-participant-row__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hesbah-participant-row__badge {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.hesbah-participant-row__badge.is-sent {
+  background: color-mix(in srgb, var(--hesbah-accent) 18%, transparent);
+  color: var(--hesbah-accent);
+}
+
+.hesbah-participant-row__badge.is-pending {
+  background: var(--hesbah-score-bg);
+  color: var(--hesbah-muted);
+}
+
+.hesbah-modal--start .hesbah-modal__toggle {
+  margin-bottom: 12px;
+}
+
+.hesbah-start-mode-pill {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--hesbah-score-bg);
+  border: 1px solid var(--hesbah-accent);
+  color: var(--hesbah-accent);
+  margin-bottom: 8px;
+}
+
+.hesbah-start-mode-hint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--hesbah-muted);
+  margin: 0 0 16px;
+  text-align: center;
 }
 
 .hesbah-admin-question__cat {

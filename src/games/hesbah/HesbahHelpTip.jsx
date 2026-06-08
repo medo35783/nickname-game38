@@ -67,19 +67,19 @@ export const HESBAH_TOOLS_HELP = (
 export const HESBAH_HOST_PARTICIPATE_HELP = (
   <ul className="hesbah-i__list">
     <li>
-      <strong>إدارة فقط:</strong> ترى كل الإجابات فوراً.
+      <strong>إدارة فقط:</strong> ترى الأسماء والإجابات فوراً.
     </li>
     <li>
-      <strong>أشارك:</strong> عداد ثم بطاقات مثل اللاعبين.
+      <strong>أشارك:</strong> ترى الأسماء والمؤشرات — وبعد إرسالك تظهر الإجابات.
     </li>
     <li>عرضية — بلا نقاط.</li>
   </ul>
 );
 
-export const HESBAH_LIVE_OPS_HELP = 'إرسال اللاعبين يظهر هنا فوراً — هم يرون بعضهم بعد إرسالهم.';
+export const HESBAH_LIVE_OPS_HELP = 'نصوص الإجابات تظهر هنا فور إرسالها — قائمة الأسماء أعلاه تُحدَّث مباشرة.';
 
-export const HESBAH_LIVE_HOST_HELP = 'بعد إرسال إجابتك تُفعَّل البطاقات الحية.';
+export const HESBAH_LIVE_HOST_HELP = 'بعد إرسال إجابتك تُفعَّل بطاقات الإجابات هنا.';
 
 export const HESBAH_HOST_ANSWER_HELP = 'للعرض والمقارنة — لا تُحسب نقاطاً.';
 
-export const HESBAH_SUBMIT_COUNTER_HELP = 'أرسل إجابتك أولاً لتفعيل البطاقات.';
+export const HESBAH_ROSTER_HELP = '✓ أرسل · ⏳ لم يرسل بعد. في وضع «أشارك» تبقى النصوص مخفية حتى ترسل إجابتك.';

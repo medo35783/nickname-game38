@@ -37,6 +37,12 @@ import { buildRoundAlert } from './roundAlertHelpers';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import TitlesGuideModal from './TitlesGuideModal';
 import StatsRemainingPanel from './stats/StatsRemainingPanel';
+import GameExitSheet from '../../shared/GameExitSheet';
+import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
+import GameCancelledScreen from '../../shared/GameCancelledScreen';
+import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
+import { formatOtherSessionsHint, getOtherActiveSessions, getSavedRoomForGame } from '../../shared/gameSessionRegistry';
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
   { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
@@ -45,6 +51,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [gameScreen, setGameScreen] = useState('home');
   /** يمنع عرض أزرار «الرئيسية» قبل انتهاء التحقق من جلسة localStorage + Firebase */
   const [sessionGate, setSessionGate] = useState('checking');
+  const [exitSheetOpen, setExitSheetOpen] = useState(false);
+  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
   const pendingOnboardingRef = useRef(null);
@@ -269,13 +277,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (roomCode) recordRoundCompleted('titles', roomCode).catch(() => {});
   };
 
-  /** مسح جلسة الألقاب من الجهاز والعودة للشاشة الرئيسية (مفيد بعد auto-rejoin أو جلسة قديمة) */
-  const clearTitlesSessionAndGoHome = () => {
-    if (role === 'admin' && roomCode) {
-      recordSessionEnd('titles', roomCode, false).catch(() => {});
-    }
-    localStorage.removeItem('ng_session');
-    localStorage.removeItem('ng_admin_session');
+  const resetTitlesRoomState = () => {
     setModal(null);
     setShowOnboarding(null);
     setRole(null);
@@ -293,6 +295,120 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     setJoinErr('');
     setJoinLoading(false);
     setGameScreen('home');
+  };
+
+  const openExitSheet = () => setExitSheetOpen(true);
+
+  const handleExitLeave = () => {
+    setExitSheetOpen(false);
+    if (phase === 'ended') {
+      withdrawToArena();
+      return;
+    }
+    if (role === 'admin') {
+      setAdminLeaveConfirmOpen(true);
+      return;
+    }
+    withdrawToArena();
+  };
+
+  /** انسحاب مؤقت — يحفظ الغرفة للعودة التلقائية */
+  const withdrawToTitlesHome = () => {
+    setExitSheetOpen(false);
+    if (role === 'admin' && roomCode) {
+      recordSessionEnd('titles', roomCode, false).catch(() => {});
+      localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode }));
+      localStorage.removeItem('ng_session');
+    } else if (role === 'player' && roomCode) {
+      localStorage.setItem(
+        'ng_session',
+        JSON.stringify({
+          roomCode,
+          playerId: myId,
+          myId,
+          nick: myNickLocal,
+          myNick: myNickLocal,
+        })
+      );
+      localStorage.removeItem('ng_admin_session');
+    } else {
+      localStorage.removeItem('ng_session');
+      localStorage.removeItem('ng_admin_session');
+    }
+    resetTitlesRoomState();
+    notify('يمكنك العودة للغرفة من شاشة اللعبة', 'info');
+  };
+
+  const withdrawToArena = () => {
+    setExitSheetOpen(false);
+    if (role === 'admin' && roomCode) {
+      recordSessionEnd('titles', roomCode, false).catch(() => {});
+    }
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    resetTitlesRoomState();
+    setSelectedGame(null);
+    notify('عدت لساحة الألعاب', 'info');
+  };
+
+  /** مسح جلسة الألقاب بالكامل */
+  const clearTitlesSessionAndGoHome = () => {
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    resetTitlesRoomState();
+  };
+
+  const reconnectToSavedRoom = async () => {
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const saved = getSavedRoomForGame('titles');
+      if (!saved?.roomCode) {
+        notify('لا توجد غرفة محفوظة', 'info');
+        return;
+      }
+      const snap = await get(roomRef(saved.roomCode));
+      if (!snap.exists()) {
+        localStorage.removeItem('ng_session');
+        localStorage.removeItem('ng_admin_session');
+        notify('الغرفة لم تعد موجودة', 'error');
+        return;
+      }
+      const roomData = snap.val();
+      if (roomData?.game?.phase === 'ended') {
+        localStorage.removeItem('ng_session');
+        localStorage.removeItem('ng_admin_session');
+        notify('انتهت هذه المسابقة', 'info');
+        return;
+      }
+      const uid = auth.currentUser?.uid;
+      if (saved.role === 'admin' || (uid && roomData?.adminId === uid)) {
+        localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: saved.roomCode }));
+        localStorage.removeItem('ng_session');
+        setRoomCode(saved.roomCode);
+        setRole('admin');
+        setMyId(null);
+        applyTitlesAdminScreens(roomData?.game?.phase || 'lobby');
+        notify('✅ عدت للغرفة كمشرف', 'gold');
+        return;
+      }
+      const pRaw = localStorage.getItem('ng_session');
+      if (pRaw) {
+        const ps = JSON.parse(pRaw);
+        if (ps?.roomCode === saved.roomCode) {
+          setRoomCode(saved.roomCode);
+          setRole('player');
+          setMyId(ps.playerId || ps.myId || null);
+          setMyNickLocal(ps.nick || ps.myNick || '');
+          setGameScreen('lobby');
+          notify('✅ عدت للغرفة!', 'success');
+        }
+      }
+    } catch {
+      notify('تعذّر العودة للغرفة', 'error');
+    } finally {
+      setSessionGate('ready');
+    }
   };
 
   /* ══ ADMIN: CREATE ROOM ══ */
@@ -1017,16 +1133,34 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     await update(gameRef(roomCode),{deadline:(deadline||Date.now())+ms});
     notify(`⏱️ تمديد ${fmtMs(ms)}`,'gold');
   };
+  const cancelCompetition = async () => {
+    if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
+    await update(gameRef(roomCode), {
+      phase: 'ended',
+      endedBeforeStart: true,
+      endedAt: Date.now(),
+    });
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+  };
+
   const endGame = async () => {
+    if (!hasTitlesCompetitionStarted(gameState, allRoundsData)) {
+      await cancelCompetition();
+      return;
+    }
     if (gameState?.phase === 'attacking' || gameState?.phase === 'revealing') {
       await recordRoundCompleted('titles', roomCode).catch(() => {});
     }
     if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
-    await update(gameRef(roomCode),{phase:'ended'});
+    await update(gameRef(roomCode), { phase: 'ended', endedAt: Date.now() });
     // Clear ALL sessions so no one auto-rejoins a finished game
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
   };
+
+  const titlesCompetitionStarted = hasTitlesCompetitionStarted(gameState, allRoundsData);
   const elimCheat = async (pid) => {
     const p = playersList.find(pl=>pl.id===pid);
     await update(ref(db,`rooms/${roomCode}/players/${pid}`),{status:'cheater',eliminatedRound:roundNum,eliminatedBy:'المشرف'});
@@ -1519,12 +1653,19 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       return;
     }
     if (phase === 'ended') {
-      setGameScreen('summary');
+      setGameScreen(isGameCancelled(gameState) ? 'cancelled' : 'summary');
       setStatsTab('overview');
-      setTimeout(() => playSound('applause'), 500);
-      setTimeout(() => playSound('applause'), 1400);
+      if (!isGameCancelled(gameState)) {
+        setTimeout(() => playSound('applause'), 500);
+        setTimeout(() => playSound('applause'), 1400);
+      }
 
-      if (role === 'player' && onGameEnd && !titlesEndGamePromptSentRef.current) {
+      if (
+        role === 'player' &&
+        onGameEnd &&
+        !titlesEndGamePromptSentRef.current &&
+        !isGameCancelled(gameState)
+      ) {
         titlesEndGamePromptSentRef.current = true;
         const winnerName = activePlayers.map((p) => p.name).join(' ، ') || '—';
         const myPlayer = myId ? playersList.find((p) => p.id === myId) : null;
@@ -1603,7 +1744,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           return true;
         }
         if (roomCode) {
-          setModal({ type: 'exit_game' });
+          setExitSheetOpen(true);
           return true;
         }
         if (gameScreen === 'join') {
@@ -1655,36 +1796,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     {/* ══ TUTORIAL MODAL ══ */}
     {modal?.type === 'guide' && <TitlesGuideModal onClose={() => setModal(null)} />}
 
-    {modal?.type==='exit_game'&&(
-      <div className="mbg"><div className="modal">
-        <div className="micn">🚪</div>
-        <div className="mtitle">ماذا تريد؟</div>
-        <div className="msub">
-          يمكنك متابعة الغرفة الحالية، أو الانسحاب منها والبدء من جديد من شاشة إنشاء غرفة / انضمام (دون الخروج من لعبة الألقاب).
-          {role==='player'&&<>
-            <br/><br/>
-            للعودة لاحقاً لنفس الغرفة احفظ:<br/>
-            <span style={{color:'var(--gold)',fontWeight:700}}>رمز الغرفة + اسمك + لقبك</span>
-          </>}
-          {role==='admin'&&<>
-            <br/><br/>
-            المتسابقون يبقون في الغرفة حتى تعود أو تُنهي المسابقة.
-          </>}
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          <button className="btn bg" onClick={()=>setModal(null)}>
-            ← أكمل اللعبة الحالية
-          </button>
-          <button className="btn br" onClick={()=>{
-            setModal(null);
-            clearTitlesSessionAndGoHome();
-            notify('تم الانسحاب — يمكنك البدء بلعبة جديدة من هنا','info');
-          }}>
-            🚪 انسحاب وبدء لعبة جديدة
-          </button>
-        </div>
-      </div></div>
-    )}
 
     {modal?.type==='confirm_end'&&<div className="mbg"><div className="modal">
       <div className="micn">⚠️</div>
@@ -2259,27 +2370,23 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
 
     if (sessionGate === 'checking') {
-      return (
-        <div className="scr" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, padding: 24 }}>
-          <div style={{ fontSize: 44, marginBottom: 14 }}>🎭</div>
-          <div style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            جاري التحقق من جلستك…
-          </div>
-        </div>
-      );
+      return <GameSessionChecking emoji="🎭" />;
     }
 
     if (gameScreen === 'home') {
       return (
         <div className="scr">
-          <button
-            type="button"
-            className="btn bgh bsm"
-            style={{ width: 'auto', marginBottom: 12 }}
-            onClick={() => setSelectedGame(null)}
-          >
-            ← ساحة الألعاب
-          </button>
+          <GameTopNav onBack={() => setSelectedGame(null)} variant="arena" />
+          {getOtherActiveSessions('titles').length > 0 && (
+            <div className="game-multi-session-hint">
+              لديك جلسة نشطة في: {formatOtherSessionsHint(getOtherActiveSessions('titles'))}
+            </div>
+          )}
+          {getSavedRoomForGame('titles') && !roomCode && (
+            <button type="button" className="btn bo" style={{ marginBottom: 8 }} onClick={() => void reconnectToSavedRoom()}>
+              🔙 العودة للغرفة ({getSavedRoomForGame('titles').roomCode})
+            </button>
+          )}
           <div style={{ textAlign: 'center', padding: '10px 0 12px' }}>
             <div style={{ fontSize: 46, marginBottom: 6 }}>🎭</div>
             <div className="ptitle" style={{ fontSize: 22 }}>
@@ -2379,14 +2486,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (gameScreen === 'host' && role === 'admin') {
       return (
         <div className="scr">
-          <button
-            type="button"
-            className="btn bgh bsm"
-            style={{ width: 'auto', marginBottom: 8 }}
-            onClick={() => setModal({ type: 'exit_game' })}
-          >
-            ← رجوع
-          </button>
+          <GameTopNav onBack={openExitSheet} sticky />
           <TitlesHostCockpit
             roomCode={roomCode}
             phase={phase}
@@ -2432,14 +2532,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (gameScreen === 'lobby') {
       return (
         <div className="scr">
-          <button
-            type="button"
-            className="btn bgh bsm"
-            style={{ width: 'auto', marginBottom: 12 }}
-            onClick={() => setModal({ type: 'exit_game' })}
-          >
-            ← رجوع
-          </button>
+          <GameTopNav onBack={openExitSheet} sticky />
           <TitlesLobby
             roomCode={roomCode}
             role={role}
@@ -2504,6 +2597,24 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       return <TitlesResults {...sharedProps} />;
     }
 
+    if (gameScreen === 'cancelled') {
+      return (
+        <div className="scr">
+          <GameTopNav onBack={openExitSheet} sticky />
+          <GameCancelledScreen
+            gameLabel="مسابقة الألقاب"
+            roomCode={roomCode}
+            onHome={() => {
+              localStorage.removeItem('ng_session');
+              localStorage.removeItem('ng_admin_session');
+              resetTitlesRoomState();
+              setSelectedGame(null);
+            }}
+          />
+        </div>
+      );
+    }
+
     if (gameScreen === 'summary') {
       return (
         <TitlesGameSummary
@@ -2530,6 +2641,30 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   return (
     <>
+      <GameExitSheet
+        open={exitSheetOpen}
+        game="titles"
+        role={role === 'admin' ? 'admin' : 'player'}
+        roomCode={roomCode}
+        phase={phase}
+        onContinue={() => setExitSheetOpen(false)}
+        onLeave={handleExitLeave}
+        onClose={() => setExitSheetOpen(false)}
+      />
+      <GameAdminLeaveConfirm
+        open={adminLeaveConfirmOpen}
+        competitionStarted={titlesCompetitionStarted}
+        onPauseOnly={() => {
+          setAdminLeaveConfirmOpen(false);
+          withdrawToTitlesHome();
+        }}
+        onEndGame={() => {
+          setAdminLeaveConfirmOpen(false);
+          if (titlesCompetitionStarted) setModal({ type: 'confirm_end' });
+          else void cancelCompetition();
+        }}
+        onCancel={() => setAdminLeaveConfirmOpen(false)}
+      />
       {renderOverlays()}
       {mainEl}
     </>

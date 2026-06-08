@@ -19,9 +19,9 @@ import {
 } from './HesbahHelpers';
 import HesbahQuestionPanel from './HesbahQuestionPanel';
 import HesbahTimerPicker from './HesbahTimerPicker';
-import { HesbahPanelTitle, HESBAH_HOST_ANSWER_HELP, HESBAH_LIVE_HOST_HELP, HESBAH_LIVE_OPS_HELP, HESBAH_SUBMIT_COUNTER_HELP } from './HesbahHelpTip';
+import { HesbahPanelTitle, HESBAH_HOST_ANSWER_HELP, HESBAH_LIVE_HOST_HELP, HESBAH_LIVE_OPS_HELP, HESBAH_ROSTER_HELP } from './HesbahHelpTip';
 import HesbahLiveAnswersPanel, {
-  HesbahAdminSubmitCounter,
+  HesbahParticipantRoster,
   useHesbahLiveAnswers,
 } from './HesbahLiveAnswers';
 import HesbahConfirmModal from './HesbahConfirmModal';
@@ -121,7 +121,7 @@ export default function HesbahAdminLive({
     setDuplicateMarked((prev) => ({ ...prev, [answerKey]: marked }));
   };
 
-  const { liveCards, totalContestants, submittedCount, hostSent } = useHesbahLiveAnswers(
+  const { liveCards, roster, hostSent } = useHesbahLiveAnswers(
     answers,
     players,
     hostAnswer,
@@ -311,6 +311,14 @@ export default function HesbahAdminLive({
             </section>
           )}
 
+          {phase === 'question' && (
+            <HesbahParticipantRoster
+              roster={roster}
+              help={HESBAH_ROSTER_HELP}
+              hostPending={hostParticipates && !hostSent}
+            />
+          )}
+
           {phase === 'question' && !hostParticipates && (
             <HesbahLiveAnswersPanel
               highlight
@@ -322,14 +330,6 @@ export default function HesbahAdminLive({
                   ? 'بانتظار أول إجابة…'
                   : 'بعد بدء المؤقت تظهر الإجابات هنا مباشرة'
               }
-            />
-          )}
-
-          {phase === 'question' && hostParticipates && !hostSent && (
-            <HesbahAdminSubmitCounter
-              submitted={submittedCount}
-              total={totalContestants}
-              help={HESBAH_SUBMIT_COUNTER_HELP}
             />
           )}
 

@@ -1,5 +1,8 @@
 /** مرجع السعر اليومي لحساب نسبة التوفير */
-export const DAY_PRICE_REF = 19;
+export const DAY_PRICE_REF = 15;
+
+/** تفعيل أسعار الخصم المؤقتة — عطّله لإظهار السعر الأساسي فقط */
+export const PACKAGE_PROMO_ACTIVE = true;
 
 /** @typedef {'plan-silver' | 'plan-gold' | 'plan-super'} PlanClass */
 
@@ -9,6 +12,7 @@ export const DAY_PRICE_REF = 19;
  * @property {string} icon
  * @property {string} durationLabel
  * @property {number} price
+ * @property {number | null} [promoPrice]
  * @property {number} days
  * @property {PlanClass} planClass
  * @property {string | null} [badge]
@@ -26,7 +30,8 @@ export const SUBSCRIPTION_PACKAGES = [
     id: '1d',
     icon: '🌟',
     durationLabel: 'يوم واحد',
-    price: 19,
+    price: 15,
+    promoPrice: 9,
     days: 1,
     planClass: 'plan-silver',
     badge: null,
@@ -42,7 +47,8 @@ export const SUBSCRIPTION_PACKAGES = [
     id: '3d',
     icon: '⭐',
     durationLabel: '3 أيام',
-    price: 38,
+    price: 30,
+    promoPrice: 18,
     days: 3,
     planClass: 'plan-gold',
     badge: 'مثالي لعطلة نهاية الأسبوع',
@@ -64,6 +70,7 @@ export const SUBSCRIPTION_PACKAGES = [
     icon: '💎',
     durationLabel: '7 أيام',
     price: 58,
+    promoPrice: 35,
     days: 7,
     planClass: 'plan-super',
     badges: ['الأفضل', 'الأوفر'],
@@ -81,14 +88,33 @@ export const SUBSCRIPTION_PACKAGES = [
   }
 ];
 
-/** للوحة الأدمن — نفس الأسعار */
-export const ADMIN_PACKAGE_OPTIONS = SUBSCRIPTION_PACKAGES.map((p) => ({
-  id: p.id,
-  duration: p.days,
-  price: p.price,
-  labelShort: p.durationLabel,
-  labelPrice: `${p.price}ر`
-}));
+/** @param {SubscriptionPackage} pkg */
+export function hasActivePromo(pkg) {
+  return PACKAGE_PROMO_ACTIVE && pkg.promoPrice != null && pkg.promoPrice < pkg.price;
+}
+
+/** @param {SubscriptionPackage} pkg */
+export function getEffectivePrice(pkg) {
+  return hasActivePromo(pkg) ? pkg.promoPrice : pkg.price;
+}
+
+/** @param {SubscriptionPackage} pkg */
+export function promoDiscountPercent(pkg) {
+  if (!hasActivePromo(pkg)) return null;
+  return Math.round(((pkg.price - pkg.promoPrice) / pkg.price) * 100);
+}
+
+/** للوحة الأدمن — السعر الفعلي (مع الخصم إن كان مفعّلاً) */
+export const ADMIN_PACKAGE_OPTIONS = SUBSCRIPTION_PACKAGES.map((p) => {
+  const effective = getEffectivePrice(p);
+  return {
+    id: p.id,
+    duration: p.days,
+    price: effective,
+    labelShort: p.durationLabel,
+    labelPrice: hasActivePromo(p) ? `${effective}ر (عرض)` : `${effective}ر`
+  };
+});
 
 export const SUBSCRIPTION_FEATURES = [
   '✅ إنشاء غرف غير محدودة',

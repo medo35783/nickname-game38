@@ -2,6 +2,7 @@ import FameeriRevealOverlay from './FameeriRevealOverlay';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
 import FameeriAttackDisplay from './FameeriAttackDisplay';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
+import { isGameCancelled } from '../../shared/gameCompetition';
 
 /**
  * شاشة العرض / البروجكتر (دور «عرض») — قراءة فقط.
@@ -78,6 +79,16 @@ export default function FameeriSpectatorView({
         </div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>
           {groups.length} مجموعة في الغرفة
+        </div>
+      </div>
+    );
+  } else if (phase === 'ended' && isGameCancelled(gameState)) {
+    stage = (
+      <div style={{ padding: '24px 0', textAlign: 'center' }}>
+        <div style={{ fontSize: 56 }}>🚪</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginTop: 12 }}>تم إلغاء المسابقة</div>
+        <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
+          لم تبدأ المسابقة بعد — لا يوجد فائز
         </div>
       </div>
     );

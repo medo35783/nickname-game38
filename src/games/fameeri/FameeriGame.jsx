@@ -37,6 +37,12 @@ import FameeriAdminLobby from './FameeriAdminLobby';
 import FameeriAdminPlay from './FameeriAdminPlay';
 import FameeriPlayerPlay from './FameeriPlayerPlay';
 import FameeriPlayerLeaderNotice from './FameeriPlayerLeaderNotice';
+import GameExitSheet from '../../shared/GameExitSheet';
+import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
+import GameCancelledScreen from '../../shared/GameCancelledScreen';
+import { hasFameeriCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
+import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
 
 /** نوع اللعبة في بنك الأسئلة المركزي (قيمة البنك للقميري). */
 const QB_GAME_TYPE = 'qumayri';
@@ -76,17 +82,19 @@ function findExistingQumairiMember(members, { memberId, uid, name }) {
 }
 
 const FameeriGame = forwardRef(function FameeriGame(
-  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd, onGoAccount },
+  { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd, onGoAccount },
   ref
 ) {
   void setTab;
   const [qSaved] = useState(readSavedFameeri);
+  const [sessionGate, setSessionGate] = useState(() => (readSavedFameeri().qRoom ? 'checking' : 'ready'));
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [showGuide, setShowGuide] = useState(false);
   const pendingOnboardingRef = useRef(null);
   const sessionRestoredRef = useRef(false);
-  const [qExitModal, setQExitModal] = useState(false);
+  const [exitSheetOpen, setExitSheetOpen] = useState(false);
+  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!canCreateRoom || pendingOnboardingRef.current !== 'admin') return;
@@ -340,8 +348,9 @@ const FameeriGame = forwardRef(function FameeriGame(
     ref,
     () => ({
       handleHeaderBack() {
+        if (sessionGate === 'checking') return true;
         if (qRoom) {
-          setQExitModal(true);
+          setExitSheetOpen(true);
           return true;
         }
         if (gameScreen !== 'home') {
@@ -351,8 +360,14 @@ const FameeriGame = forwardRef(function FameeriGame(
         return false;
       },
     }),
-    [qRoom, gameScreen]
+    [qRoom, gameScreen, sessionGate]
   );
+
+  useEffect(() => {
+    const inRoom = !!qRoom;
+    onHeaderMeta?.({ inRoom });
+    return () => onHeaderMeta?.({ inRoom: false });
+  }, [qRoom, onHeaderMeta]);
 
   const qSave = (extra = {}) => {
     localStorage.setItem(
@@ -574,9 +589,12 @@ const FameeriGame = forwardRef(function FameeriGame(
   useEffect(() => {
     if (sessionRestoredRef.current) return;
     const saved = readSavedFameeri();
-    if (!saved.qRoom) return;
+    if (!saved.qRoom) {
+      setSessionGate('ready');
+      return;
+    }
     sessionRestoredRef.current = true;
-    void restoreQumairiSession(saved.qRoom);
+    void restoreQumairiSession(saved.qRoom).finally(() => setSessionGate('ready'));
   }, []);
 
   // الدخول كشاشة عرض (بروجكتر) — قراءة فقط، بلا انضمام كعضو
@@ -620,6 +638,80 @@ const FameeriGame = forwardRef(function FameeriGame(
   const isSpectator = qRole === 'spectator';
   const qMyMember = qMyId ? qMList.find((m) => m.id === qMyId) : null;
   const isLeader = !isAdmin && qMyMember?.role === 'leader';
+
+  const openExitSheet = () => setExitSheetOpen(true);
+
+  const resetFameeriRoomState = () => {
+    setQRoom('');
+    setQRole(null);
+    setQGroupId(null);
+    setQDistribution({});
+    setQMyId(null);
+    setGameScreen('home');
+  };
+
+  const withdrawToFameeriHome = () => {
+    setExitSheetOpen(false);
+    if (isAdmin && qRoom) {
+      recordSessionEnd('fameeri', qRoom, false).catch(() => {});
+      localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom, qRole: 'admin' }));
+    } else if (qRoom) {
+      qSave();
+    }
+    resetFameeriRoomState();
+    notify('يمكنك العودة للغرفة من شاشة اللعبة', 'info');
+  };
+
+  const withdrawToArena = () => {
+    setExitSheetOpen(false);
+    setAdminLeaveConfirmOpen(false);
+    if (isAdmin && qRoom) recordSessionEnd('fameeri', qRoom, false).catch(() => {});
+    clearAdminSessionLocal(qRoom);
+    localStorage.removeItem('ng_qumairi');
+    resetFameeriRoomState();
+    setSelectedGame(null);
+    notify('عدت لساحة الألعاب', 'info');
+  };
+
+  const cancelFameeriCompetition = async () => {
+    if (!qRoom) return;
+    setAdminLeaveConfirmOpen(false);
+    await recordSessionEnd('fameeri', qRoom, true).catch(() => {});
+    await update(dbRef(db, `qrooms/${qRoom}/game`), {
+      phase: 'ended',
+      endedBeforeStart: true,
+      endedAt: Date.now(),
+    });
+    notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+  };
+
+  const endFameeriCompetition = async () => {
+    if (!qRoom) return;
+    setAdminLeaveConfirmOpen(false);
+    if (!hasFameeriCompetitionStarted(qGameState, qAttacks)) {
+      await cancelFameeriCompetition();
+      return;
+    }
+    await recordSessionEnd('fameeri', qRoom, true).catch(() => {});
+    await update(dbRef(db, `qrooms/${qRoom}/game`), { phase: 'ended', endedAt: Date.now() });
+    playSound('applause');
+    notify('🏆 تم إنهاء المسابقة — المتسابقون يرون النتائج', 'gold');
+  };
+
+  const fameeriCompetitionStarted = hasFameeriCompetitionStarted(qGameState, qAttacks);
+
+  const handleExitLeave = () => {
+    setExitSheetOpen(false);
+    if (qPhase === 'ended') {
+      withdrawToArena();
+      return;
+    }
+    if (isAdmin) {
+      setAdminLeaveConfirmOpen(true);
+      return;
+    }
+    withdrawToArena();
+  };
 
   /* ── جلسة الأسئلة: استرجاع، سحب، إظهار، اعتماد ── */
   const qActiveQuestion = qGameState?.currentQuestion || null;
@@ -1158,6 +1250,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   useEffect(() => {
     const ph = qGameState?.phase || 'lobby';
     if (ph !== 'ended' || !qRoom || !onGameEnd) return;
+    if (isGameCancelled(qGameState)) return;
     if (qRole === 'admin' || qRole === 'spectator') return;
     if (fameeriEndGamePromptSentRef.current) return;
     fameeriEndGamePromptSentRef.current = true;
@@ -1245,10 +1338,19 @@ const FameeriGame = forwardRef(function FameeriGame(
       return <FameeriGuideModal onClose={() => setShowGuide(false)} />;
     }
 
+    if (sessionGate === 'checking') {
+      return <GameSessionChecking emoji="🦅" />;
+    }
+
     if (gameScreen === 'home') {
       return (
         <div className="scr">
-          <button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setSelectedGame(null)}>← ساحة الألعاب</button>
+          <GameTopNav onBack={() => setSelectedGame(null)} variant="arena" />
+          {getOtherActiveSessions('fameeri').length > 0 && (
+            <div className="game-multi-session-hint">
+              لديك جلسة نشطة في: {formatOtherSessionsHint(getOtherActiveSessions('fameeri'))}
+            </div>
+          )}
           <div className="fameeri-hero" style={{ textAlign: 'center', padding: '10px 0 12px' }}>
             <div style={{ fontSize: 46, marginBottom: 6 }}>🦅</div>
             <div className="ptitle" style={{ fontSize: 22 }}>لعبة القميري</div>
@@ -1286,9 +1388,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     if (gameScreen === 'qumairi_spectator_join') {
       return (
         <div className="scr">
-          <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
-            ← رجوع
-          </button>
+          <GameTopNav onBack={() => setGameScreen('home')} />
           <div className="ptitle">📺 شاشة العرض</div>
           <div className="psub" style={{ marginBottom: 10 }}>
             افتح هذه الشاشة على بروجكتر أو تلفزيون. تعرض سير اللعبة للجميع بدون كشف الأرصدة السرية.
@@ -1333,9 +1433,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     if (gameScreen === 'qumairi_join') {
       return (
         <div className="scr">
-          <button type="button" className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setGameScreen('home')}>
-            ← رجوع
-          </button>
+          <GameTopNav onBack={() => setGameScreen('home')} />
           <div className="ptitle">انضمام للغرفة</div>
           <div className="psub" style={{ marginBottom: 10 }}>
             مسجّل سابقاً؟ أدخل نفس الاسم والرمز للعودة — حتى أثناء تنظيم المشرف
@@ -1373,7 +1471,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
 
     if(gameScreen==='qumairi_lobby'){return(
-<div className="scr"><button className="btn bgh bsm" style={{width:'auto',marginBottom:12}} onClick={()=>setQExitModal(true)}>← رجوع</button>{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(<><FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="distributing" /><div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div></>);})()}{!isAdmin&&qPhase==='lobby'&&(<>{isLeader&&qGroupId&&<FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="lobby" />}<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>{isLeader&&qGroupId?'👑':'⏳'}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?(isLeader?`قائد مجموعة ${qMyGroup?.name||'—'}`:`مجموعتك: ${qMyGroup?.name||'—'}`):'انتظر المشرف'}</div></div></>)}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}
+<div className="scr"><GameTopNav onBack={openExitSheet} sticky />{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(<><FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="distributing" /><div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div></>);})()}{!isAdmin&&qPhase==='lobby'&&(<>{isLeader&&qGroupId&&<FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="lobby" />}<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>{isLeader&&qGroupId?'👑':'⏳'}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?(isLeader?`قائد مجموعة ${qMyGroup?.name||'—'}`:`مجموعتك: ${qMyGroup?.name||'—'}`):'انتظر المشرف'}</div></div></>)}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}
 </div>);}
 
     if (gameScreen === 'qumairi_play') {
@@ -1388,9 +1486,7 @@ const FameeriGame = forwardRef(function FameeriGame(
       if (isAdmin) {
         return (
           <div className="scr">
-            <button className="btn bgh bsm" style={{ width: 'auto', marginBottom: 12 }} onClick={() => setQExitModal(true)}>
-              ← رجوع
-            </button>
+            <GameTopNav onBack={openExitSheet} sticky />
             <FameeriAdminPlay
               qRoom={qRoom}
               qGameState={qGameState}
@@ -1428,11 +1524,7 @@ const FameeriGame = forwardRef(function FameeriGame(
               notify={notify}
               accent={FAMEERI_ACCENT}
               recordRoundCompleted={recordRoundCompleted}
-              onEndGame={async () => {
-                if (qRoom) recordSessionEnd('fameeri', qRoom, true).catch(() => {});
-                await update(dbRef(db, `qrooms/${qRoom}/game`), { phase: 'ended' });
-                playSound('applause');
-              }}
+              onEndGame={() => void endFameeriCompetition()}
               onOpenReport={() => {
                 openFameeriPrintableReport({ qRoom, qGList, qAttacks });
                 notify('✅ تم فتح التقرير — للحفظ كـ PDF استخدم طباعة ثم «حفظ كـ PDF»', 'success');
@@ -1443,7 +1535,9 @@ const FameeriGame = forwardRef(function FameeriGame(
       }
 
       return (
-        <FameeriPlayerPlay
+        <div className="scr">
+          <GameTopNav onBack={openExitSheet} sticky />
+          <FameeriPlayerPlay
           qReveal={qReveal}
           qTurnOverlay={qTurnOverlay}
           qTimer={qTimer}
@@ -1479,6 +1573,28 @@ const FameeriGame = forwardRef(function FameeriGame(
           shieldActivating={shieldActivating}
           myAtks={myAtks}
         />
+        </div>
+      );
+    }
+
+    if (gameScreen === 'qumairi_results' && isGameCancelled(qGameState)) {
+      return (
+        <div className="scr">
+          <GameTopNav onBack={openExitSheet} sticky />
+          <GameCancelledScreen
+            gameLabel="مسابقة القميري"
+            roomCode={qRoom}
+            onHome={() => {
+              setGameScreen('home');
+              setSelectedGame(null);
+              setQRoom('');
+              setQRole(null);
+              setQGroupId(null);
+              clearAdminSessionLocal(qRoom);
+              localStorage.removeItem('ng_qumairi');
+            }}
+          />
+        </div>
       );
     }
 
@@ -1488,65 +1604,26 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   return (
     <div className="fameeri-theme">
-      {qRoom && (qReveal || qTurnOverlay || qTimer) && (
-        <button
-          type="button"
-          onClick={() => setQExitModal(true)}
-          style={{
-            position: 'fixed',
-            top: 10,
-            insetInlineStart: 10,
-            zIndex: 360,
-            background: 'rgba(0,0,0,.55)',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,.3)',
-            borderRadius: 999,
-            padding: '6px 12px',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          ✕ خروج
-        </button>
-      )}
-      {qExitModal && (
-        <div className="mbg" style={{ zIndex: 400 }}>
-          <div className="modal">
-            <div className="micn">🦅</div>
-            <div className="mtitle">{isAdmin ? 'الخروج من إدارة المسابقة؟' : 'الانسحاب من المسابقة؟'}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 14 }}>
-              {isAdmin
-                ? 'تغادر الشاشة فقط، ويمكنك العودة لاحقًا بنفس الجهاز ما دامت الغرفة قائمة.'
-                : 'الانسحاب يُخرجك من المسابقة نهائيًا ويعيدك لساحة الألعاب — دون أي حاجة لحذف بيانات المتصفح.'}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button className="btn bg" onClick={() => setQExitModal(false)}>
-                ↩️ العودة للّعبة
-              </button>
-              <button
-                className="btn br"
-                onClick={() => {
-                  setQExitModal(false);
-                  if (isAdmin && qRoom) recordSessionEnd('fameeri', qRoom, false).catch(() => {});
-                  setGameScreen('home');
-                  setSelectedGame(null);
-                  setQRoom('');
-                  setQRole(null);
-                  setQGroupId(null);
-                  setQDistribution({});
-                  clearAdminSessionLocal(qRoom);
-                  localStorage.removeItem('ng_qumairi');
-                  notify('تم الخروج من المسابقة', 'info');
-                }}
-              >
-                🚪 انسحاب وخروج
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <GameExitSheet
+        open={exitSheetOpen}
+        game="fameeri"
+        role={isAdmin ? 'admin' : 'player'}
+        roomCode={qRoom}
+        phase={qPhase}
+        onContinue={() => setExitSheetOpen(false)}
+        onLeave={handleExitLeave}
+        onClose={() => setExitSheetOpen(false)}
+      />
+      <GameAdminLeaveConfirm
+        open={adminLeaveConfirmOpen}
+        competitionStarted={fameeriCompetitionStarted}
+        onPauseOnly={() => {
+          setAdminLeaveConfirmOpen(false);
+          withdrawToFameeriHome();
+        }}
+        onEndGame={() => void endFameeriCompetition()}
+        onCancel={() => setAdminLeaveConfirmOpen(false)}
+      />
       {renderMain()}
     </div>
   );

@@ -1,14 +1,6 @@
-import { HesbahExitTrigger } from './HesbahExitSheet';
+import GameTopNav from '../../shared/GameTopNav';
 
-/**
- * زر رجوع ثابت — نفس الشكل للمشرف والمتسابق (شريحة علوية يمين).
- */
-export default function HesbahTopNav({ onBack, label = 'رجوع' }) {
-  if (typeof onBack !== 'function') return null;
-
-  return (
-    <div className="hesbah-top-nav">
-      <HesbahExitTrigger variant="nav" label={label} onClick={onBack} />
-    </div>
-  );
+/** غلاف توافق — شريط علوي موحّد */
+export default function HesbahTopNav({ label, variant = 'nav', ...props }) {
+  return <GameTopNav sticky variant={variant} {...(label != null ? { label } : {})} {...props} />;
 }

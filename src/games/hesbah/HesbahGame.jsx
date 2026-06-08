@@ -19,6 +19,11 @@ import HesbahExitSheet from './HesbahExitSheet';
 import HesbahPlayerHud from './HesbahPlayerHud';
 import HesbahLeaderboardList from './HesbahLeaderboardList';
 import HesbahTopNav from './HesbahTopNav';
+import { GameSessionChecking } from '../../shared/GameTopNav';
+import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
+import GameCancelledScreen from '../../shared/GameCancelledScreen';
+import { hasHesbahCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
 import {
   readSavedHesbah,
   persistHesbahSession,
@@ -64,6 +69,7 @@ const HesbahGame = forwardRef(function HesbahGame(
 ) {
   void setTab;
   const [savedSession, setSavedSession] = useState(() => readSavedHesbah());
+  const [sessionGate, setSessionGate] = useState(() => (readSavedHesbah().roomCode ? 'checking' : 'ready'));
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [roomCode, setRoomCode] = useState('');
@@ -74,7 +80,7 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [joinErr, setJoinErr] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [totalQSetup, setTotalQSetup] = useState(20);
+  const [totalQSetup, setTotalQSetup] = useState(null);
 
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState({});
@@ -99,6 +105,7 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [adminQMeta, setAdminQMeta] = useState(null);
   const [confirmEarlyEndOpen, setConfirmEarlyEndOpen] = useState(false);
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
+  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
   const endPromptRef = useRef(false);
   const pendingOnboardingRef = useRef(null);
 
@@ -169,13 +176,29 @@ const HesbahGame = forwardRef(function HesbahGame(
     try {
       const raw = localStorage.getItem(poolStorageKey(room));
       if (!raw) return null;
-      const { pool, bankMeta } = JSON.parse(raw);
+      const { pool, bankMeta, cursorState } = JSON.parse(raw);
       if (bankMeta) qBankMetaRef.current = bankMeta;
       const flat = flattenHesbahPool(normalizePoolToStructured(pool));
       if (!flat.length) return null;
-      return createQuestionCursor(flat);
+      return createQuestionCursor(flat, {
+        startPtr: cursorState?.ptr ?? 0,
+        savedOrder: cursorState?.order,
+      });
     } catch {
       return null;
+    }
+  }, []);
+
+  const persistPoolCursor = useCallback((room) => {
+    if (!room || !qCursorRef.current?.snapshot) return;
+    try {
+      const raw = localStorage.getItem(poolStorageKey(room));
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      data.cursorState = qCursorRef.current.snapshot();
+      localStorage.setItem(poolStorageKey(room), JSON.stringify(data));
+    } catch {
+      /* ignore */
     }
   }, []);
 
@@ -235,6 +258,7 @@ const HesbahGame = forwardRef(function HesbahGame(
     else if (phase === 'roundResult') setGameScreen('roundResult');
     else if (phase === 'leaderboard') setGameScreen('leaderboard');
     else if (phase === 'final') setGameScreen('final');
+    else if (phase === 'ended') setGameScreen(isGameCancelled(game) ? 'cancelled' : 'final');
     else if (role === 'admin' && (phase === 'question' || phase === 'grading')) setGameScreen('adminLive');
     else if (phase === 'question' || phase === 'grading') setGameScreen('play');
   }, [phase, roomCode, game, role]);
@@ -313,6 +337,10 @@ const HesbahGame = forwardRef(function HesbahGame(
       onRequestActivation?.();
       return;
     }
+    if (!totalQ) {
+      notify('اختر عدد الأسئلة أولاً', 'error');
+      return;
+    }
     setCreating(true);
     try {
       try {
@@ -328,8 +356,13 @@ const HesbahGame = forwardRef(function HesbahGame(
 
       const code = genCode();
       const poolNorm = normalizePoolToStructured(pool || {});
-      if (source !== QSOURCE.EXTERNAL && countHesbahPool(poolNorm) === 0) {
+      const poolSize = countHesbahPool(poolNorm);
+      if (source !== QSOURCE.EXTERNAL && poolSize === 0) {
         notify('لا توجد أسئلة صالحة — حمّل البنك أو أضف أسئلة ثم أنشئ الغرفة', 'error');
+        return;
+      }
+      if (source !== QSOURCE.EXTERNAL && poolSize < totalQ) {
+        notify(`البنك ${poolSize} سؤالاً فقط — تحتاج ${totalQ}. أعد إعداد الأسئلة.`, 'error');
         return;
       }
       const board = buildScoreBoard(totalQ);
@@ -367,6 +400,12 @@ const HesbahGame = forwardRef(function HesbahGame(
       persistHesbahSession({ roomCode: code, role: 'admin', myId: adminPid });
       setGameScreen('lobby');
       notify(`✅ الغرفة: ${code}`, 'gold');
+      if (source !== QSOURCE.EXTERNAL && poolSize < totalQ) {
+        notify(
+          `⚠️ البنك ${poolSize} سؤالاً والمسابقة ${totalQ} جولة — لن يُكرَّر السؤال؛ عند النفاد «سؤال من المشرف»`,
+          'gold'
+        );
+      }
     } catch (err) {
       console.error('[hesbah] createRoom', err);
       if (isPermissionErr(err)) {
@@ -500,9 +539,13 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   const drawNextQuestion = () => {
     if (!qCursorRef.current) qCursorRef.current = restorePoolCursor(roomCode);
-    const q = qCursorRef.current?.next();
+    const cursor = qCursorRef.current;
+    const q = cursor?.next();
     if (!q) {
       setAdminQMeta(null);
+      if (cursor?.total?.() > 0 && cursor.remaining?.() === 0) {
+        notify('⚠️ نفد بنك الأسئلة — السؤال التالي «من المشرف»', 'gold');
+      }
       return {
         hostText: 'سؤال من المشرف',
         playerText: '',
@@ -519,6 +562,7 @@ const HesbahGame = forwardRef(function HesbahGame(
     if (q?.id && qBankMetaRef.current?.filterKey) {
       void markHesbahQuestionAsUsed(qBankMetaRef.current.filterKey, q.id);
     }
+    persistPoolCursor(roomCode);
     return q;
   };
 
@@ -855,7 +899,25 @@ const HesbahGame = forwardRef(function HesbahGame(
     playSound('victory');
   };
 
+  const cancelCompetition = async () => {
+    try {
+      await recordSessionEnd('hesbah', roomCode, true);
+      await update(dbRef(db, `srooms/${roomCode}/game`), {
+        phase: 'ended',
+        endedBeforeStart: true,
+        endedAt: Date.now(),
+      });
+      notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+    } catch {
+      notify('تعذّر إلغاء المسابقة', 'error');
+    }
+  };
+
   const requestEarlyEnd = async () => {
+    if (!hasHesbahCompetitionStarted(game)) {
+      await cancelCompetition();
+      return;
+    }
     try {
       await update(dbRef(db, `srooms/${roomCode}/game`), {
         phase: 'final',
@@ -867,6 +929,8 @@ const HesbahGame = forwardRef(function HesbahGame(
       notify('تعذّر إنهاء المسابقة', 'error');
     }
   };
+
+  const competitionStarted = hasHesbahCompetitionStarted(game);
 
   const canEarlyEnd =
     !!roomCode &&
@@ -892,17 +956,75 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   const openExitSheet = () => setExitSheetOpen(true);
 
+  const handleExitLeave = () => {
+    setExitSheetOpen(false);
+    if (phase === 'final' || phase === 'ended') {
+      void withdrawToArena();
+      return;
+    }
+    if (role === 'admin') {
+      setAdminLeaveConfirmOpen(true);
+      return;
+    }
+    void withdrawToArena();
+  };
+
+  const resetHesbahRoomState = () => {
+    setRoomCode('');
+    setRole(null);
+    setMyId(null);
+    setGame(null);
+    setPlayers({});
+    setAnswers({});
+    setHostAnswer(null);
+    setVotes({});
+    setAnswerText('');
+    setChosenScore(null);
+    setInsuranceActive(false);
+    setGameScreen('home');
+  };
+
   const withdrawFromGame = async () => {
+    setExitSheetOpen(false);
+    const code = roomCode;
+    const withdrawingRole = role;
+    const pid = myId;
+    const savedName = players[pid]?.name || joinName;
+
+    try {
+      if (withdrawingRole === 'player' && pid && code) {
+        await purgePlayerFromRoom(code, pid);
+        clearHesbahSession();
+      } else if (withdrawingRole === 'admin' && code) {
+        await recordSessionEnd('hesbah', code, false);
+        persistHesbahSession({ roomCode: code, role: 'admin', myId: pid, myName: savedName });
+      } else {
+        clearHesbahSession();
+      }
+    } catch {
+      /* ignore */
+    }
+
+    setSavedSession(readSavedHesbah());
+    resetHesbahRoomState();
+    notify(
+      withdrawingRole === 'admin'
+        ? 'غادرت الغرفة — اضغط «العودة للغرفة» للرجوع'
+        : 'انسحبت — يمكنك الانضمام من جديد',
+      'info'
+    );
+  };
+
+  const withdrawToArena = async () => {
     setExitSheetOpen(false);
     const code = roomCode;
     const withdrawingRole = role;
     const pid = myId;
 
     try {
-      if (pid && code) {
+      if (withdrawingRole === 'player' && pid && code) {
         await purgePlayerFromRoom(code, pid);
-      }
-      if (withdrawingRole === 'admin' && code) {
+      } else if (withdrawingRole === 'admin' && code) {
         await recordSessionEnd('hesbah', code, false);
       }
     } catch {
@@ -917,28 +1039,32 @@ const HesbahGame = forwardRef(function HesbahGame(
       }
     }
 
-    clearHesbahSession();
-    setSavedSession({});
-    setRoomCode('');
-    setRole(null);
-    setMyId(null);
-    setGame(null);
-    setPlayers({});
-    setGameScreen('home');
-    setSelectedGame(null);
-    notify(
-      withdrawingRole === 'admin'
-        ? 'غادرت الغرفة — اللاعبون ما زالوا متصلين'
-        : 'انسحبت — عند العودة تبدأ من جديد بنفس الاسم',
-      'info'
-    );
+    leaveToArena();
+    notify('عدت لساحة الألعاب', 'info');
   };
 
   useEffect(() => {
     if (phase === 'final' && role === 'admin') void endGame();
   }, [phase, role]);
 
+  /** عودة تلقائية للغرفة المحفوظة — مثل الألقاب والقميري */
+  useEffect(() => {
+    if (sessionGate !== 'checking') return undefined;
+    let cancelled = false;
+    void (async () => {
+      await reconnectToSavedRoom();
+      if (!cancelled) setSessionGate('ready');
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const renderMain = () => {
+    if (sessionGate === 'checking') {
+      return <GameSessionChecking emoji="🎯" />;
+    }
     if (showOnboarding) {
       return (
         <QuickOnboarding
@@ -958,7 +1084,7 @@ const HesbahGame = forwardRef(function HesbahGame(
       return (
         <div className="scr hesbah-theme hesbah-setup-screen">
           <div className="hesbah-sticky-chrome">
-            <HesbahTopNav onBack={() => setSelectedGame(null)} />
+            <HesbahTopNav onBack={() => setSelectedGame(null)} variant="arena" />
           </div>
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <div style={{ fontSize: 48 }}>🎯</div>
@@ -966,6 +1092,11 @@ const HesbahGame = forwardRef(function HesbahGame(
             <span className="hesbah-hero-badge">🎯 ساحة حَسْبة — كل درجة رهان</span>
             <div className="psub">اربط السؤال برقم درجة — صوّب بذكاء قبل أن يُسرق أحد درجتك</div>
           </div>
+          {getOtherActiveSessions('hesbah').length > 0 && (
+            <div className="game-multi-session-hint">
+              لديك جلسة نشطة في: {formatOtherSessionsHint(getOtherActiveSessions('hesbah'))}
+            </div>
+          )}
           {savedSession.roomCode && !roomCode && (
             <button type="button" className="btn bo" onClick={() => void reconnectToSavedRoom()}>
               🔙 العودة للغرفة ({savedSession.roomCode})
@@ -1161,6 +1292,22 @@ const HesbahGame = forwardRef(function HesbahGame(
       );
     }
 
+    if (gameScreen === 'cancelled') {
+      return (
+        <div className="scr hesbah-theme hesbah-admin">
+          <div className="hesbah-sticky-chrome">
+            <HesbahTopNav onBack={openExitSheet} />
+          </div>
+          <GameCancelledScreen
+            gameLabel="مسابقة حَسْبة"
+            roomCode={roomCode}
+            onHome={leaveToArena}
+            hint="يمكن للمشرف إنشاء غرفة جديدة في أي وقت"
+          />
+        </div>
+      );
+    }
+
     if (gameScreen === 'final' && role === 'player') {
       return (
         <HesbahPlayerHud
@@ -1231,8 +1378,22 @@ const HesbahGame = forwardRef(function HesbahGame(
         roomCode={roomCode}
         phase={phase}
         onContinue={() => setExitSheetOpen(false)}
-        onWithdraw={() => void withdrawFromGame()}
+        onLeave={handleExitLeave}
         onClose={() => setExitSheetOpen(false)}
+      />
+      <GameAdminLeaveConfirm
+        open={adminLeaveConfirmOpen}
+        competitionStarted={competitionStarted}
+        onPauseOnly={() => {
+          setAdminLeaveConfirmOpen(false);
+          void withdrawFromGame();
+        }}
+        onEndGame={() => {
+          setAdminLeaveConfirmOpen(false);
+          if (competitionStarted) setConfirmEarlyEndOpen(true);
+          else void cancelCompetition();
+        }}
+        onCancel={() => setAdminLeaveConfirmOpen(false)}
       />
     </>
   );

@@ -2,6 +2,9 @@ import { SUPPORT_EMAIL } from '../core/constants';
 import {
   SUBSCRIPTION_PACKAGES,
   SUBSCRIPTION_FEATURES,
+  getEffectivePrice,
+  hasActivePromo,
+  promoDiscountPercent,
   savingsPercent
 } from '../core/subscriptionPackages';
 import PackagePlanBadges, { badgesForPackage } from '../components/codes/PackagePlanBadges';
@@ -17,8 +20,9 @@ export default function Packages({ onSubscribe }) {
       return;
     }
     const subject = encodeURIComponent(`اشتراك ${pkg.durationLabel} — لعبة الألقاب`);
+    const price = getEffectivePrice(pkg);
     const body = encodeURIComponent(
-      `أرغب بالاشتراك في باقة ${pkg.durationLabel} (${pkg.price} ريال).\n\nالاسم:\nرقم الجوال:`
+      `أرغب بالاشتراك في باقة ${pkg.durationLabel} (${price} ريال).\n\nالاسم:\nرقم الجوال:`
     );
     window.open(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`, '_blank');
   };
@@ -57,8 +61,11 @@ export default function Packages({ onSubscribe }) {
 
       <div className="pkg-cards-col">
         {SUBSCRIPTION_PACKAGES.map((pkg) => {
-          const save = savingsPercent(pkg.days, pkg.price);
-          const perDay = (pkg.price / pkg.days).toFixed(1);
+          const promo = hasActivePromo(pkg);
+          const effective = getEffectivePrice(pkg);
+          const save = savingsPercent(pkg.days, effective);
+          const perDay = (effective / pkg.days).toFixed(1);
+          const promoPct = promoDiscountPercent(pkg);
 
           return (
             <div
@@ -73,9 +80,18 @@ export default function Packages({ onSubscribe }) {
                 <div className="plan-name">{pkg.durationLabel}</div>
                 <div className="pkg-days-pill">{pkg.days} {pkg.days === 1 ? 'يوم' : 'أيام'}</div>
                 <div className="pkg-price-row">
-                  <span className="pkg-price-num">{pkg.price}</span>
+                  {promo && (
+                    <>
+                      <span className="pkg-price-original">{pkg.price}</span>
+                      {promoPct != null && (
+                        <span className="pkg-promo-badge">-{promoPct}%</span>
+                      )}
+                    </>
+                  )}
+                  <span className="pkg-price-num">{effective}</span>
                   <span className="pkg-price-currency">ريال</span>
                 </div>
+                {promo && <div className="pkg-promo-note">عرض مؤقت — لفترة محدودة</div>}
                 <div className="pkg-per-day">≈ {perDay} ريال / يوم</div>
                 {save != null && save > 0 ? (
                   <div className="tag tv pkg-save-tag">وفر {save}% مقارنة باليومي</div>
@@ -91,7 +107,7 @@ export default function Packages({ onSubscribe }) {
               </ul>
 
               <button type="button" className="btn bg" onClick={() => handleSubscribe(pkg)}>
-                🛒 اشترك — {pkg.durationLabel}
+                🛒 اشترك — {effective} ريال
               </button>
             </div>
           );

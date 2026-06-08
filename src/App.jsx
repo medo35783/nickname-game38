@@ -4,12 +4,16 @@ import { auth } from "./firebase";
 import Packages from './pages/Packages';
 import { SUPPORT_EMAIL, PLATFORM_NAME } from './core/constants';
 import Home from './pages/Home';
+import QuestionContribute from './question-bank/QuestionContribute';
+import { fetchBankStats } from './question-bank/qbank.helpers';
+import './styles/knowledge-chest.css';
 import AdminCodesPanel from './components/admin/AdminCodesPanel';
 import QBankManager from './question-bank/QBankManager';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
 import AccountPage from './components/account/AccountPage';
 import { renderPlatformGame, handlePlatformGameBack } from './games/platformGameRouter';
 import './styles/base.css';
+import './styles/game-ui.css';
 import Stars from './shared/Stars';
 import Notif from './shared/Notif';
 import CodeActivation from './components/codes/CodeActivation';
@@ -19,6 +23,7 @@ import SiteFooter from './components/layout/SiteFooter';
 import ThemeToggle from './components/layout/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
+import { getEffectivePrice } from './core/subscriptionPackages';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
 const ADMIN_LOGO_TAPS = 7;
@@ -35,6 +40,7 @@ const COMMUNITY_SUGGESTIONS = [
 export default function App() {
   const { theme, followSystem, setTheme, setFollowSystemMode, toggleTheme } = useTheme();
   const [authReady, setAuthReady] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
 
   /* ── NAV ── */
   const [tab, setTab]           = useState('game');
@@ -51,6 +57,7 @@ export default function App() {
   /* ── معلومات تأتي من TitlesGame لرسم زر 👑 في الهيدر ── */
   const [titlesMeta, setTitlesMeta] = useState({ inRoom: false, showAdminBtn: false, gameScreen: 'home' });
   const [hesbahMeta, setHesbahMeta] = useState({ inRoom: false });
+  const [fameeriMeta, setFameeriMeta] = useState({ inRoom: false });
   const [isAdmin, setIsAdmin] = useState(false);
   const adminLogoTapRef = useRef({ count: 0, last: 0 });
   const [activeCode, setActiveCode] = useState(null);
@@ -62,7 +69,14 @@ export default function App() {
   const [adminPanelTab, setAdminPanelTab] = useState('codes');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountAuthMode, setAccountAuthMode] = useState('login');
+  const [bankTotal, setBankTotal] = useState(null);
   const accountMenuRef = useRef(null);
+
+  const openContribute = useCallback(() => {
+    setTab('game');
+    setSelectedGame(null);
+    setGameScreen('contribute');
+  }, []);
 
   useEffect(() => {
     let done = false;
@@ -81,14 +95,18 @@ export default function App() {
         setIsAdmin(false);
         setActiveCode(null);
         persistActiveCodeLocal(null);
+        setAuthFailed(false);
         try {
           await signInAnonymously(auth);
         } catch (e) {
           console.warn('Anonymous sign-in skipped:', e?.code || e);
+          setAuthFailed(true);
           finish();
         }
         return;
       }
+
+      setAuthFailed(false);
 
       try {
         if (user.email) {
@@ -165,6 +183,18 @@ export default function App() {
     setTimeout(() => setNotifs((p) => p.filter((n) => n.id !== id)), 3200);
   }, []);
 
+  const openVoiceSuggest = useCallback((preset = {}) => {
+    setVoiceType(preset.type || 'suggest');
+    setSuggForm({
+      cat: preset.cat || 'لعبة',
+      text: preset.text || '',
+    });
+    setSelectedGame(null);
+    setGameScreen('home');
+    setTab('voice');
+    notify('💬 صوّتك — شاركنا فكرتك', 'info');
+  }, [notify]);
+
   const openAdminGate = useCallback(() => {
     const u = auth.currentUser;
     if (!u) {
@@ -186,7 +216,20 @@ export default function App() {
 
   const goToTab = useCallback((id) => {
     setTab(id);
+    if (id !== 'game') {
+      setGameScreen('home');
+    }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchBankStats()
+      .then((stats) => {
+        if (active) setBankTotal(stats?.total ?? null);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [gameScreen, tab]);
 
   const handleLogoSecretTap = useCallback(() => {
     const now = Date.now();
@@ -215,13 +258,15 @@ export default function App() {
   /** التذييل أثناء التصفح فقط — يختفي داخل غرف الألعاب */
   const showSiteFooter = !selectedGame;
 
-  /** زر «رجوع» في الهيدر — حَسْبة تدير الرجوع داخلياً (زر واحد موحّد) */
+  /** زر «رجوع» في الهيدر — الألقاب والقميري يديران الخروج داخلياً فقط */
   const hidePlatformBack =
-    selectedGame === 'hesbah' ||
-    (selectedGame === 'nicknames' && titlesMeta.inRoom);
+    selectedGame === 'nicknames' ||
+    selectedGame === 'qumairi' ||
+    (selectedGame === 'hesbah' && hesbahMeta.inRoom);
 
   const showHeaderBack =
-    tab !== 'game' || selectedGame || gameScreen !== 'home'
+    (tab !== 'game' || selectedGame || (gameScreen !== 'home' && tab === 'game'))
+    && gameScreen !== 'contribute'
       ? !hidePlatformBack
       : false;
 
@@ -235,6 +280,7 @@ export default function App() {
       setSelectedGame,
       onHeaderMeta: setTitlesMeta,
       onHesbahHeaderMeta: setHesbahMeta,
+      onFameeriHeaderMeta: setFameeriMeta,
       canHostRoom,
       onRequestActivation: () => setShowCodeActivation(true),
       onGameEnd,
@@ -242,8 +288,24 @@ export default function App() {
     });
     if (mounted) return mounted;
 
+    if (gameScreen === 'contribute') {
+      return (
+        <QuestionContribute
+          notify={notify}
+          onBack={() => setGameScreen('home')}
+        />
+      );
+    }
+
     if (gameScreen === 'home') {
-      return <Home setSelectedGame={setSelectedGame} />;
+      return (
+        <Home
+          setSelectedGame={setSelectedGame}
+          onOpenContribute={openContribute}
+          onSuggestGame={() => openVoiceSuggest({ type: 'suggest', cat: 'لعبة' })}
+          bankTotal={bankTotal}
+        />
+      );
     }
 
     return null;
@@ -371,7 +433,7 @@ export default function App() {
     }
   };
 
-  if (!authReady) {
+  if (!authReady || (!auth.currentUser && !authFailed)) {
     return (
       <div style={{ minHeight: "100vh", background: "#07071a", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Stars />
@@ -383,7 +445,7 @@ export default function App() {
     );
   }
 
-  if (!auth.currentUser) {
+  if (!auth.currentUser && authFailed) {
     return (
       <div className="app" style={{ minHeight: '100vh' }}>
         <Stars />
@@ -450,7 +512,9 @@ export default function App() {
           >
             {tab === 'voice'
               ? '💬 صوّتك'
-              : tab === 'game'
+              : tab === 'game' && gameScreen === 'contribute'
+                ? '📋 بنك الأسئلة'
+                : tab === 'game'
                 ? '🏟️ ساحة الألعاب'
                 : tab === 'pricing'
                     ? '💎 الباقات'
@@ -472,6 +536,10 @@ export default function App() {
                   goToTab('game');
                   return;
                 }
+                if (gameScreen === 'contribute') {
+                  setGameScreen('home');
+                  return;
+                }
                 if (
                   handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, hesbahRef }, {
                     setSelectedGame,
@@ -483,7 +551,7 @@ export default function App() {
                 }
               }}
             >
-              رجوع →
+              ← رجوع
             </button>
           ) : null}
 
@@ -563,6 +631,7 @@ export default function App() {
             isAdmin={isAdmin}
             onActivateCode={() => setShowCodeActivation(true)}
             onGoPricing={() => setTab('pricing')}
+            onOpenContribute={openContribute}
             theme={theme}
             followSystem={followSystem}
             onSetTheme={setTheme}
@@ -573,7 +642,7 @@ export default function App() {
         {!showCodeActivation && tab==='pricing'&&(
           <Packages
             onSubscribe={(pkg) => {
-              notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${pkg.price} ريال)`, 'info');
+              notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${getEffectivePrice(pkg)} ريال)`, 'info');
             }}
           />
         )}
@@ -615,6 +684,11 @@ export default function App() {
             setShowEndGamePrompt(false);
             setEndGameData(null);
             setSelectedGame(null);
+          }}
+          onContribute={() => {
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+            openContribute();
           }}
         />
       )}

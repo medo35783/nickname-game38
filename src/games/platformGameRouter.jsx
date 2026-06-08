@@ -15,6 +15,7 @@ export function renderPlatformGame(selectedGame, props) {
     setSelectedGame,
   onHeaderMeta,
   onHesbahHeaderMeta,
+  onFameeriHeaderMeta,
   canHostRoom,
     onRequestActivation,
     onGameEnd,
@@ -43,6 +44,7 @@ export function renderPlatformGame(selectedGame, props) {
         notify={notify}
         setTab={setTab}
         setSelectedGame={setSelectedGame}
+        onHeaderMeta={onFameeriHeaderMeta}
         canCreateRoom={canHostRoom}
         onRequestActivation={onRequestActivation}
         onGameEnd={onGameEnd}
