@@ -1,4 +1,4 @@
-import { ref, set, get, update, onValue, off, push } from "firebase/database";
+import { ref, set, get, update, onValue, off, push, remove } from "firebase/database";
 import { db } from './firebase';
 
 // ── لعبة الألقاب ──
@@ -14,7 +14,7 @@ export const qGroupsRef = code => ref(db, `qrooms/${code}/groups`);
 export const qAttacksRef= code => ref(db, `qrooms/${code}/attacks`);
 export const qMembersRef= code => ref(db, `qrooms/${code}/members`);
 
-export { ref, set, get, update, onValue, off, push, db };
+export { ref, set, get, update, onValue, off, push, remove, db };
 
 export {
   resolveUserId,
@@ -369,6 +369,7 @@ export async function ensurePlayerProfile(userId, userLike) {
       lastLoginAt: now,
       totalLogins: 1,
       gamesHosted: 0,
+      // حقول شارة الساحة تُكمَّل في ensureArenaProfile
     });
     return;
   }

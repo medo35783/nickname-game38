@@ -37,3 +37,5 @@ export const PLATFORM_NAME = 'ساحة الألعاب';
 
 /** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
 export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';
+export const VOICE_BACK_LABEL = 'الرجوع لصوتك';
+export const ACCOUNT_BACK_LABEL = 'الرجوع لحسابي';

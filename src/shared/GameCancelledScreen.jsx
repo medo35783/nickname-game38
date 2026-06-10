@@ -15,7 +15,7 @@ export default function GameCancelledScreen({
         </div>
         <h1 className="game-cancelled-screen__title">تم إلغاء {gameLabel}</h1>
         <p className="game-cancelled-screen__lead">
-          لم تبدأ المسابقة بعد — <strong>لا يوجد فائز</strong>
+          أُغلقت الغرفة — <strong>لا يوجد فائز</strong>
         </p>
         {roomCode && (
           <span className="game-cancelled-screen__room">

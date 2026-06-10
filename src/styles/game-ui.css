@@ -318,6 +318,24 @@
   color: var(--text);
 }
 
+.game-exit-sheet--confirm .game-exit-sheet__lead {
+  text-align: center;
+}
+
+/* زر إنهاء وإعلان الفائز — موحّد لكل الألعاب */
+.game-admin-end-btn {
+  width: 100%;
+  border: 2px solid rgba(239, 68, 68, 0.65) !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(239, 68, 68, 0.05)) !important;
+  color: #ef4444 !important;
+  font-weight: 900;
+}
+
+.game-admin-end-btn:hover {
+  border-color: rgba(239, 68, 68, 0.85) !important;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.18);
+}
+
 /* ألوان حسب اللعبة */
 .game-exit-sheet--fameeri {
   border-color: rgba(0, 105, 92, 0.35);

@@ -1,5 +1,7 @@
 ﻿import { ref, update, get, set } from 'firebase/database';
 import { auth, db } from '../firebase';
+import { rewardHostIfRegistered } from './arenaRewards';
+import { emitArenaCelebration } from './arenaEvents';
 
 const MAX_RECENT_SESSIONS = 20;
 
@@ -184,11 +186,21 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
       timestamp: sessionEnd,
     };
 
-    await updateCodeStats(
-      game.adminId || resolveUserId(),
-      game.adminCode || resolveCodeId(),
-      sessionData
-    );
+    const adminId = game.adminId || resolveUserId();
+    await updateCodeStats(adminId, game.adminCode || resolveCodeId(), sessionData);
+
+    if (completed && adminId) {
+      const hostResult = await rewardHostIfRegistered({
+        uid: adminId,
+        gameType: type,
+        playerCount,
+        completed,
+        roomCode,
+      });
+      if (hostResult && (hostResult.tierUpgraded || hostResult.newAchievements?.length)) {
+        emitArenaCelebration(hostResult);
+      }
+    }
   } catch (err) {
     console.error('[stats]', err);
   }

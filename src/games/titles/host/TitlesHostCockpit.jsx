@@ -593,10 +593,10 @@ export default function TitlesHostCockpit(props) {
 
       <button
         type="button"
-        className="btn bgh bsm host-end-btn"
+        className="btn bgh bsm host-end-btn game-admin-end-btn"
         onClick={() => setModal({ type: 'confirm_end' })}
       >
-        🛑 إنهاء المسابقة
+        🏁 إنهاء اللعبة وإعلان الفائز
       </button>
 
       {decoyAskOpen && (

@@ -51,15 +51,38 @@ export default HesbahInfoBtn;
 
 export const HESBAH_TOOLS_HELP = (
   <ul className="hesbah-i__list">
-    <li>اضغط للتفعيل/الإلغاء — لا يبدأ المؤقت.</li>
+    <li>كرت واحد نشط لكل جولة — يُفعَّل بعد بدء المؤقت.</li>
     <li>
-      <strong>🙈</strong> عميان: التصنيف فقط للاعبين.
+      <strong>🔥 2X</strong> خطر مضاعف: الخطأ أو التكرار يخصم ضعف الدرجة.
     </li>
     <li>
-      <strong>⚡</strong> سرعة: 10 ث ثابتة.
+      <strong>🔥</strong> خطر: الخطأ أو التكرار يخصم الدرجة.
     </li>
     <li>
-      <strong>✖️2</strong> مضاعف: ضعف النقاط الصحيحة.
+      <strong>💎 X3</strong> ثلاثي: ×3 للإجابة الصحيحة.
+    </li>
+    <li>
+      <strong>🎲</strong> حظ: درجة عشوائية عند الإرسال.
+    </li>
+    <li>
+      <strong>⚔️</strong> حصار: أعلى درجة عالية تلقائياً.
+    </li>
+    <li>
+      <strong>🕶️</strong> ظلام: لا بطاقات حية حتى اكتمال الإجابات أو انتهاء الوقت.
+    </li>
+  </ul>
+);
+
+export const HESBAH_PLAYER_POWERS_HELP = (
+  <ul className="hesbah-i__list">
+    <li>
+      <strong>🛡️ درع</strong> — مرة واحدة: إذا تكررت مع شخص واحد فقط تُحمى.
+    </li>
+    <li>
+      <strong>✏️ تعديل</strong> — مرة واحدة: غيّر إجابتك بعد الإرسال.
+    </li>
+    <li>
+      <strong>💪 ثقة X2</strong> — مرة واحدة: إذا صحت ×2 على درجتك.
     </li>
   </ul>
 );

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Av from '../../shared/Av';
+import GameTopNav from '../../shared/GameTopNav';
 import TitlesRevealScene from './TitlesRevealScene';
 import LiveConnectionBar from './LiveConnectionBar';
 
@@ -33,6 +34,7 @@ export default function TitlesResults(props) {
     declareWinner,
     firebaseConnected,
     onPrepNextRound,
+    onExitRequest,
   } = props;
 
   void statsTab;
@@ -91,6 +93,7 @@ export default function TitlesResults(props) {
   if (phase === 'revealing') {
     return (
       <div className="scr">
+        <GameTopNav onBack={onExitRequest} sticky />
         <LiveConnectionBar connected={firebaseConnected !== false} roomCode={roomCode} />
         <TitlesRevealScene
           role={role}

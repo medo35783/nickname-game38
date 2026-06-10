@@ -31,6 +31,9 @@ import { hesbahBankFilterKey } from '../games/hesbah/HesbahHelpers';
 import { pickHesbahSessionQuestions } from '../games/hesbah/HesbahQuestions';
 import CustomQuestionBuilder from './CustomQuestionBuilder';
 import { flattenSessionPool } from './customQuestionPool';
+import ArenaSignupPrompt from '../shared/ArenaSignupPrompt';
+import { countLocalSavedQuestions } from '../core/arenaProfile';
+import '../styles/arena-badge.css';
 
 /**
  * إعداد مصدر الأسئلة قبل بدء اللعبة — مكوّن مشترك بين الألعاب.
@@ -447,37 +450,14 @@ export default function QuestionSourceSetup({
             </div>
           )}
 
-          {isQumairi && !registered && (
-            <div
-              className="card2"
-              style={{
-                marginBottom: 10,
-                padding: 10,
-                fontSize: 11,
-                lineHeight: 1.65,
-                border: '1px solid var(--gold)',
-                background: 'rgba(212,175,55,0.06)',
-              }}
-            >
-              <div style={{ fontWeight: 800, color: 'var(--gold)', marginBottom: 4 }}>
-                🔐 لماذا التسجيل مهم؟
-              </div>
-              <div style={{ color: 'var(--muted)' }}>
-                السجل حالياً على هذا الجهاز فقط.{' '}
-                <strong style={{ color: 'var(--text)' }}>سجّل دخولك من «حسابي»</strong> ليُحفظ سجل الأسئلة
-                ومخزون المسابقة على حسابك — لا تتكرر الأسئلة التي ظهرت، وتستكمل من أي جهاز إذا توقفت
-                قبل النهاية.
-              </div>
-              {typeof onGoAccount === 'function' && (
-                <button
-                  type="button"
-                  className="btn bg bsm mt2"
-                  style={{ width: 'auto' }}
-                  onClick={onGoAccount}
-                >
-                  👤 الذهاب إلى حسابي
-                </button>
-              )}
+          {(isQumairi || isHesbah) && !registered && (
+            <div style={{ marginBottom: 10 }}>
+              <ArenaSignupPrompt
+                variant="compact"
+                localQuestionCount={countLocalSavedQuestions()}
+                onSignup={typeof onGoAccount === 'function' ? onGoAccount : undefined}
+                title="شارة الساحة — لا تتكرر أسئلتك"
+              />
             </div>
           )}
 
@@ -490,32 +470,6 @@ export default function QuestionSourceSetup({
               استكمال نفس الغرفة من جوال أو لابتوب بعد تسجيل الدخول.
             </div>
           )}
-          {isHesbah && !registered && (
-            <div
-              className="card2"
-              style={{
-                marginBottom: 10,
-                padding: 10,
-                fontSize: 11,
-                lineHeight: 1.65,
-                border: `1px solid ${accent}`,
-                background: 'rgba(230,81,0,0.06)',
-              }}
-            >
-              <div style={{ fontWeight: 800, color: accent, marginBottom: 4 }}>🔐 سجل الأسئلة</div>
-              <div style={{ color: 'var(--muted)' }}>
-                بدون تسجيل، السجل على هذا الجهاز فقط.{' '}
-                <strong style={{ color: 'var(--text)' }}>سجّل دخولك</strong> لحفظ الأسئلة التي ظهرت
-                ومتابعة من أي جهاز دون تكرار.
-              </div>
-              {typeof onGoAccount === 'function' && (
-                <button type="button" className="btn bg bsm mt2" style={{ width: 'auto' }} onClick={onGoAccount}>
-                  👤 حسابي
-                </button>
-              )}
-            </div>
-          )}
-
           {isHesbah && registered && authUid && (
             <div
               className="card2"

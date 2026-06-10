@@ -1,5 +1,4 @@
 ﻿import '../styles/hesbah.css';
-import '../styles/knowledge-chest.css';
 import { formatOtherSessionsHint, getAllActiveSessions } from '../shared/gameSessionRegistry';
 import { setLastPlayedGame } from '../question-bank/qbank.helpers';
 
@@ -9,7 +8,8 @@ const GAME_BANK_TYPE = {
   hesbah: 'hesbah',
 };
 
-export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame, bankTotal }) {
+/** ساحة الألعاب — الألعاب + بوابة صوتك */
+export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
   const activeSessions = getAllActiveSessions();
 
   return (
@@ -31,8 +31,12 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
           setLastPlayedGame(GAME_BANK_TYPE.nicknames);
           setSelectedGame('nicknames');
         }}
-        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
-        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = 'scale(.98)';
+        }}
+        onTouchEnd={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🎭</div>
@@ -41,7 +45,9 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
             <div className="home-game-card__sub">أخفِ هويتك واكشف الآخرين قبل أن يكشفوك</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
               {['6-50 لاعب', 'متعدد الجولات', 'إثارة وتشويق'].map((t) => (
-                <span key={t} className="tag tg" style={{ fontSize: 10 }}>{t}</span>
+                <span key={t} className="tag tg" style={{ fontSize: 10 }}>
+                  {t}
+                </span>
               ))}
             </div>
           </div>
@@ -55,8 +61,12 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
           setLastPlayedGame(GAME_BANK_TYPE.qumairi);
           setSelectedGame('qumairi');
         }}
-        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
-        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = 'scale(.98)';
+        }}
+        onTouchEnd={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🦅</div>
@@ -65,11 +75,15 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
             <div className="home-game-card__sub">وزّع القميري على الأشجار واهجم مجموعات الخصوم</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
               {['2-6 مجموعات', '100 قميري', 'استراتيجية'].map((t) => (
-                <span key={t} className="tag" style={{ fontSize: 10 }}>{t}</span>
+                <span key={t} className="tag" style={{ fontSize: 10 }}>
+                  {t}
+                </span>
               ))}
             </div>
           </div>
-          <div className="home-game-card__arrow" style={{ fontSize: 20 }}>←</div>
+          <div className="home-game-card__arrow" style={{ fontSize: 20 }}>
+            ←
+          </div>
         </div>
       </div>
 
@@ -79,8 +93,12 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
           setLastPlayedGame(GAME_BANK_TYPE.hesbah);
           setSelectedGame('hesbah');
         }}
-        onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(.98)'; }}
-        onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = 'scale(.98)';
+        }}
+        onTouchEnd={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 44 }}>🎯</div>
@@ -89,7 +107,9 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
             <div className="home-game-card__sub">اختر درجتك، أجب بذكاء، ونافس على التتويج</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
               {['15–30 سؤال', 'تأمين واشتعال', 'رهان حاسم'].map((t) => (
-                <span key={t} className="tag" style={{ fontSize: 10 }}>{t}</span>
+                <span key={t} className="tag" style={{ fontSize: 10 }}>
+                  {t}
+                </span>
               ))}
             </div>
           </div>
@@ -97,40 +117,37 @@ export default function Home({ setSelectedGame, onOpenContribute, onSuggestGame,
         </div>
       </div>
 
-      <div className="qbank-section">
-        <div className="qbank-section__label">بنك الأسئلة المركزي</div>
-        <button type="button" className="qbank-entry" onClick={() => onOpenContribute?.()}>
-          <span className="qbank-entry__badge">ساهم معنا</span>
-          <div className="qbank-entry__icon">🗂️</div>
-          <div className="qbank-entry__body">
-            <div className="qbank-entry__title">اقترح سؤالاً للبنك</div>
-            <div className="qbank-entry__sub">
-              ساعدنا نوسّع بنك الأسئلة — يُراجع ويُصنَّف ويُستخدم في الألعاب
-            </div>
-            {bankTotal != null ? (
-              <div className="qbank-entry__meta">{bankTotal} سؤال جاهز في البنك</div>
-            ) : null}
-          </div>
-          <span className="qbank-entry__chevron">‹</span>
-        </button>
-      </div>
-
-      <div className="home-suggest-section">
+      <section className="home-teaser-zone" aria-label="قادم وصوتك">
         <div className="home-coming-teaser">
-          <div className="home-coming-teaser__icon">🎲</div>
+          <span className="home-coming-teaser__glow" aria-hidden />
+          <span className="home-coming-teaser__badge">قريباً</span>
+          <div className="home-coming-teaser__icon" aria-hidden>
+            🎲
+          </div>
           <div className="home-coming-teaser__title">المزيد قادم!</div>
-          <div className="home-coming-teaser__sub">ألعاب جماعية جديدة على الساحة</div>
+          <div className="home-coming-teaser__sub">ألعاب جماعية جديدة على الساحة — استعدوا للمفاجآت</div>
         </div>
 
-        <button type="button" className="home-suggest-entry" onClick={() => onSuggestGame?.()}>
-          <div className="home-suggest-entry__icon">💡</div>
-          <div className="home-suggest-entry__body">
-            <div className="home-suggest-entry__title">اقترح لعبة جديدة</div>
-            <div className="home-suggest-entry__sub">صوّتك — شاركنا فكرتك ونوصلها للفريق</div>
-          </div>
-          <span className="home-suggest-entry__chevron">‹</span>
+        <button
+          type="button"
+          className="home-suggest-entry"
+          onClick={() => onOpenVoiceSuggest?.()}
+        >
+          <span className="home-suggest-entry__shine" aria-hidden />
+          <span className="home-suggest-entry__icon" aria-hidden>
+            💡
+          </span>
+          <span className="home-suggest-entry__body">
+            <span className="home-suggest-entry__title">اقترح لعبة جديدة</span>
+            <span className="home-suggest-entry__sub">
+              صوتك يهمنا — شاركنا فكرتك ونوصلها للفريق
+            </span>
+          </span>
+          <span className="home-suggest-entry__chevron" aria-hidden>
+            ←
+          </span>
         </button>
-      </div>
+      </section>
     </div>
   );
 }

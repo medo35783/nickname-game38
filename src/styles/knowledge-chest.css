@@ -1,4 +1,4 @@
-/* بنك الأسئلة — واجهة مساهمة هادئة وواضحة */
+/* بنك المعرفة — واجهة مساهمة فخمة وموحّدة */
 
 /* ── مدخل الصفحة الرئيسية (ليس بطاقة لعبة) ── */
 .qbank-section {
@@ -96,36 +96,206 @@
   flex-shrink: 0;
 }
 
+/* ── بطاقة بنك المعرفة (صوتك + حسابي) ── */
+
+.kb-spotlight {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 168px;
+  padding: 20px 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(79, 163, 224, 0.48);
+  background: linear-gradient(155deg, var(--card) 0%, rgba(79, 163, 224, 0.1) 45%, rgba(155, 89, 182, 0.08) 100%);
+  box-shadow:
+    0 10px 36px rgba(79, 163, 224, 0.16),
+    0 0 0 1px rgba(155, 89, 182, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  text-align: center;
+  font-family: inherit;
+  color: inherit;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kb-spotlight:active {
+  transform: scale(0.98);
+}
+
+.kb-spotlight--wide {
+  min-height: 152px;
+  margin-bottom: 0;
+}
+
+.kb-spotlight__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(79, 163, 224, 0.28), transparent 62%),
+    radial-gradient(circle at 85% 100%, rgba(155, 89, 182, 0.14), transparent 50%),
+    radial-gradient(circle at 10% 80%, rgba(240, 192, 64, 0.08), transparent 45%);
+  opacity: 0.95;
+}
+
+.kb-spotlight__glyph {
+  position: relative;
+  z-index: 1;
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 14px rgba(79, 163, 224, 0.35));
+}
+
+.kb-spotlight__title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Cairo', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.kb-spotlight--wide .kb-spotlight__title {
+  font-size: 20px;
+}
+
+.kb-spotlight__sub {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.55;
+  max-width: 280px;
+}
+
+.kb-spotlight__cta {
+  position: relative;
+  z-index: 1;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.kb-spotlight__badge {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(79, 163, 224, 0.16);
+  color: var(--blue);
+  border: 1px solid rgba(79, 163, 224, 0.32);
+  box-shadow: 0 2px 10px rgba(79, 163, 224, 0.12);
+}
+
+.kb-spotlight__stats {
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(79, 163, 224, 0.28);
+  width: 100%;
+  max-width: 300px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.kb-spotlight__stats strong {
+  color: var(--gold);
+  font-weight: 900;
+}
+
+[data-theme="light"] .kb-spotlight {
+  border-color: rgba(42, 122, 184, 0.42);
+  box-shadow:
+    0 12px 32px rgba(42, 122, 184, 0.14),
+    0 0 0 1px rgba(125, 60, 152, 0.08);
+}
+
+.voice-spotlight .kb-spotlight,
+.kb-spotlight--cell {
+  min-height: 168px;
+  height: 100%;
+}
+
+.kb-spotlight-open {
+  border: 1px solid rgba(79, 163, 224, 0.38) !important;
+  background: linear-gradient(145deg, rgba(79, 163, 224, 0.12), var(--card)) !important;
+  color: var(--blue) !important;
+  font-weight: 800 !important;
+}
+
 /* ── صفحة البنك ── */
 .qbank-page-head {
-  margin-bottom: 16px;
+  position: relative;
+  margin-bottom: 18px;
+  padding: 22px 16px 20px;
+  border-radius: 20px;
+  text-align: center;
+  overflow: hidden;
+  border: 1px solid rgba(79, 163, 224, 0.42);
+  background: linear-gradient(155deg, var(--card) 0%, rgba(79, 163, 224, 0.12) 50%, rgba(155, 89, 182, 0.07) 100%);
+  box-shadow: 0 8px 28px rgba(79, 163, 224, 0.12);
+}
+
+.qbank-page-head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(79, 163, 224, 0.22), transparent 65%),
+    radial-gradient(circle at 80% 100%, rgba(155, 89, 182, 0.1), transparent 55%);
+}
+
+.qbank-page-head__glyph {
+  position: relative;
+  font-size: 42px;
+  line-height: 1;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 4px 12px rgba(79, 163, 224, 0.3));
 }
 
 .qbank-page-head__title {
+  position: relative;
   font-family: 'Cairo', sans-serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 900;
   color: var(--text);
   line-height: 1.35;
 }
 
 .qbank-page-head__sub {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 5px;
-  line-height: 1.7;
+  position: relative;
+  font-size: 13px;
+  color: var(--text-soft);
+  margin-top: 6px;
+  line-height: 1.65;
 }
 
 .qbank-page-head__count {
+  position: relative;
   display: inline-block;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--blue);
-  padding: 4px 10px;
+  padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(79, 163, 224, 0.1);
-  border: 1px solid rgba(79, 163, 224, 0.2);
+  background: rgba(79, 163, 224, 0.14);
+  border: 1px solid rgba(79, 163, 224, 0.28);
 }
 
 .qbank-form-section {
@@ -275,84 +445,180 @@
 }
 
 /* ── اقتراح لعبة + المزيد قادم ── */
-.home-suggest-section {
-  margin: 8px 0 16px;
+.home-teaser-zone {
+  margin: 20px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .home-coming-teaser {
+  position: relative;
   text-align: center;
-  padding: 18px 14px;
-  margin-bottom: 10px;
-  border-radius: 14px;
-  border: 1.5px dashed var(--border-subtle);
-  background: var(--card2);
+  padding: 22px 16px 18px;
+  border-radius: 18px;
+  border: 1.5px dashed rgba(155, 89, 182, 0.38);
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 0%, rgba(155, 89, 182, 0.14), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 85% 100%, rgba(240, 192, 64, 0.1), transparent 55%),
+    var(--card2);
+  overflow: hidden;
+}
+
+.home-coming-teaser__glow {
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(155, 89, 182, 0.12) 60deg,
+    transparent 120deg,
+    rgba(240, 192, 64, 0.1) 200deg,
+    transparent 280deg
+  );
+  animation: home-teaser-spin 12s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes home-teaser-spin {
+  to { transform: rotate(360deg); }
+}
+
+.home-coming-teaser__badge {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  background: rgba(240, 192, 64, 0.14);
+  border: 1px solid rgba(240, 192, 64, 0.35);
+  animation: home-badge-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes home-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 192, 64, 0.2); }
+  50% { box-shadow: 0 0 14px 2px rgba(240, 192, 64, 0.28); }
 }
 
 .home-coming-teaser__icon {
-  font-size: 30px;
+  position: relative;
+  z-index: 1;
+  font-size: 34px;
   line-height: 1;
-  margin-bottom: 6px;
-  opacity: 0.85;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 4px 12px rgba(155, 89, 182, 0.35));
+  animation: home-dice-float 3s ease-in-out infinite;
+}
+
+@keyframes home-dice-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-6px) rotate(4deg); }
 }
 
 .home-coming-teaser__title {
+  position: relative;
+  z-index: 1;
   font-family: 'Cairo', sans-serif;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 900;
-  color: var(--muted);
+  background: linear-gradient(135deg, var(--text), var(--purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .home-coming-teaser__sub {
-  font-size: 11px;
-  color: var(--dim);
-  margin-top: 4px;
-  line-height: 1.55;
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.6;
+  max-width: 280px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .home-suggest-entry {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 14px 14px;
-  border-radius: 14px;
-  border: 1.5px solid rgba(155, 89, 182, 0.35);
-  background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(240, 192, 64, 0.06));
+  padding: 16px 14px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(155, 89, 182, 0.42);
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.16), rgba(240, 192, 64, 0.08));
   cursor: pointer;
   text-align: right;
   font-family: inherit;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  box-shadow: 0 2px 14px rgba(155, 89, 182, 0.1);
+  color: inherit;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow:
+    0 4px 20px rgba(155, 89, 182, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-suggest-entry__shine {
+  position: absolute;
+  top: 0;
+  right: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  transform: skewX(-18deg);
+  animation: home-suggest-shine 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes home-suggest-shine {
+  0%, 100% { right: -60%; opacity: 0; }
+  45% { opacity: 1; }
+  55% { right: 120%; opacity: 0; }
 }
 
 .home-suggest-entry:hover,
 .home-suggest-entry:active {
-  border-color: rgba(155, 89, 182, 0.55);
-  background: linear-gradient(135deg, rgba(155, 89, 182, 0.14), rgba(240, 192, 64, 0.1));
-  transform: scale(0.99);
+  border-color: rgba(155, 89, 182, 0.62);
+  box-shadow:
+    0 8px 28px rgba(155, 89, 182, 0.22),
+    0 0 0 2px rgba(240, 192, 64, 0.1);
+  transform: scale(0.985);
 }
 
 .home-suggest-entry__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--card);
-  border: 1px solid rgba(155, 89, 182, 0.25);
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--card), rgba(155, 89, 182, 0.08));
+  border: 1px solid rgba(155, 89, 182, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 24px;
   flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(155, 89, 182, 0.15);
 }
 
 .home-suggest-entry__body {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
 }
 
 .home-suggest-entry__title {
   font-family: 'Cairo', sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
   color: var(--text);
   line-height: 1.35;
@@ -361,15 +627,25 @@
 .home-suggest-entry__sub {
   font-size: 11px;
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 4px;
   line-height: 1.55;
 }
 
 .home-suggest-entry__chevron {
-  font-size: 16px;
+  position: relative;
+  z-index: 1;
+  font-size: 18px;
   color: var(--purple);
   flex-shrink: 0;
   font-weight: 900;
+  opacity: 0.75;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.home-suggest-entry:hover .home-suggest-entry__chevron,
+.home-suggest-entry:active .home-suggest-entry__chevron {
+  transform: translateX(-4px);
+  opacity: 1;
 }
 
 [data-theme='dark'] .home-suggest-entry__chevron {

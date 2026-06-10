@@ -397,11 +397,11 @@ export default function TitlesAdminLive(props) {
         ─── إنهاء المسابقة نهائياً ───
       </div>
       <button
-        className="btn bgh"
-        style={{ border: '1px solid var(--red)', color: 'var(--red)' }}
+        type="button"
+        className="btn bgh game-admin-end-btn"
         onClick={() => setModal({ type: 'confirm_end' })}
       >
-        🛑 إنهاء المسابقة كاملاً
+        🏁 إنهاء اللعبة وإعلان الفائز
       </button>
     </div>
   );

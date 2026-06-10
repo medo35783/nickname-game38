@@ -197,6 +197,15 @@
         }
       }
     },
+    "arenaLeaderboard": {
+      "$weekId": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.hasChildren(['uid', 'weeklyPoints', 'updatedAt']) && newData.child('uid').val() == auth.uid && newData.child('weeklyPoints').isNumber() && newData.child('weeklyPoints').val() >= 0 && newData.child('updatedAt').isNumber()"
+        }
+      }
+    },
     "srooms": {
       "$roomCode": {
         ".read": "$roomCode.matches(/^[0-9]{4}$/)",

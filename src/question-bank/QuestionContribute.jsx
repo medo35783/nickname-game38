@@ -67,7 +67,7 @@ function validatePayload(payload) {
   return null;
 }
 
-export default function QuestionContribute({ notify, onBack }) {
+export default function QuestionContribute({ notify, onBack, backLabel }) {
   const [view, setView] = useState('add');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -132,7 +132,7 @@ export default function QuestionContribute({ notify, onBack }) {
   if (success) {
     return (
       <div className="scr">
-        {onBack ? <GameTopNav onBack={onBack} variant="arena" /> : null}
+        {onBack ? <GameTopNav onBack={onBack} variant="arena" label={backLabel} /> : null}
         <div className="qbank-success">
           <div className="qbank-success__icon">✅</div>
           <div className="qbank-success__title">تم إرسال سؤالك</div>
@@ -154,11 +154,12 @@ export default function QuestionContribute({ notify, onBack }) {
 
   return (
     <div className="scr">
-      {onBack ? <GameTopNav onBack={onBack} variant="arena" /> : null}
+      {onBack ? <GameTopNav onBack={onBack} variant="arena" label={backLabel} /> : null}
 
       <div className="qbank-page-head">
-        <div className="qbank-page-head__title">بنك الأسئلة</div>
-        <div className="qbank-page-head__sub">مساهمتك</div>
+        <div className="qbank-page-head__glyph">📚</div>
+        <div className="qbank-page-head__title">بنك المعرفة</div>
+        <div className="qbank-page-head__sub">مساهمتك — تُراجع وتُضاف للألعاب</div>
         {bankTotal != null ? (
           <span className="qbank-page-head__count">{bankTotal} سؤال في البنك</span>
         ) : null}

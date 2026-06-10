@@ -1,9 +1,10 @@
 ﻿import { useState, useRef, useEffect, useCallback } from "react";
 import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
 import { auth } from "./firebase";
+import { ARENA_BACK_LABEL, VOICE_BACK_LABEL, ACCOUNT_BACK_LABEL } from './core/constants';
 import Packages from './pages/Packages';
-import { SUPPORT_EMAIL, PLATFORM_NAME } from './core/constants';
 import Home from './pages/Home';
+import VoicePage from './pages/VoicePage';
 import QuestionContribute from './question-bank/QuestionContribute';
 import { fetchBankStats } from './question-bank/qbank.helpers';
 import './styles/knowledge-chest.css';
@@ -24,10 +25,23 @@ import ThemeToggle from './components/layout/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
 import { getEffectivePrice } from './core/subscriptionPackages';
+import { ensureArenaProfile } from './core/arenaProfile';
+import { arenaPointsForRank } from './core/arena.constants';
+import { rewardCurrentPlayerIfRegistered } from './core/arenaRewards';
+import { onArenaCelebration } from './core/arenaEvents';
+import useArenaProfile from './hooks/useArenaProfile';
+import ArenaLevelUpModal from './shared/ArenaLevelUpModal';
+import './styles/arena-badge.css';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
 const ADMIN_LOGO_TAPS = 7;
 const ADMIN_LOGO_TAP_MS = 2000;
+
+const CONTRIBUTE_BACK_LABELS = {
+  voice: VOICE_BACK_LABEL,
+  game: ARENA_BACK_LABEL,
+  account: ACCOUNT_BACK_LABEL,
+};
 
 const COMMUNITY_SUGGESTIONS = [
   { id: 1, cat: 'تصميم', text: 'وضع داكن أكثر', date: '2025-03-10' },
@@ -64,19 +78,31 @@ export default function App() {
   const [showCodeActivation, setShowCodeActivation] = useState(false);
   const [showEndGamePrompt, setShowEndGamePrompt] = useState(false);
   const [endGameData, setEndGameData] = useState(null);
-  const [voiceType, setVoiceType] = useState('suggest');
-  const [suggForm, setSuggForm] = useState({ cat: 'لعبة', text: '' });
+  const [arenaCelebration, setArenaCelebration] = useState(null);
+  const [voicePortal, setVoicePortal] = useState(null);
   const [adminPanelTab, setAdminPanelTab] = useState('codes');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountAuthMode, setAccountAuthMode] = useState('login');
   const [bankTotal, setBankTotal] = useState(null);
+  const [contributeOpen, setContributeOpen] = useState(false);
+  const [contributeReturnTab, setContributeReturnTab] = useState('game');
   const accountMenuRef = useRef(null);
 
-  const openContribute = useCallback(() => {
-    setTab('game');
-    setSelectedGame(null);
-    setGameScreen('contribute');
+  const openContribute = useCallback((fromTab = 'game') => {
+    setContributeReturnTab(fromTab);
+    setContributeOpen(true);
+    if (fromTab === 'game') {
+      setTab('game');
+      setSelectedGame(null);
+      setGameScreen('home');
+    }
   }, []);
+
+  const closeContribute = useCallback(() => {
+    setContributeOpen(false);
+    setTab(contributeReturnTab);
+    setGameScreen('home');
+  }, [contributeReturnTab]);
 
   useEffect(() => {
     let done = false;
@@ -114,6 +140,13 @@ export default function App() {
             email: user.email,
             displayName: user.displayName || '',
           });
+          const arenaPatch = await ensureArenaProfile(user.uid, {
+            email: user.email,
+            displayName: user.displayName || '',
+          });
+          if (arenaPatch?.isNewArenaProfile) {
+            notify('🏟️ مرحباً في الساحة — +300 نقطة ترحيب!', 'gold');
+          }
         }
 
         const adm = await adminProfileExistsForUid(user.uid);
@@ -184,15 +217,11 @@ export default function App() {
   }, []);
 
   const openVoiceSuggest = useCallback((preset = {}) => {
-    setVoiceType(preset.type || 'suggest');
-    setSuggForm({
-      cat: preset.cat || 'لعبة',
-      text: preset.text || '',
-    });
+    setVoicePortal(preset.portal || preset.type || 'suggest');
     setSelectedGame(null);
     setGameScreen('home');
     setTab('voice');
-    notify('💬 صوّتك — شاركنا فكرتك', 'info');
+    notify('💬 صوتك — مجتمع الساحة', 'info');
   }, [notify]);
 
   const openAdminGate = useCallback(() => {
@@ -229,7 +258,7 @@ export default function App() {
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [gameScreen, tab]);
+  }, [gameScreen, tab, contributeOpen]);
 
   const handleLogoSecretTap = useCallback(() => {
     const now = Date.now();
@@ -244,9 +273,50 @@ export default function App() {
     }
   }, [openAdminGate]);
 
-  const onGameEnd = useCallback((data) => {
+  useEffect(() => onArenaCelebration(setArenaCelebration), []);
+
+  const onGameEnd = useCallback(async (data) => {
     if (isAdmin || (activeCode && isCodeValid(activeCode))) return;
-    setEndGameData(data ?? null);
+
+    let arenaResult = null;
+    const rank = data?.playerStats?.rank;
+    if (rank != null && data?.game) {
+      const dedupeKey = `pfcc_arena_${data.game}_${data.roomCode || ''}_${rank}`;
+      if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem(dedupeKey)) {
+        try {
+          arenaResult = await rewardCurrentPlayerIfRegistered({
+            gameType: data.game,
+            rank,
+            roomCode: data.roomCode,
+          });
+          if (arenaResult?.pointsAwarded > 0) sessionStorage.setItem(dedupeKey, '1');
+          if (arenaResult && (arenaResult.tierUpgraded || arenaResult.newAchievements?.length)) {
+            setArenaCelebration(arenaResult);
+          }
+        } catch (e) {
+          console.warn('[arena]', e);
+        }
+      }
+    }
+
+    setEndGameData({
+      ...(data ?? {}),
+      arenaReward: arenaResult?.pointsAwarded ?? 0,
+      arenaShare: arenaResult
+        ? {
+            displayName: arenaResult.displayName,
+            avatarIcon: arenaResult.avatarIcon,
+            avatarFrame: arenaResult.newTier,
+            tierLabel: arenaResult.newTierLabel,
+            totalPoints: arenaResult.totalPoints,
+            arenaReward: arenaResult.pointsAwarded,
+            rank,
+            winner: data?.winner,
+            gameType: data?.game,
+            roomCode: data?.roomCode,
+          }
+        : null,
+    });
     setTimeout(() => {
       setShowEndGamePrompt(true);
     }, 2000);
@@ -265,10 +335,11 @@ export default function App() {
     (selectedGame === 'hesbah' && hesbahMeta.inRoom);
 
   const showHeaderBack =
-    (tab !== 'game' || selectedGame || (gameScreen !== 'home' && tab === 'game'))
-    && gameScreen !== 'contribute'
-      ? !hidePlatformBack
-      : false;
+    contributeOpen
+    || (
+      (tab !== 'game' || selectedGame || (gameScreen !== 'home' && tab === 'game'))
+      && !hidePlatformBack
+    );
 
   const renderGame = () => {
     const mounted = renderPlatformGame(selectedGame, {
@@ -288,114 +359,13 @@ export default function App() {
     });
     if (mounted) return mounted;
 
-    if (gameScreen === 'contribute') {
-      return (
-        <QuestionContribute
-          notify={notify}
-          onBack={() => setGameScreen('home')}
-        />
-      );
-    }
-
     if (gameScreen === 'home') {
       return (
-        <Home
-          setSelectedGame={setSelectedGame}
-          onOpenContribute={openContribute}
-          onSuggestGame={() => openVoiceSuggest({ type: 'suggest', cat: 'لعبة' })}
-          bankTotal={bankTotal}
-        />
+        <Home setSelectedGame={setSelectedGame} onOpenVoiceSuggest={openVoiceSuggest} />
       );
     }
 
     return null;
-  };
-
-  const renderVoice = () => {
-    const typeConfig = {
-      suggest: { icon: '💡', label: 'اقتراح', emailSubject: `اقتراح [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة', 'تصميم', 'إحصائيات', 'أسعار', 'أخرى'] },
-      bug: { icon: '🐛', label: 'مشكلة', emailSubject: `مشكلة [${suggForm.cat}] — ${PLATFORM_NAME}`, cats: ['لعبة الألقاب', 'لعبة القميري', 'حَسْبة', 'تسجيل دخول', 'أخرى'] },
-      ask: { icon: '💬', label: 'استفسار', emailSubject: `استفسار — ${PLATFORM_NAME}`, cats: ['عام', 'الأسعار', 'طريقة اللعب', 'أخرى'] },
-    };
-
-    const cfg = typeConfig[voiceType];
-
-    return (
-      <div className="scr">
-        <div className="ptitle" style={{ marginBottom: 4 }}>📣 تحديثات</div>
-        <div className="psub" style={{ marginBottom: 12 }}>آخر ما يصير في {PLATFORM_NAME}</div>
-        {[
-          { id: 1, date: '2025-03-29', title: '🎉 إطلاق النسخة التجريبية', body: 'تم إطلاق لعبة الألقاب رسمياً مع دعم الغرف الحقيقية عبر Firebase!', isNew: true },
-          { id: 2, date: '2025-03-25', title: '⚡ نظام الهجوم المتزامن', body: 'الكل يهاجم في نفس الوقت — سرية تامة ثم كشف مفاجئ.', isNew: true },
-          { id: 3, date: '2025-03-20', title: '📊 إحصائيات الإثارة', body: 'أكثر لقب مطاردة وأقل اسم استهدافاً.', isNew: false },
-        ].map(n => (
-          <div key={n.id} className="news-item">
-            <div className="news-date">{n.isNew && <span className="news-new">جديد</span>}{n.date}</div>
-            <div className="news-title">{n.title}</div>
-            <div className="news-body">{n.body}</div>
-          </div>
-        ))}
-
-        <div className="div" style={{ margin: '18px 0 14px' }}>تواصل معنا</div>
-
-        <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
-          {Object.entries(typeConfig).map(([key, val]) => (
-            <button
-              key={key}
-              className={`btn bsm ${voiceType === key ? 'bg' : 'bgh'}`}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px' }}
-              onClick={() => {
-                setVoiceType(key);
-                setSuggForm(f => ({ ...f, cat: typeConfig[key].cats[0] }));
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{val.icon}</span>
-              <span style={{ fontSize: 10 }}>{val.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="ctitle">{cfg.icon} {cfg.label} جديد</div>
-          <div className="ig">
-            <label className="lbl">التصنيف</label>
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-              {cfg.cats.map(c => (
-                <button key={c} className={`btn bsm ${suggForm.cat === c ? 'bg' : 'bgh'}`} style={{ width: 'auto' }} onClick={() => setSuggForm(f => ({ ...f, cat: c }))}>{c}</button>
-              ))}
-            </div>
-          </div>
-          <div className="ig">
-            <label className="lbl">اكتب رسالتك</label>
-            <textarea className="inp" placeholder="اكتب هنا..." value={suggForm.text} onChange={e => setSuggForm(f => ({ ...f, text: e.target.value }))} />
-          </div>
-          <button className="btn bg" onClick={() => {
-            if (!suggForm.text.trim()) { notify('اكتب رسالتك أولاً', 'error'); return; }
-            const sub = encodeURIComponent(cfg.emailSubject);
-            const bod = encodeURIComponent(`النوع: ${cfg.label}\nالتصنيف: ${suggForm.cat}\n\n${suggForm.text}`);
-            window.open(`mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`);
-            setSuggForm(f => ({ ...f, text: '' }));
-            notify('✅ سيُفتح تطبيق البريد', 'success');
-          }}>📤 إرسال عبر البريد</button>
-          <div style={{ marginTop: 10, padding: '9px 12px', background: 'rgba(79,163,224,.07)', border: '1px solid rgba(79,163,224,.2)', borderRadius: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-            إلى: <strong style={{ color: 'var(--blue)' }}>{SUPPORT_EMAIL}</strong>
-          </div>
-        </div>
-
-        {COMMUNITY_SUGGESTIONS.length > 0 && (
-          <>
-            <div className="div">من المجتمع</div>
-            {COMMUNITY_SUGGESTIONS.map(s => (
-              <div key={s.id} className="sugg-item">
-                <div className="sugg-cat">{s.cat}</div>
-                <div className="sugg-text">{s.text}</div>
-                <div className="sugg-date">{s.date}</div>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-    );
   };
 
   const navItems = [
@@ -405,14 +375,15 @@ export default function App() {
     { id: 'pricing', icon: '💎', label: 'الباقات' },
   ];
 
+  const arena = useArenaProfile();
   const user = auth.currentUser;
-  const isGuest = Boolean(user?.isAnonymous);
-  const accountDisplayName =
-    isGuest
-      ? 'سجّل دخول'
-      : user?.displayName?.trim() ||
-        user?.email?.split('@')?.[0] ||
-        'حسابي';
+  const isGuest = arena.isGuest;
+  const accountDisplayName = isGuest
+    ? 'افتح شارتك'
+    : `${arena.avatarIcon} ${arena.displayName}`;
+  const accountBtnClass = isGuest
+    ? 'hdr-account-btn hdr-account-btn--guest'
+    : 'hdr-account-btn hdr-account-btn--arena';
 
   const openAccountTab = (mode = 'login') => {
     setAccountAuthMode(mode);
@@ -472,10 +443,18 @@ export default function App() {
           <div className="hdr-account-wrap" ref={accountMenuRef}>
             <button
               type="button"
-              className="hdr-account-btn"
+              className={accountBtnClass}
               onClick={() => setAccountMenuOpen((v) => !v)}
+              title={isGuest ? 'سجّل واحصل على شارة الساحة' : `${arena.points} نقطة ساحة`}
             >
-              👤 {accountDisplayName}
+              {isGuest ? `👤 ${accountDisplayName}` : (
+                <>
+                  {accountDisplayName}
+                  {arena.points > 0 ? (
+                    <span className="hdr-account-pts"> · {arena.points}</span>
+                  ) : null}
+                </>
+              )}
             </button>
             {accountMenuOpen ? (
               <div className="hdr-account-menu">
@@ -510,11 +489,11 @@ export default function App() {
             style={{ userSelect: 'none' }}
             onClick={handleLogoSecretTap}
           >
-            {tab === 'voice'
+            {contributeOpen
+              ? '📚 بنك المعرفة'
+              : tab === 'voice'
               ? '💬 صوّتك'
-              : tab === 'game' && gameScreen === 'contribute'
-                ? '📋 بنك الأسئلة'
-                : tab === 'game'
+              : tab === 'game'
                 ? '🏟️ ساحة الألعاب'
                 : tab === 'pricing'
                     ? '💎 الباقات'
@@ -532,12 +511,12 @@ export default function App() {
               className="btn bgh bsm"
               style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
               onClick={() => {
-                if (tab !== 'game') {
-                  goToTab('game');
+                if (contributeOpen) {
+                  closeContribute();
                   return;
                 }
-                if (gameScreen === 'contribute') {
-                  setGameScreen('home');
+                if (tab !== 'game') {
+                  goToTab('game');
                   return;
                 }
                 if (
@@ -594,9 +573,26 @@ export default function App() {
             onBack={() => setShowCodeActivation(false)}
           />
         ) : null}
-        {!showCodeActivation && tab==='voice'&&renderVoice()}
-        {!showCodeActivation && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
-        {!showCodeActivation && tab === 'codes' && isAdmin && (
+        {!showCodeActivation && contributeOpen ? (
+          <QuestionContribute
+            notify={notify}
+            onBack={closeContribute}
+            backLabel={CONTRIBUTE_BACK_LABELS[contributeReturnTab] || ARENA_BACK_LABEL}
+          />
+        ) : null}
+        {!showCodeActivation && !contributeOpen && tab === 'voice' && (
+          <VoicePage
+            notify={notify}
+            onOpenContribute={() => openContribute('voice')}
+            onGoAccount={() => openAccountTab('register')}
+            isGuest={isGuest}
+            bankTotal={bankTotal}
+            initialPortal={voicePortal}
+            communitySuggestions={COMMUNITY_SUGGESTIONS}
+          />
+        )}
+        {!showCodeActivation && !contributeOpen && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
+        {!showCodeActivation && !contributeOpen && tab === 'codes' && isAdmin && (
           <div className="scr">
             <div className="tabs">
               <button
@@ -623,7 +619,7 @@ export default function App() {
               )}
           </div>
         )}
-        {!showCodeActivation && tab === 'account' && (
+        {!showCodeActivation && !contributeOpen && tab === 'account' && (
           <AccountPage
             notify={notify}
             activeCode={activeCode}
@@ -631,7 +627,7 @@ export default function App() {
             isAdmin={isAdmin}
             onActivateCode={() => setShowCodeActivation(true)}
             onGoPricing={() => setTab('pricing')}
-            onOpenContribute={openContribute}
+            onOpenContribute={() => openContribute('account')}
             theme={theme}
             followSystem={followSystem}
             onSetTheme={setTheme}
@@ -639,7 +635,7 @@ export default function App() {
             initialAuthMode={accountAuthMode}
           />
         )}
-        {!showCodeActivation && tab==='pricing'&&(
+        {!showCodeActivation && !contributeOpen && tab==='pricing'&&(
           <Packages
             onSubscribe={(pkg) => {
               notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${getEffectivePrice(pkg)} ريال)`, 'info');
@@ -660,10 +656,44 @@ export default function App() {
         ))}
       </nav>
 
+      <ArenaLevelUpModal
+        celebration={arenaCelebration}
+        onClose={() => setArenaCelebration(null)}
+      />
+
       {showEndGamePrompt && (
         <EndGameJoinPrompt
           winner={endGameData?.winner}
           playerStats={endGameData?.playerStats}
+          arenaReward={endGameData?.arenaReward}
+          arenaShare={
+            endGameData?.arenaShare ||
+            (!isGuest && endGameData?.playerStats?.rank != null
+              ? {
+                  displayName: arena.displayName,
+                  avatarIcon: arena.avatarIcon,
+                  avatarFrame: arena.avatarFrame,
+                  tierLabel: arena.tier?.label,
+                  totalPoints: arena.points,
+                  arenaReward:
+                    endGameData?.arenaReward ||
+                    arenaPointsForRank(endGameData.playerStats.rank),
+                  rank: endGameData.playerStats.rank,
+                  winner: endGameData?.winner,
+                  gameType: endGameData?.game,
+                  roomCode: endGameData?.roomCode,
+                }
+              : null)
+          }
+          isGuest={isGuest}
+          notify={notify}
+          onArenaSignup={() => {
+            setShowEndGamePrompt(false);
+            setEndGameData(null);
+            setAccountAuthMode('register');
+            setTab('account');
+            notify('🏟️ افتح شارة الساحة — سجّل في 30 ثانية', 'gold');
+          }}
           onClose={() => {
             setShowEndGamePrompt(false);
             setEndGameData(null);
@@ -688,7 +718,7 @@ export default function App() {
           onContribute={() => {
             setShowEndGamePrompt(false);
             setEndGameData(null);
-            openContribute();
+            openContribute('game');
           }}
         />
       )}

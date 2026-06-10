@@ -1,8 +1,9 @@
+import { useEffect, useState } from 'react';
 import { ARENA_BACK_LABEL } from '../core/constants';
 import { getGameBrand } from './gameBrands';
 
 /**
- * ورقة خروج — واضحة وفخمة (نفس الشاشة للمشرف والمتسابق).
+ * ورقة خروج موحّدة — 3 خيارات أثناء اللعب، خياران بعد انتهاء المسابقة.
  */
 export default function GameExitSheet({
   open,
@@ -11,43 +12,88 @@ export default function GameExitSheet({
   roomCode,
   phase,
   onContinue,
-  onLeave,
+  onPause,
+  onQuit,
+  onArena,
   onClose,
 }) {
+  const [confirmQuit, setConfirmQuit] = useState(false);
+
+  useEffect(() => {
+    if (!open) setConfirmQuit(false);
+  }, [open]);
+
   if (!open) return null;
 
   const brand = getGameBrand(game);
   const isAdmin = role === 'admin';
   const gameEnded = phase === 'final' || phase === 'ended';
 
-  const continueCopy = gameEnded
-    ? {
-        icon: '📊',
-        title: 'أبقَ على التقارير',
-        sub: 'شاهد الملخص والنتائج',
-      }
-    : {
-        icon: '✅',
-        title: isAdmin ? 'أتابع إدارة الغرفة' : 'أتابع اللعب',
-        sub: 'إغلاق النافذة والبقاء هنا',
-      };
+  const handleOverlayClick = confirmQuit ? () => setConfirmQuit(false) : onClose;
 
-  const leaveCopy = gameEnded
-    ? {
-        icon: '🏟️',
-        title: ARENA_BACK_LABEL,
-        sub: 'المسابقة انتهت — يمكنك المغادرة',
-      }
-    : {
-        icon: '🚪',
-        title: isAdmin ? 'خروج من الغرفة' : ARENA_BACK_LABEL,
-        sub: isAdmin
-          ? 'مغادرة شاشة أو إنهاء المسابقة'
-          : 'مغادرة الغرفة والرجوع لساحة الألعاب',
-      };
+  if (confirmQuit) {
+    const title = isAdmin ? 'إلغاء المسابقة؟' : 'انسحاب من المسابقة؟';
+    const message = isAdmin
+      ? 'المتسابقون سيُخرجون من الغرفة — لا يمكن العودة لهذه الغرفة.'
+      : 'ستُسجَّل كمنسحب — يمكنك العودة لاحقاً برمز الغرفة ونفس اسمك.';
+    const confirmLabel = isAdmin ? 'نعم، إلغاء المسابقة' : 'نعم، انسحاب';
+
+    return (
+      <div className="game-exit-overlay" role="presentation" onClick={handleOverlayClick}>
+        <div
+          className={`game-exit-sheet game-exit-sheet--${game} game-exit-sheet--confirm`}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="game-exit-confirm-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="game-exit-sheet__close"
+            aria-label="رجوع للخيارات"
+            onClick={() => setConfirmQuit(false)}
+          >
+            ✕
+          </button>
+
+          <div className="game-exit-sheet__head">
+            <span className="game-exit-sheet__emoji" aria-hidden>
+              {isAdmin ? '⚠️' : '🚪'}
+            </span>
+            <h2 id="game-exit-confirm-title" className="game-exit-sheet__title">
+              {title}
+            </h2>
+            <p className="game-exit-sheet__lead">{message}</p>
+          </div>
+
+          <div className="game-exit-sheet__choices">
+            <button
+              type="button"
+              className="game-exit-card game-exit-card--end"
+              onClick={() => {
+                setConfirmQuit(false);
+                onQuit?.();
+              }}
+            >
+              <span className="game-exit-card__icon" aria-hidden>
+                {isAdmin ? '🛑' : '👋'}
+              </span>
+              <span className="game-exit-card__body">
+                <span className="game-exit-card__title">{confirmLabel}</span>
+              </span>
+            </button>
+          </div>
+
+          <button type="button" className="game-exit-sheet__back-btn" onClick={() => setConfirmQuit(false)}>
+            ↩ لا — أرجع للخيارات
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="game-exit-overlay" role="presentation" onClick={onClose}>
+    <div className="game-exit-overlay" role="presentation" onClick={handleOverlayClick}>
       <div
         className={`game-exit-sheet game-exit-sheet--${game}`}
         role="dialog"
@@ -61,7 +107,7 @@ export default function GameExitSheet({
 
         <div className="game-exit-sheet__head">
           <span className="game-exit-sheet__emoji" aria-hidden>
-            {brand.emoji}
+            {isAdmin && !gameEnded ? '👑' : brand.emoji}
           </span>
           <h2 id="game-exit-title" className="game-exit-sheet__title">
             {gameEnded ? 'المسابقة انتهت' : 'ماذا تريد أن تفعل؟'}
@@ -76,27 +122,65 @@ export default function GameExitSheet({
         <div className="game-exit-sheet__choices">
           <button type="button" className="game-exit-card game-exit-card--continue" onClick={onContinue}>
             <span className="game-exit-card__icon" aria-hidden>
-              {continueCopy.icon}
+              {gameEnded ? '📊' : '✅'}
             </span>
             <span className="game-exit-card__body">
-              <span className="game-exit-card__title">{continueCopy.title}</span>
-              <span className="game-exit-card__sub">{continueCopy.sub}</span>
+              <span className="game-exit-card__title">
+                {gameEnded ? 'أبقَ على التقارير' : isAdmin ? 'أتابع إدارة الغرفة' : 'أتابع اللعب'}
+              </span>
+              <span className="game-exit-card__sub">
+                {gameEnded ? 'شاهد الملخص والنتائج' : 'إغلاق النافذة والبقاء هنا'}
+              </span>
             </span>
           </button>
 
-          <button
-            type="button"
-            className={`game-exit-card ${gameEnded ? 'game-exit-card--arena' : 'game-exit-card--leave'}`}
-            onClick={onLeave}
-          >
-            <span className="game-exit-card__icon" aria-hidden>
-              {leaveCopy.icon}
-            </span>
-            <span className="game-exit-card__body">
-              <span className="game-exit-card__title">{leaveCopy.title}</span>
-              <span className="game-exit-card__sub">{leaveCopy.sub}</span>
-            </span>
-          </button>
+          {!gameEnded && (
+            <>
+              <button type="button" className="game-exit-card game-exit-card--pause" onClick={onPause}>
+                <span className="game-exit-card__icon" aria-hidden>
+                  ⏸️
+                </span>
+                <span className="game-exit-card__body">
+                  <span className="game-exit-card__title">
+                    {isAdmin ? 'مغادرة الشاشة فقط' : 'مغادرة مؤقتة'}
+                  </span>
+                  <span className="game-exit-card__sub">
+                    {isAdmin
+                      ? 'الغرفة تبقى مفتوحة — ترجع بـ «العودة للغرفة»'
+                      : 'تبقى مسجّلاً — ارجع بـ «العودة للغرفة»'}
+                  </span>
+                </span>
+              </button>
+
+              <button type="button" className="game-exit-card game-exit-card--end" onClick={() => setConfirmQuit(true)}>
+                <span className="game-exit-card__icon" aria-hidden>
+                  {isAdmin ? '🛑' : '👋'}
+                </span>
+                <span className="game-exit-card__body">
+                  <span className="game-exit-card__title">
+                    {isAdmin ? 'إلغاء المسابقة' : 'انسحاب من المسابقة'}
+                  </span>
+                  <span className="game-exit-card__sub">
+                    {isAdmin
+                      ? 'إغلاق الغرفة — المتسابقون يُخرجون'
+                      : 'تُسجَّل كمنسحب — يمكنك العودة بالرمز والاسم'}
+                  </span>
+                </span>
+              </button>
+            </>
+          )}
+
+          {gameEnded && (
+            <button type="button" className="game-exit-card game-exit-card--arena" onClick={onArena}>
+              <span className="game-exit-card__icon" aria-hidden>
+                🏟️
+              </span>
+              <span className="game-exit-card__body">
+                <span className="game-exit-card__title">{ARENA_BACK_LABEL}</span>
+                <span className="game-exit-card__sub">المسابقة انتهت — يمكنك المغادرة</span>
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </div>

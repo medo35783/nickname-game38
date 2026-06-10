@@ -595,8 +595,8 @@ export default function FameeriAdminPlay({
 
         {!endConfirm ? (
           <>
-            <button type="button" className="btn br fameeri-admin-end-btn" onClick={() => setEndConfirm(true)}>
-              🏆 إنهاء وإعلان الفائز
+            <button type="button" className="btn br game-admin-end-btn" onClick={() => setEndConfirm(true)}>
+              🏁 إنهاء اللعبة وإعلان الفائز
             </button>
             <button type="button" className="btn bgh mt2" onClick={onOpenReport}>
               📄 تقرير (طباعة / PDF)

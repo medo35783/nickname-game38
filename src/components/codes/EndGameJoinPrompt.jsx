@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { shareArenaVictoryImage, downloadArenaVictoryImage } from '../../core/arenaVictoryShare';
 import {
   SUBSCRIPTION_PACKAGES,
   SUBSCRIPTION_FEATURES,
@@ -7,6 +8,8 @@ import {
   promoDiscountPercent,
   savingsPercent
 } from '../../core/subscriptionPackages';
+import { arenaPointsForRank } from '../../core/arena.constants';
+import ArenaSignupPrompt from '../../shared/ArenaSignupPrompt';
 import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
 
 /**
@@ -23,6 +26,11 @@ import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
  * @param {() => void} props.onTryFree
  * @param {() => void} [props.onNewGame] — إن لم يُمرَّر، يُستدعى `onClose` عند «لعبة جديدة»
  * @param {() => void} [props.onContribute] — فتح بنك الأسئلة
+ * @param {() => void} [props.onArenaSignup] — فتح حسابي للتسجيل
+ * @param {boolean} [props.isGuest] — ضيف (عرض نقاط معلّقة)
+ * @param {number} [props.arenaReward] — نقاط أُضيفت للمسجّل
+ * @param {object} [props.arenaShare] — بيانات بطاقة المجد
+ * @param {(text: string, type?: string) => void} [props.notify]
  */
 
 const SUB_FEATURES = SUBSCRIPTION_FEATURES;
@@ -47,8 +55,30 @@ export default function EndGameJoinPrompt({
   onTryFree,
   onNewGame,
   onContribute,
+  onArenaSignup,
+  isGuest = false,
+  arenaReward = 0,
+  arenaShare = null,
+  notify,
 }) {
+  const [shareBusy, setShareBusy] = useState(false);
   const handleNewGame = onNewGame ?? onClose;
+  const pendingArenaPoints =
+    isGuest && playerStats?.rank != null ? arenaPointsForRank(playerStats.rank) : 0;
+
+  const handleShareArena = async (preferShare = true) => {
+    if (!arenaShare || shareBusy) return;
+    setShareBusy(true);
+    try {
+      const fn = preferShare ? shareArenaVictoryImage : downloadArenaVictoryImage;
+      const mode = await fn(arenaShare);
+      notify?.(mode === 'share' ? '✅ تم فتح المشاركة' : '📥 تم حفظ بطاقة المجد', 'success');
+    } catch {
+      notify?.('تعذّر إنشاء البطاقة', 'error');
+    } finally {
+      setShareBusy(false);
+    }
+  };
 
   useEffect(() => {
     const onKey = (e) => {
@@ -136,6 +166,76 @@ export default function EndGameJoinPrompt({
               </div>
               <div className="slbl">الوقت</div>
             </div>
+          </div>
+        ) : null}
+
+        {arenaReward > 0 ? (
+          <div
+            className="card"
+            style={{
+              marginBottom: 12,
+              textAlign: 'center',
+              background: 'linear-gradient(145deg, rgba(240,192,64,.12), rgba(15,15,34,.95))',
+              borderColor: 'rgba(240,192,64,.35)',
+            }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 4 }}>🏟️</div>
+            <div style={{ fontFamily: "'Cairo', sans-serif", fontSize: 16, fontWeight: 900, color: 'var(--gold)' }}>
+              +{arenaReward} نقطة ساحة
+            </div>
+            <div className="psub" style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
+              أُضيفت لشارتك — تظهر في قاعة المجد
+            </div>
+            {arenaShare ? (
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn bg bsm"
+                  style={{ flex: 1, minWidth: 120 }}
+                  disabled={shareBusy}
+                  onClick={() => void handleShareArena(true)}
+                >
+                  {shareBusy ? '⏳…' : '📤 شارك بطاقة مجدك'}
+                </button>
+                <button
+                  type="button"
+                  className="btn bgh bsm"
+                  style={{ flex: 1, minWidth: 100 }}
+                  disabled={shareBusy}
+                  onClick={() => void handleShareArena(false)}
+                >
+                  💾 حفظ
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isGuest && arenaShare && arenaReward <= 0 && playerStats?.rank != null ? (
+          <div style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              className="btn bo bsm"
+              style={{ width: '100%' }}
+              disabled={shareBusy}
+              onClick={() => void handleShareArena(true)}
+            >
+              {shareBusy ? '⏳…' : '📤 شارك بطاقة مجدك'}
+            </button>
+          </div>
+        ) : null}
+
+        {isGuest && typeof onArenaSignup === 'function' ? (
+          <div style={{ marginBottom: 12 }}>
+            <ArenaSignupPrompt
+              variant="compact"
+              pendingPoints={pendingArenaPoints}
+              localQuestionCount={0}
+              onSignup={onArenaSignup}
+              onDismiss={onClose}
+              dismissLabel="لاحقاً"
+              title="ثبّت مجدك في الساحة"
+            />
           </div>
         ) : null}
 

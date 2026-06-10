@@ -2,26 +2,46 @@
 import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
 import HesbahLeaderboardList from './HesbahLeaderboardList';
-import { HESBAH_ACCENT_CSS, hesbahPlayerQuestionView } from './HesbahHelpers';
+import {
+  HESBAH_ACCENT_CSS,
+  hesbahPlayerQuestionView,
+  siegeMinScore,
+  isTimerRunning,
+} from './HesbahHelpers';
 import HesbahTopNav from './HesbahTopNav';
 
 export function getHesbahPlayerAlerts(game, me) {
   const alerts = [];
   if (game?.phase === 'question' && !game?.deadline) {
     const qv = hesbahPlayerQuestionView(game);
-    if (qv.mode === 'blind-pick') {
-      alerts.push({ key: 'blind-pick', text: '🙈 عميان — اختر درجتك ثم ينكشف السؤال' });
-    } else if (qv.mode === 'pending') {
+    if (qv.mode === 'pending') {
       alerts.push({ key: 'wait-timer', text: '⏳ اختر درجتك — السؤال يظهر عند بدء المؤقت' });
     } else if (qv.oral) {
       alerts.push({ key: 'oral', text: '🎙️ استمع للمشرف — الأسئلة معه فقط' });
+    } else if (game?.specialRound === 'lucky' || game?.specialRound === 'siege') {
+      alerts.push({ key: 'scoreless', text: '⏸ انتظر بدء المؤقت لكتابة إجابتك' });
     } else {
       alerts.push({ key: 'wait-timer', text: '⏸ انتظر بدء المؤقت لكتابة إجابتك' });
     }
   }
-  if (game?.specialRound === 'blind') alerts.push({ key: 'blind', text: '🙈 جولة عميان — التصنيف فقط' });
-  if (game?.specialRound === 'speed') alerts.push({ key: 'speed', text: '⚡ سرعة قصوى (10 ث)' });
-  if (game?.specialRound === 'double') alerts.push({ key: 'double', text: '✖️2 الدرجة مضاعفة' });
+  if (game?.specialRound === 'risk2x') {
+    alerts.push({ key: 'risk2x', text: '🔥 خطر 2X — الخطأ أو التكرار يخصم ضعف درجتك!' });
+  }
+  if (game?.specialRound === 'risk') {
+    alerts.push({ key: 'risk', text: '🔥 كرت خطر — الخطأ أو التكرار يخصم نقاط درجتك!' });
+  }
+  if (game?.specialRound === 'triple') {
+    alerts.push({ key: 'triple', text: '💎 كرت ثلاثي — X3 للإجابة الصحيحة' });
+  }
+  if (game?.specialRound === 'lucky') {
+    alerts.push({ key: 'lucky', text: '🎲 كرت حظ — درجتك تُسحب عند الإرسال' });
+  }
+  if (game?.specialRound === 'siege') {
+    alerts.push({ key: 'siege', text: `⚔️ كرت حصار — أعلى درجة ${siegeMinScore(game?.totalQ || 15)}+ تلقائياً` });
+  }
+  if (game?.specialRound === 'dark') {
+    alerts.push({ key: 'dark', text: '🕶️ كرت ظلام — لا نتائج فورية' });
+  }
   if (me?.isOnFire) alerts.push({ key: 'fire', text: '🔥 أنت مشتعل — بونص +5 عند الإصابة' });
   if (game?.finalVoteActive) alerts.push({ key: 'vote', text: '🗳️ صوّت للسؤال الحاسم' });
   if (game?.phase === 'grading') {
@@ -38,17 +58,20 @@ export function getHesbahPlayerAlerts(game, me) {
   return alerts;
 }
 
-const PHASE_BADGE = {
-  question: 'جولة',
-  grading: 'تصحيح',
-  roundResult: 'نتيجة',
-  leaderboard: 'ترتيب',
-  final: 'نهائي',
-};
+const COMPACT_SKIP_ALERTS = new Set([
+  'wait-timer',
+  'scoreless',
+  'risk',
+  'risk2x',
+  'triple',
+  'lucky',
+  'siege',
+  'dark',
+  'grade',
+]);
 
-/**
- * غلاف المتسابق — تبويبان: الجولة + الترتيب (شريط رجوع ثابت دائماً)
- */
+const SPECIAL_UNTIL_TIMER = new Set(['risk', 'risk2x', 'triple', 'lucky', 'siege', 'dark']);
+
 export default function HesbahPlayerHud({
   roomCode,
   me,
@@ -60,11 +83,17 @@ export default function HesbahPlayerHud({
   initialTab = 'round',
   onExitRequest,
   hideTabs = false,
+  onOpenGuide,
+  compactAlerts = false,
 }) {
   const [playerTab, setPlayerTab] = useState(initialTab);
-  const alerts = getHesbahPlayerAlerts(game, me);
+  const alerts = getHesbahPlayerAlerts(game, me).filter((a) => {
+    if (!isTimerRunning(game) && SPECIAL_UNTIL_TIMER.has(a.key)) return false;
+    return !compactAlerts || !COMPACT_SKIP_ALERTS.has(a.key);
+  });
   const phase = game?.phase;
-  const phaseBadge = PHASE_BADGE[phase] || 'انتظار';
+  const qNum = game?.currentQ;
+  const qTotal = game?.totalQ || 15;
 
   useEffect(() => {
     if (phase === 'leaderboard') setPlayerTab('rank');
@@ -75,22 +104,34 @@ export default function HesbahPlayerHud({
     <div className="scr hesbah-theme hesbah-player-screen">
       <div className="hesbah-sticky-chrome">
         <LiveConnectionBar connected roomCode={roomCode} />
-        <HesbahTopNav onBack={onExitRequest} />
 
-        <header className="hesbah-player-hud hesbah-player-hud--compact">
-          <div className="hesbah-player-hud__main">
-            <Av p={me} sz={40} />
-            <div className="hesbah-player-hud__info">
-              <div className="hesbah-player-hud__name">{me?.name || 'متسابق'}</div>
-              <div className="hesbah-player-hud__score">
-                نقاطك{' '}
-                <strong style={{ color: HESBAH_ACCENT_CSS }}>{me?.totalScore ?? 0}</strong>
-                {me?.insuranceLeft > 0 && (
-                  <span className="hesbah-player-hud__ins"> · 🛡️ {me.insuranceLeft}</span>
-                )}
-              </div>
-            </div>
-            <span className="hesbah-player-hud__phase">{phaseBadge}</span>
+        <div className="hesbah-player-topbar">
+          <HesbahTopNav onBack={onExitRequest} />
+          {onOpenGuide && (
+            <button
+              type="button"
+              className="hesbah-hud-guide-btn"
+              onClick={onOpenGuide}
+              aria-label="دليل اللعبة"
+            >
+              📖
+            </button>
+          )}
+        </div>
+
+        <header className="hesbah-player-hud hesbah-player-hud--slim">
+          <Av p={me} sz={34} />
+          <div className="hesbah-player-hud__meta">
+            <span className="hesbah-player-hud__name">{me?.name || 'متسابق'}</span>
+            <span className="hesbah-player-hud__dot" aria-hidden="true">·</span>
+            <span className="hesbah-player-hud__round">
+              س{qNum || '—'}/{qTotal}
+            </span>
+            <span className="hesbah-player-hud__dot" aria-hidden="true">·</span>
+            <span className="hesbah-player-hud__pts">
+              <strong style={{ color: HESBAH_ACCENT_CSS }}>{me?.totalScore ?? 0}</strong>
+              <span> نقطة</span>
+            </span>
           </div>
         </header>
 
@@ -120,7 +161,10 @@ export default function HesbahPlayerHud({
             {!hideTabs && alerts.length > 0 && (
               <div className="hesbah-player-alerts">
                 {alerts.map((a) => (
-                  <div key={a.key} className="hesbah-player-alert">
+                  <div
+                    key={a.key}
+                    className={`hesbah-player-alert ${a.key === 'risk2x' ? 'hesbah-player-alert--risk2x' : ''}`}
+                  >
                     {a.text}
                   </div>
                 ))}

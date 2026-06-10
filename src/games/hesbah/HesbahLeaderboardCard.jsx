@@ -40,6 +40,12 @@ function LeaderboardRow({ p, rank, isMe }) {
       <div className="hesbah-lb-row__info">
         <span className="hesbah-lb-row__name">
           {p.name}
+          {p.arenaName && p.arenaName !== p.name ? (
+            <span className="hesbah-lb-row__arena-name" title="شارة الساحة">
+              {' '}
+              · {p.arenaName}
+            </span>
+          ) : null}
           {p.isOnFire && <span className="hesbah-lb-row__fire">🔥</span>}
         </span>
         {isMe && <span className="hesbah-lb-row__you">أنت</span>}

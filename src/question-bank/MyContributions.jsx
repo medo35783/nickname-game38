@@ -73,8 +73,8 @@ export default function MyContributions({ compact = false, onContribute }) {
           </p>
         )}
         {onContribute ? (
-          <button type="button" className="btn bo mt2" style={{ width: '100%', fontSize: 12 }} onClick={onContribute}>
-            فتح بنك الأسئلة
+          <button type="button" className="btn kb-spotlight-open mt2" style={{ width: '100%' }} onClick={onContribute}>
+            📚 فتح بنك المعرفة
           </button>
         ) : null}
       </div>

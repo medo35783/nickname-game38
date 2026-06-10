@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { db, ref, set, get, update, onValue, off, push, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
+import { db, ref, set, get, update, onValue, off, push, remove, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
+import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import { genCode, fmtMs, shuffle, mkInitials } from '../../core/helpers';
 import { AV_COLORS } from '../../core/constants';
 import Av from '../../shared/Av';
@@ -38,7 +39,6 @@ import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import TitlesGuideModal from './TitlesGuideModal';
 import StatsRemainingPanel from './stats/StatsRemainingPanel';
 import GameExitSheet from '../../shared/GameExitSheet';
-import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
@@ -52,7 +52,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   /** يمنع عرض أزرار «الرئيسية» قبل انتهاء التحقق من جلسة localStorage + Firebase */
   const [sessionGate, setSessionGate] = useState('checking');
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
-  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
   const pendingOnboardingRef = useRef(null);
@@ -299,19 +298,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   const openExitSheet = () => setExitSheetOpen(true);
 
-  const handleExitLeave = () => {
-    setExitSheetOpen(false);
-    if (phase === 'ended') {
-      withdrawToArena();
-      return;
-    }
-    if (role === 'admin') {
-      setAdminLeaveConfirmOpen(true);
-      return;
-    }
-    withdrawToArena();
-  };
-
   /** انسحاب مؤقت — يحفظ الغرفة للعودة التلقائية */
   const withdrawToTitlesHome = () => {
     setExitSheetOpen(false);
@@ -349,6 +335,26 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     resetTitlesRoomState();
     setSelectedGame(null);
     notify('عدت لساحة الألعاب', 'info');
+  };
+
+  const withdrawFromCompetition = async () => {
+    setExitSheetOpen(false);
+    if (myId && roomCode) {
+      try {
+        await remove(ref(db, `rooms/${roomCode}/players/${myId}`));
+      } catch {
+        /* ignore */
+      }
+    }
+    localStorage.removeItem('ng_session');
+    resetTitlesRoomState();
+    notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+  };
+
+  const cancelCompetitionFromExit = async () => {
+    setExitSheetOpen(false);
+    await cancelCompetition();
+    resetTitlesRoomState();
   };
 
   /** مسح جلسة الألقاب بالكامل */
@@ -601,6 +607,14 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       if(existing) {
         // REJOIN — player already registered
         const [existingId, existingData] = existing;
+        try {
+          const arenaFields = await fetchArenaFieldsForJoin();
+          if (Object.keys(arenaFields).length) {
+            await update(ref(db, `rooms/${joinInput}/players/${existingId}`), arenaFields);
+          }
+        } catch {
+          /* قد يمنعها قواعد Firebase — لا تعطل العودة */
+        }
         setMyId(existingId);
         setMyNickLocal(existingData.nick);
         setRoomCode(joinInput);
@@ -645,6 +659,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           return;
         }
       }
+      const arenaFields = await fetchArenaFieldsForJoin();
       const newRef = push(playersRef(joinInput));
       await set(newRef, {
         name: joinName.trim(),
@@ -654,6 +669,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         colorIdx: existingPlayers.length % AV_COLORS.length,
         status:'active', missedRounds:0,
         ...(hostUid ? { ownerUid: hostUid } : {}),
+        ...arenaFields,
       });
       setMyId(newRef.key);
       setMyNickLocal(joinNick.trim());
@@ -1137,12 +1153,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
     await update(gameRef(roomCode), {
       phase: 'ended',
-      endedBeforeStart: true,
+      cancelled: true,
       endedAt: Date.now(),
     });
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
-    notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+    notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
   };
 
   const endGame = async () => {
@@ -1689,6 +1705,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         const started = gameState?.createdAt;
         const timeSec = started ? Math.round((Date.now() - started) / 1000) : undefined;
         onGameEnd({
+          game: 'titles',
+          roomCode: joinInput || roomCode,
           winner: winnerName,
           playerStats: {
             rank,
@@ -2351,6 +2369,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     declareWinner,
     firebaseConnected,
     onPrepNextRound: () => setGameScreen('host_prep'),
+    onExitRequest: openExitSheet,
   };
 
   const mainEl = (() => {
@@ -2458,6 +2477,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           : remainingTitlesCount(playersList);
       return (
         <div className="scr">
+          <GameTopNav onBack={openExitSheet} sticky />
         <TitlesHostPrep
           roundNum={roundNum}
           playersList={playersList}
@@ -2558,7 +2578,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
     if (gameScreen === 'attack') {
       return (
-        <TitlesPlay
+        <div className="scr">
+          <GameTopNav onBack={openExitSheet} sticky />
+          <TitlesPlay
           role={role}
           players={players}
           gameState={gameState}
@@ -2590,6 +2612,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           allRoundsData={allRoundsData}
           firebaseConnected={firebaseConnected}
         />
+        </div>
       );
     }
 
@@ -2648,22 +2671,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         roomCode={roomCode}
         phase={phase}
         onContinue={() => setExitSheetOpen(false)}
-        onLeave={handleExitLeave}
+        onPause={withdrawToTitlesHome}
+        onQuit={role === 'admin' ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onArena={withdrawToArena}
         onClose={() => setExitSheetOpen(false)}
-      />
-      <GameAdminLeaveConfirm
-        open={adminLeaveConfirmOpen}
-        competitionStarted={titlesCompetitionStarted}
-        onPauseOnly={() => {
-          setAdminLeaveConfirmOpen(false);
-          withdrawToTitlesHome();
-        }}
-        onEndGame={() => {
-          setAdminLeaveConfirmOpen(false);
-          if (titlesCompetitionStarted) setModal({ type: 'confirm_end' });
-          else void cancelCompetition();
-        }}
-        onCancel={() => setAdminLeaveConfirmOpen(false)}
       />
       {renderOverlays()}
       {mainEl}

@@ -19,5 +19,5 @@ export function hasTitlesCompetitionStarted(gameState, allRoundsData) {
 }
 
 export function isGameCancelled(gameState) {
-  return Boolean(gameState?.endedBeforeStart);
+  return Boolean(gameState?.cancelled || gameState?.endedBeforeStart);
 }

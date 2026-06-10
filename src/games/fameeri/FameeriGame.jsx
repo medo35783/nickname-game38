@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { ref as dbRef, set, get, update, push, onValue, off } from 'firebase/database';
+import { ref as dbRef, set, get, update, push, onValue, off, remove } from 'firebase/database';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../../firebase';
 import { Q_TREES, Q_WEAPONS, Q_TOTAL } from '../../core/constants';
 import { genCode, playSound } from '../../core/helpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
+import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import FameeriRevealOverlay from './FameeriRevealOverlay';
 import { openFameeriPrintableReport } from './fameeriPrintReport';
 import { patchLeaderByUid } from './fameeriLeaderIndex';
@@ -38,7 +39,6 @@ import FameeriAdminPlay from './FameeriAdminPlay';
 import FameeriPlayerPlay from './FameeriPlayerPlay';
 import FameeriPlayerLeaderNotice from './FameeriPlayerLeaderNotice';
 import GameExitSheet from '../../shared/GameExitSheet';
-import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasFameeriCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
@@ -94,7 +94,6 @@ const FameeriGame = forwardRef(function FameeriGame(
   const pendingOnboardingRef = useRef(null);
   const sessionRestoredRef = useRef(false);
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
-  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!canCreateRoom || pendingOnboardingRef.current !== 'admin') return;
@@ -557,6 +556,7 @@ const FameeriGame = forwardRef(function FameeriGame(
         return;
       }
 
+      const arenaFields = await fetchArenaFieldsForJoin();
       const mRef = push(dbRef(db, `qrooms/${qJoinInput}/members`));
       await set(mRef, {
         name: qMyName.trim(),
@@ -564,6 +564,7 @@ const FameeriGame = forwardRef(function FameeriGame(
         role: 'member',
         joinedAt: Date.now(),
         ...(uid ? { ownerUid: uid } : {}),
+        ...arenaFields,
       });
       setQMyId(mRef.key);
       setQRoom(qJoinInput);
@@ -664,7 +665,6 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   const withdrawToArena = () => {
     setExitSheetOpen(false);
-    setAdminLeaveConfirmOpen(false);
     if (isAdmin && qRoom) recordSessionEnd('fameeri', qRoom, false).catch(() => {});
     clearAdminSessionLocal(qRoom);
     localStorage.removeItem('ng_qumairi');
@@ -675,19 +675,38 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   const cancelFameeriCompetition = async () => {
     if (!qRoom) return;
-    setAdminLeaveConfirmOpen(false);
     await recordSessionEnd('fameeri', qRoom, true).catch(() => {});
     await update(dbRef(db, `qrooms/${qRoom}/game`), {
       phase: 'ended',
-      endedBeforeStart: true,
+      cancelled: true,
       endedAt: Date.now(),
     });
-    notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+    localStorage.removeItem('ng_qumairi');
+    notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+  };
+
+  const cancelCompetitionFromExit = async () => {
+    setExitSheetOpen(false);
+    await cancelFameeriCompetition();
+    resetFameeriRoomState();
+  };
+
+  const withdrawFromCompetition = async () => {
+    setExitSheetOpen(false);
+    if (qMyId && qRoom) {
+      try {
+        await remove(dbRef(db, `qrooms/${qRoom}/members/${qMyId}`));
+      } catch {
+        /* ignore */
+      }
+    }
+    localStorage.removeItem('ng_qumairi');
+    resetFameeriRoomState();
+    notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
   };
 
   const endFameeriCompetition = async () => {
     if (!qRoom) return;
-    setAdminLeaveConfirmOpen(false);
     if (!hasFameeriCompetitionStarted(qGameState, qAttacks)) {
       await cancelFameeriCompetition();
       return;
@@ -699,19 +718,6 @@ const FameeriGame = forwardRef(function FameeriGame(
   };
 
   const fameeriCompetitionStarted = hasFameeriCompetitionStarted(qGameState, qAttacks);
-
-  const handleExitLeave = () => {
-    setExitSheetOpen(false);
-    if (qPhase === 'ended') {
-      withdrawToArena();
-      return;
-    }
-    if (isAdmin) {
-      setAdminLeaveConfirmOpen(true);
-      return;
-    }
-    withdrawToArena();
-  };
 
   /* ── جلسة الأسئلة: استرجاع، سحب، إظهار، اعتماد ── */
   const qActiveQuestion = qGameState?.currentQuestion || null;
@@ -1272,7 +1278,7 @@ const FameeriGame = forwardRef(function FameeriGame(
       playerStats = { rank, hits, accuracy, time: timeSec };
     }
 
-    onGameEnd({ winner: winnerName, playerStats });
+    onGameEnd({ game: 'fameeri', roomCode: qRoom, winner: winnerName, playerStats });
   }, [qGameState, qRoom, qRole, qGroupId, qGroups, qAttacks, onGameEnd]);
 
   const shareRoomInvite = async ({ gameName, roomCode, preferWhatsApp = false }) => {
@@ -1611,18 +1617,10 @@ const FameeriGame = forwardRef(function FameeriGame(
         roomCode={qRoom}
         phase={qPhase}
         onContinue={() => setExitSheetOpen(false)}
-        onLeave={handleExitLeave}
+        onPause={withdrawToFameeriHome}
+        onQuit={isAdmin ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onArena={withdrawToArena}
         onClose={() => setExitSheetOpen(false)}
-      />
-      <GameAdminLeaveConfirm
-        open={adminLeaveConfirmOpen}
-        competitionStarted={fameeriCompetitionStarted}
-        onPauseOnly={() => {
-          setAdminLeaveConfirmOpen(false);
-          withdrawToFameeriHome();
-        }}
-        onEndGame={() => void endFameeriCompetition()}
-        onCancel={() => setAdminLeaveConfirmOpen(false)}
       />
       {renderMain()}
     </div>

@@ -1,10 +1,11 @@
-﻿import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { ref as dbRef, set, get, update, push, onValue, off, remove } from 'firebase/database';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../../firebase';
 import { genCode, playSound } from '../../core/helpers';
 import '../../styles/hesbah.css';
 import { buildGameSessionTracking, recordRoundCompleted, recordSessionEnd } from '../../core/sessionStats';
+import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import { AV_COLORS } from '../../core/constants';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import { ROOM_CODE_PLACEHOLDER, PLAYER_DISPLAY_NAME_PLACEHOLDER } from '../../core/formLabels';
@@ -18,9 +19,10 @@ import HesbahConfirmModal from './HesbahConfirmModal';
 import HesbahExitSheet from './HesbahExitSheet';
 import HesbahPlayerHud from './HesbahPlayerHud';
 import HesbahLeaderboardList from './HesbahLeaderboardList';
+import HesbahPlayerLeaderboard from './HesbahPlayerLeaderboard';
 import HesbahTopNav from './HesbahTopNav';
+import HesbahGuideModal from './HesbahGuideModal';
 import { GameSessionChecking } from '../../shared/GameTopNav';
-import GameAdminLeaveConfirm from '../../shared/GameAdminLeaveConfirm';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasHesbahCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
@@ -33,6 +35,7 @@ import {
   findLeftPlayerByName,
   HESBAH_STORAGE_KEY,
   hesbahPlayerPayload,
+  sortedHesbahPlayers,
   buildScoreBoard,
   questionDurationSec,
   clampCustomQuestionSecs,
@@ -44,9 +47,17 @@ import {
   HOT_STREAK_BONUS,
   computeFinalVoteWinner,
   groupDuplicateAnswers,
-  normalizeAnswer,
+  answerDedupeKey,
   gradedPoints,
   BOARD_CELL,
+  boardCellForCorrect,
+  pickRandomAvailableScore,
+  pickHighestAvailableScore,
+  siegeMinScore,
+  HESBAH_SPECIAL_LABELS,
+  isScorelessPickSpecial,
+  isRiskSpecial,
+  riskDeduction,
   QB_GAME_TYPE,
 } from './HesbahHelpers';
 import { normalizePoolToStructured } from '../fameeri/fameeriQuestionPool';
@@ -72,6 +83,7 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [sessionGate, setSessionGate] = useState(() => (readSavedHesbah().roomCode ? 'checking' : 'ready'));
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
+  const [showGuide, setShowGuide] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [role, setRole] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -90,7 +102,9 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   const [answerText, setAnswerText] = useState('');
   const [chosenScore, setChosenScore] = useState(null);
-  const [insuranceActive, setInsuranceActive] = useState(false);
+  const [shieldActive, setShieldActive] = useState(false);
+  const [confidenceActive, setConfidenceActive] = useState(false);
+  const [editPending, setEditPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(null);
   const [voteCountdown, setVoteCountdown] = useState(null);
@@ -98,15 +112,15 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [verdicts, setVerdicts] = useState({});
   const [duplicateMarked, setDuplicateMarked] = useState({});
   const [hostDraft, setHostDraft] = useState({ answer: '' });
-  const [roundSummary, setRoundSummary] = useState([]);
+  const [playerRoundView, setPlayerRoundView] = useState('result');
 
   const qCursorRef = useRef(null);
   const qBankMetaRef = useRef(null);
   const [adminQMeta, setAdminQMeta] = useState(null);
   const [confirmEarlyEndOpen, setConfirmEarlyEndOpen] = useState(false);
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
-  const [adminLeaveConfirmOpen, setAdminLeaveConfirmOpen] = useState(false);
   const endPromptRef = useRef(false);
+  const hesbahPlayerEndRef = useRef(false);
   const pendingOnboardingRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -126,6 +140,19 @@ const HesbahGame = forwardRef(function HesbahGame(
   const me = myId ? players[myId] : null;
   const phase = game?.phase || 'lobby';
 
+  const roundSummary = useMemo(() => {
+    const raw = game?.roundSummary;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((row) => ({
+      ...row,
+      player: players[row.playerId] || {
+        name: row.name || '—',
+        initials: (row.name || '?').slice(0, 2),
+        colorIdx: 0,
+      },
+    }));
+  }, [game?.roundSummary, players]);
+
   const prevQuestionRef = useRef(null);
   const prevSubmittedRef = useRef(undefined);
   const timeoutRoundRef = useRef(null);
@@ -137,21 +164,25 @@ const HesbahGame = forwardRef(function HesbahGame(
     if (prevQuestionRef.current !== null && prevQuestionRef.current !== q) {
       setAnswerText('');
       setChosenScore(null);
-      setInsuranceActive(false);
+      setShieldActive(false);
+      setConfidenceActive(false);
+      setEditPending(false);
     }
     prevQuestionRef.current = q;
   }, [game?.currentQ, game?.phase]);
 
-  /** مسح الإجابة المحلية عند إعادة ضبط الجولة من Firebase */
+  /** مسح الإجابة المحلية عند إعادة ضبط الجولة من Firebase — لا يُطبَّق أثناء وضع التعديل */
   useEffect(() => {
     const sub = me?.submitted;
-    if (sub === false && prevSubmittedRef.current === true) {
+    if (sub === false && prevSubmittedRef.current === true && !editPending) {
       setAnswerText('');
       setChosenScore(null);
-      setInsuranceActive(false);
+      setShieldActive(false);
+      setConfidenceActive(false);
+      setEditPending(false);
     }
     if (sub !== undefined) prevSubmittedRef.current = sub;
-  }, [me?.submitted]);
+  }, [me?.submitted, editPending]);
 
   /** انتهى الوقت دون إرسال — تعليم الدرجة المختارة محلياً */
   useEffect(() => {
@@ -246,6 +277,15 @@ const HesbahGame = forwardRef(function HesbahGame(
     onHesbahHeaderMeta?.({ inRoom });
     return () => onHesbahHeaderMeta?.({ inRoom: false });
   }, [roomCode, gameScreen, onHesbahHeaderMeta]);
+
+  /* ── متسابق: نتيجة الجولة ثم الترتيب بعد «متابعة» ── */
+  useEffect(() => {
+    if (!roomCode || !game) return;
+    if (phase === 'leaderboard') setPlayerRoundView('rank');
+    else if (phase === 'question' || phase === 'grading' || phase === 'lobby' || phase === 'final' || phase === 'ended') {
+      setPlayerRoundView('result');
+    }
+  }, [phase, roomCode, game?.currentQ]);
 
   /* ── Screen sync from phase ── */
   useEffect(() => {
@@ -367,6 +407,7 @@ const HesbahGame = forwardRef(function HesbahGame(
       }
       const board = buildScoreBoard(totalQ);
       const adminPid = hostUid;
+      const arenaFields = await fetchArenaFieldsForJoin();
       await update(dbRef(db), {
         [`srooms/${code}/adminId`]: hostUid,
         [`srooms/${code}/game`]: {
@@ -387,6 +428,7 @@ const HesbahGame = forwardRef(function HesbahGame(
         },
         [`srooms/${code}/players/${adminPid}`]: {
           ...hesbahPlayerPayload('المشرف', 0),
+          ...arenaFields,
           board,
           isHost: true,
         },
@@ -459,7 +501,8 @@ const HesbahGame = forwardRef(function HesbahGame(
         }
         const newRef = push(dbRef(db, `srooms/${code}/players`));
         pid = newRef.key;
-        await set(newRef, { ...hesbahPlayerPayload(name, colorIdx), board });
+        const arenaFields = await fetchArenaFieldsForJoin();
+        await set(newRef, { ...hesbahPlayerPayload(name, colorIdx), ...arenaFields, board });
       }
 
       setRoomCode(code);
@@ -573,7 +616,8 @@ const HesbahGame = forwardRef(function HesbahGame(
     Object.keys(players).forEach((pid) => {
       resets[`srooms/${roomCode}/players/${pid}/submittedAnswer`] = null;
       resets[`srooms/${roomCode}/players/${pid}/chosenScore`] = null;
-      resets[`srooms/${roomCode}/players/${pid}/insuranceUsed`] = false;
+      resets[`srooms/${roomCode}/players/${pid}/shieldActive`] = false;
+      resets[`srooms/${roomCode}/players/${pid}/confidenceActive`] = false;
       resets[`srooms/${roomCode}/players/${pid}/submitted`] = false;
     });
     if (Object.keys(resets).length) await update(dbRef(db), resets);
@@ -606,6 +650,7 @@ const HesbahGame = forwardRef(function HesbahGame(
       [`srooms/${roomCode}/game/deadline`]: null,
       [`srooms/${roomCode}/game/specialRound`]: null,
       [`srooms/${roomCode}/game/roundSecs`]: null,
+      [`srooms/${roomCode}/game/roundSummary`]: null,
     });
     await resetRoundAnswers();
     notify('اضغط «بدء المؤقت» عندما تكون جاهزاً', 'gold');
@@ -621,6 +666,7 @@ const HesbahGame = forwardRef(function HesbahGame(
       roundSecs: null,
       specialRound: ultimate ? null : null,
       finalVoteActive: false,
+      roundSummary: null,
     });
     if (ultimate && fixedScore) {
       const patches = {};
@@ -663,10 +709,18 @@ const HesbahGame = forwardRef(function HesbahGame(
       deadline: Date.now() + sec * 1000,
     });
     notify(`⏱️ بدأ المؤقت (${sec} ث)`, 'gold');
+    setShieldActive(false);
+    setConfidenceActive(false);
+    setEditPending(false);
   };
 
   const onSetSpecial = async (mode) => {
-    const labels = { blind: 'جولة عميان', speed: 'سرعة قصوى', double: 'كرت مضاعف' };
+    if (game?.phase !== 'question') return;
+    if (game?.deadline && game.deadline <= Date.now()) {
+      notify('انتهى وقت الجولة', 'gold');
+      return;
+    }
+    const labels = HESBAH_SPECIAL_LABELS;
     const turningOff = game?.specialRound === mode;
     const nextMode = turningOff ? null : mode;
     const patch = { specialRound: nextMode };
@@ -683,7 +737,7 @@ const HesbahGame = forwardRef(function HesbahGame(
     notify(
       game?.deadline && game.deadline > Date.now()
         ? `تم تفعيل ${labels[mode] || mode} — المؤقت ${previewSec}ث`
-        : `تم تجهيز ${labels[mode] || mode} — يُطبَّق عند بدء المؤقت (${previewSec}ث)`,
+        : `تم اختيار ${labels[mode] || mode} — يظهر للمتسابقين عند بدء المؤقت`,
       'gold'
     );
   };
@@ -693,17 +747,63 @@ const HesbahGame = forwardRef(function HesbahGame(
   };
 
   const submitAnswer = async () => {
-    if (!myId || me?.submitted) return;
+    if (!myId) return;
     if (!game?.deadline || game.deadline <= Date.now()) {
-      notify('انتظر حتى يبدأ المشرف المؤقت', 'gold');
+      notify('انتهى الوقت', 'gold');
       return;
     }
+
     const text = answerText.trim();
-    const score = game?.finalVoteResult ? game.finalVoteResult : chosenScore;
+    if (!text) return;
+
+    if (editPending && me?.submitted) {
+      setSubmitting(true);
+      try {
+        await update(dbRef(db, `srooms/${roomCode}/players/${myId}`), {
+          submittedAnswer: text,
+        });
+        const prev = answers?.[myId] || {};
+        await update(dbRef(db, `srooms/${roomCode}/answers/${myId}`), {
+          ...prev,
+          answer: text,
+          edited: true,
+          editedAt: Date.now(),
+        });
+        setEditPending(false);
+        notify('✅ تم تحديث إجابتك', 'success');
+      } catch {
+        notify('تعذّر إرسال التعديل', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (me?.submitted) return;
+    let score = game?.finalVoteResult ? game.finalVoteResult : chosenScore;
+    if (!game?.finalVoteResult && game?.specialRound === 'lucky') {
+      const rolled = pickRandomAvailableScore(me?.board, game?.totalQ);
+      if (!rolled) {
+        notify('لا توجد درجات متاحة للسحب', 'error');
+        return;
+      }
+      score = rolled;
+    } else if (!game?.finalVoteResult && game?.specialRound === 'siege') {
+      const min = siegeMinScore(game?.totalQ);
+      const rolled = pickHighestAvailableScore(me?.board, game?.totalQ, min);
+      if (!rolled) {
+        notify(`⚔️ حصار — لا توجد درجات ${min}+ متاحة`, 'error');
+        return;
+      }
+      score = rolled;
+    } else if (!game?.finalVoteResult && !isScorelessPickSpecial(game?.specialRound) && !score) {
+      return;
+    }
     if (!text || !score) return;
     setSubmitting(true);
     try {
-      const usedInsurance = insuranceActive && (me?.insuranceLeft || 0) > 0;
+      const useShield = shieldActive && !me?.shieldUsed;
+      const useConfidence = confidenceActive && !me?.confidenceUsed;
       const board = { ...(me.board || {}) };
       const key = String(score);
       if (!game?.finalVoteResult) board[key] = BOARD_CELL.USED;
@@ -711,22 +811,45 @@ const HesbahGame = forwardRef(function HesbahGame(
       await update(dbRef(db, `srooms/${roomCode}/players/${myId}`), {
         submittedAnswer: text,
         chosenScore: score,
-        insuranceUsed: usedInsurance,
+        shieldActive: useShield,
+        confidenceActive: useConfidence,
         submitted: true,
         board,
-        ...(usedInsurance ? { insuranceLeft: Math.max(0, (me.insuranceLeft || 0) - 1) } : {}),
+        ...(useShield ? { shieldUsed: true } : {}),
+        ...(useConfidence ? { confidenceUsed: true } : {}),
       });
       await set(dbRef(db, `srooms/${roomCode}/answers/${myId}`), {
         answer: text,
         chosenScore: score,
-        insuranceUsed: usedInsurance,
+        shieldActive: useShield,
+        confidenceUsed: useConfidence,
         ts: Date.now(),
       });
+      setEditPending(false);
       notify('✅ تم الإرسال', 'success');
     } catch {
       notify('تعذّر الإرسال', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onEditAnswer = async () => {
+    if (!myId || !me?.submitted || me?.editUsed || editPending) return;
+    if (!game?.deadline || game.deadline <= Date.now()) {
+      notify('انتهى وقت التعديل', 'gold');
+      return;
+    }
+    try {
+      const prevText = me?.submittedAnswer || answerText;
+      await update(dbRef(db, `srooms/${roomCode}/players/${myId}`), {
+        editUsed: true,
+      });
+      setAnswerText(prevText);
+      setEditPending(true);
+      notify('✏️ عدّل إجابتك ثم اضغط إرسال التعديل', 'gold');
+    } catch {
+      notify('تعذّر التعديل', 'error');
     }
   };
 
@@ -782,7 +905,11 @@ const HesbahGame = forwardRef(function HesbahGame(
       players,
       game?.hostParticipates ? hostAnswer : null
     );
-    const dupKeys = new Set(dupGroups.map((g) => normalizeAnswer(g.answer)));
+    const dupKeys = new Set(dupGroups.map((g) => g.dedupeKey || answerDedupeKey(g.answer)));
+    const dupContestantCount = (answerKey) => {
+      const group = dupGroups.find((g) => (g.dedupeKey || answerDedupeKey(g.answer)) === answerKey);
+      return group?.items.filter((it) => !it.isHost).length ?? 0;
+    };
     const spec = game?.specialRound;
     const currentQ = game?.currentQ || 1;
     const summary = [];
@@ -791,23 +918,35 @@ const HesbahGame = forwardRef(function HesbahGame(
 
     Object.entries(answers).forEach(([pid, row]) => {
       const p = players[pid] || {};
-      const key = normalizeAnswer(row.answer);
+      const key = answerDedupeKey(row.answer);
       const v = verdicts[pid];
       let delta = 0;
       let correct = false;
       const base = row.chosenScore || 0;
+      const bKey = String(base);
+      const isDupMarked = dupKeys.has(key) && duplicateMarked[key];
 
-      if (dupKeys.has(key)) {
-        const marked = duplicateMarked[key];
-        if (marked) {
-          delta = row.insuranceUsed ? Math.floor(base / 2) : 0;
+      if (isDupMarked) {
+        const groupSize = dupContestantCount(key);
+        const shieldOn = !!row.shieldActive;
+        const shieldProtects = shieldOn && groupSize === 2;
+
+        if (shieldProtects) {
+          delta = 0;
+        } else {
+          delta = -riskDeduction(base, spec);
+          const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
+          board[bKey] = BOARD_CELL.BURNED;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = 0;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = false;
+          hotStreak[pid] = 0;
         }
       } else if (v === 'correct') {
         correct = true;
-        delta = gradedPoints(base, true, spec, row.insuranceUsed);
-        const bKey = String(base);
+        delta = gradedPoints(base, true, spec, { confidenceUsed: !!row.confidenceUsed });
         const board = { ...(p.board || {}) };
-        board[bKey] = spec === 'double' ? BOARD_CELL.DOUBLE_WON : BOARD_CELL.WON;
+        board[bKey] = boardCellForCorrect(spec);
         playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
         if (currentQ >= HOT_STREAK_START_Q) {
           const streak = (p.consecutiveCorrect || 0) + 1;
@@ -821,8 +960,7 @@ const HesbahGame = forwardRef(function HesbahGame(
           delta += bonus;
         }
       } else if (v === 'wrong') {
-        delta = gradedPoints(base, false, spec, false);
-        const bKey = String(base);
+        delta = gradedPoints(base, false, spec);
         const board = { ...(p.board || {}) };
         board[bKey] = BOARD_CELL.BURNED;
         playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
@@ -831,17 +969,6 @@ const HesbahGame = forwardRef(function HesbahGame(
         hotStreak[pid] = 0;
       }
 
-      if (dupKeys.has(key) && duplicateMarked[key]) {
-        const bKey = String(base);
-        const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
-        board[bKey] = BOARD_CELL.BURNED;
-        playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
-        playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = 0;
-        playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = false;
-        hotStreak[pid] = 0;
-      }
-
-      const isDupMarked = dupKeys.has(key) && duplicateMarked[key];
       if (delta !== 0 || v === 'correct' || v === 'wrong' || isDupMarked) {
         const newTotal = (p.totalScore || 0) + delta;
         playerUpdates[`srooms/${roomCode}/players/${pid}/totalScore`] = newTotal;
@@ -851,9 +978,33 @@ const HesbahGame = forwardRef(function HesbahGame(
           player: p,
           delta,
           correct,
+          risk2x: spec === 'risk2x' && (v === 'wrong' || isDupMarked),
         });
       }
+    }); 
+
+    Object.entries(players).forEach(([pid, p]) => {
+      if (p.isHost || !isActiveHesbahPlayer(p)) return;
+      if (summary.some((s) => s.playerId === pid)) return;
+      summary.push({
+        playerId: pid,
+        name: p.name,
+        delta: 0,
+        correct: false,
+        missed: true,
+      });
     });
+
+    summary.sort((a, b) => b.delta - a.delta);
+
+    const roundSummaryPayload = summary.map(({ playerId, name, delta, correct, risk2x, missed }) => ({
+      playerId,
+      name,
+      delta,
+      correct: !!correct,
+      risk2x: !!risk2x,
+      missed: !!missed,
+    }));
 
     try {
       await update(dbRef(db), {
@@ -861,8 +1012,8 @@ const HesbahGame = forwardRef(function HesbahGame(
         [`srooms/${roomCode}/game/phase`]: 'roundResult',
         [`srooms/${roomCode}/game/hotStreak`]: hotStreak,
         [`srooms/${roomCode}/game/specialRound`]: null,
+        [`srooms/${roomCode}/game/roundSummary`]: roundSummaryPayload,
       });
-      setRoundSummary(summary);
       await recordRoundCompleted('hesbah', roomCode);
     } catch (err) {
       console.error('[hesbah] applyGrading', err);
@@ -904,13 +1055,20 @@ const HesbahGame = forwardRef(function HesbahGame(
       await recordSessionEnd('hesbah', roomCode, true);
       await update(dbRef(db, `srooms/${roomCode}/game`), {
         phase: 'ended',
-        endedBeforeStart: true,
+        cancelled: true,
         endedAt: Date.now(),
       });
-      notify('تم إلغاء المسابقة — لم تبدأ بعد', 'info');
+      clearHesbahSession();
+      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
     } catch {
       notify('تعذّر إلغاء المسابقة', 'error');
     }
+  };
+
+  const cancelCompetitionFromExit = async () => {
+    setExitSheetOpen(false);
+    await cancelCompetition();
+    resetHesbahRoomState();
   };
 
   const requestEarlyEnd = async () => {
@@ -956,19 +1114,6 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   const openExitSheet = () => setExitSheetOpen(true);
 
-  const handleExitLeave = () => {
-    setExitSheetOpen(false);
-    if (phase === 'final' || phase === 'ended') {
-      void withdrawToArena();
-      return;
-    }
-    if (role === 'admin') {
-      setAdminLeaveConfirmOpen(true);
-      return;
-    }
-    void withdrawToArena();
-  };
-
   const resetHesbahRoomState = () => {
     setRoomCode('');
     setRole(null);
@@ -984,22 +1129,18 @@ const HesbahGame = forwardRef(function HesbahGame(
     setGameScreen('home');
   };
 
-  const withdrawFromGame = async () => {
+  const pauseFromGame = async () => {
     setExitSheetOpen(false);
     const code = roomCode;
-    const withdrawingRole = role;
     const pid = myId;
     const savedName = players[pid]?.name || joinName;
 
     try {
-      if (withdrawingRole === 'player' && pid && code) {
-        await purgePlayerFromRoom(code, pid);
-        clearHesbahSession();
-      } else if (withdrawingRole === 'admin' && code) {
+      if (role === 'admin' && code) {
         await recordSessionEnd('hesbah', code, false);
         persistHesbahSession({ roomCode: code, role: 'admin', myId: pid, myName: savedName });
-      } else {
-        clearHesbahSession();
+      } else if (role === 'player' && code && pid) {
+        persistHesbahSession({ roomCode: code, role: 'player', myId: pid, myName: savedName });
       }
     } catch {
       /* ignore */
@@ -1007,12 +1148,26 @@ const HesbahGame = forwardRef(function HesbahGame(
 
     setSavedSession(readSavedHesbah());
     resetHesbahRoomState();
-    notify(
-      withdrawingRole === 'admin'
-        ? 'غادرت الغرفة — اضغط «العودة للغرفة» للرجوع'
-        : 'انسحبت — يمكنك الانضمام من جديد',
-      'info'
-    );
+    notify('يمكنك العودة للغرفة من شاشة اللعبة', 'info');
+  };
+
+  const withdrawFromCompetition = async () => {
+    setExitSheetOpen(false);
+    const code = roomCode;
+    const pid = myId;
+
+    try {
+      if (pid && code) {
+        await purgePlayerFromRoom(code, pid);
+      }
+      clearHesbahSession();
+    } catch {
+      /* ignore */
+    }
+
+    setSavedSession({});
+    resetHesbahRoomState();
+    notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
   };
 
   const withdrawToArena = async () => {
@@ -1047,6 +1202,25 @@ const HesbahGame = forwardRef(function HesbahGame(
     if (phase === 'final' && role === 'admin') void endGame();
   }, [phase, role]);
 
+  useEffect(() => {
+    if (phase !== 'final' || role !== 'player' || !onGameEnd || !roomCode) return;
+    if (isGameCancelled(game)) return;
+    if (hesbahPlayerEndRef.current) return;
+    hesbahPlayerEndRef.current = true;
+
+    const ranked = sortedHesbahPlayers(players);
+    const rankIdx = ranked.findIndex((p) => p.id === myId);
+    const rank = rankIdx >= 0 ? rankIdx + 1 : ranked.length || null;
+    const winnerName = ranked[0]?.name || '—';
+
+    onGameEnd({
+      game: 'hesbah',
+      roomCode,
+      winner: winnerName,
+      playerStats: rank != null ? { rank } : null,
+    });
+  }, [phase, role, onGameEnd, roomCode, players, myId, game]);
+
   /** عودة تلقائية للغرفة المحفوظة — مثل الألقاب والقميري */
   useEffect(() => {
     if (sessionGate !== 'checking') return undefined;
@@ -1064,6 +1238,9 @@ const HesbahGame = forwardRef(function HesbahGame(
   const renderMain = () => {
     if (sessionGate === 'checking') {
       return <GameSessionChecking emoji="🎯" />;
+    }
+    if (showGuide) {
+      return <HesbahGuideModal onClose={() => setShowGuide(false)} />;
     }
     if (showOnboarding) {
       return (
@@ -1102,12 +1279,30 @@ const HesbahGame = forwardRef(function HesbahGame(
               🔙 العودة للغرفة ({savedSession.roomCode})
             </button>
           )}
-          <button type="button" className="btn bg" onClick={() => (canCreateRoom ? setShowOnboarding('admin') : onRequestActivation?.())}>
-            👑 إنشاء غرفة
-          </button>
-          <button type="button" className="btn bo mt2" onClick={() => setShowOnboarding('player')}>
-            🎮 انضمام برمز الغرفة
-          </button>
+          <div className="card" style={{ marginTop: 8 }}>
+            <button type="button" className="btn bg" onClick={() => (canCreateRoom ? setShowOnboarding('admin') : onRequestActivation?.())}>
+              👑 إنشاء غرفة
+            </button>
+            <button type="button" className="btn bo mt2" onClick={() => setShowOnboarding('player')}>
+              🎮 انضمام برمز الغرفة
+            </button>
+            <button type="button" className="btn bgh mt2" onClick={() => setShowGuide(true)}>
+              📖 كيف تلعب؟ — دليل المشرف والمتسابق
+            </button>
+            <div className="div">قوانين سريعة</div>
+            {[
+              '🎯 كل درجة على لوحتك تُستخدم مرة واحدة — اخترها بذكاء',
+              '🔒 لا ترى إجابات أحد حتى ترسل — ضد التكرار',
+              '✍️ الإجابة الكتابية — التكرار أو الجهل أكثر أسباب الخطأ',
+              '⚡ كروت إثارة للمشرف + درع وتعديل وثقة للمتسابق (مرة للمسابقة)',
+              '🗳️ بعد آخر جولة: تصويت على قيمة السؤال الحاسم',
+              '🏆 أعلى مجموع نقاط يفوز',
+            ].map((r, i) => (
+              <div key={i} className="game-rule-row">
+                {r}
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -1149,6 +1344,9 @@ const HesbahGame = forwardRef(function HesbahGame(
             <button type="button" className="btn bg mt2" disabled={joinLoading} onClick={() => void joinRoom()}>
               {joinLoading ? '⏳' : '🚀 انضمام'}
             </button>
+            <button type="button" className="btn bgh mt2" onClick={() => setShowGuide(true)}>
+              📖 كيف تلعب؟
+            </button>
           </div>
         </div>
       );
@@ -1170,6 +1368,7 @@ const HesbahGame = forwardRef(function HesbahGame(
           onStart={() => void startGame()}
           onShare={shareRoomInvite}
           onExitRequest={openExitSheet}
+          onOpenGuide={() => setShowGuide(true)}
         />
       );
     }
@@ -1189,8 +1388,12 @@ const HesbahGame = forwardRef(function HesbahGame(
           setAnswerText={setAnswerText}
           chosenScore={chosenScore}
           setChosenScore={setChosenScore}
-          insuranceActive={insuranceActive}
-          setInsuranceActive={setInsuranceActive}
+          shieldActive={shieldActive}
+          setShieldActive={setShieldActive}
+          confidenceActive={confidenceActive}
+          setConfidenceActive={setConfidenceActive}
+          editPending={editPending}
+          onEditAnswer={() => void onEditAnswer()}
           onSubmit={() => void submitAnswer()}
           submitting={submitting}
           finalVoteActive={game?.finalVoteActive}
@@ -1198,6 +1401,7 @@ const HesbahGame = forwardRef(function HesbahGame(
           onVote={(v) => void onVote(v)}
           voteCountdown={voteCountdown}
           onExitRequest={openExitSheet}
+          onOpenGuide={() => setShowGuide(true)}
         />
       );
     }
@@ -1232,11 +1436,23 @@ const HesbahGame = forwardRef(function HesbahGame(
           canEarlyEnd={canEarlyEnd}
           onExitRequest={openExitSheet}
           notify={notify}
+          onOpenGuide={() => setShowGuide(true)}
         />
       );
     }
 
     if (gameScreen === 'roundResult') {
+      if (role === 'player' && playerRoundView === 'rank') {
+        return (
+          <HesbahPlayerLeaderboard
+            roomCode={roomCode}
+            players={players}
+            myId={myId}
+            game={game}
+            onExitRequest={openExitSheet}
+          />
+        );
+      }
       return (
         <HesbahResults
           roomCode={roomCode}
@@ -1245,9 +1461,9 @@ const HesbahGame = forwardRef(function HesbahGame(
           me={me}
           myId={myId}
           roundSummary={roundSummary}
-          showHud={role !== 'admin'}
+          showHud={role === 'player'}
           onExitRequest={openExitSheet}
-          onContinue={() => (role === 'admin' ? void onLeaderboard() : setGameScreen('leaderboard'))}
+          onContinue={() => (role === 'admin' ? void onLeaderboard() : setPlayerRoundView('rank'))}
         />
       );
     }
@@ -1269,25 +1485,20 @@ const HesbahGame = forwardRef(function HesbahGame(
               ➡️ السؤال التالي
             </button>
             {canEarlyEnd && (
-              <button type="button" className="btn br mt2" onClick={() => setConfirmEarlyEndOpen(true)}>
-                🏁 إنهاء المسابقة وإعلان الفائز
+              <button type="button" className="btn br game-admin-end-btn mt2" onClick={() => setConfirmEarlyEndOpen(true)}>
+                🏁 إنهاء اللعبة وإعلان الفائز
               </button>
             )}
           </div>
         );
       }
       return (
-        <HesbahPlayerHud
+        <HesbahPlayerLeaderboard
           roomCode={roomCode}
-          me={me}
+          players={players}
           myId={myId}
           game={game}
-          players={players}
-          initialTab="rank"
           onExitRequest={openExitSheet}
-          rankFooter={
-            <p className="hesbah-player-wait">⏳ انتظر المشرف للجولة التالية…</p>
-          }
         />
       );
     }
@@ -1378,22 +1589,10 @@ const HesbahGame = forwardRef(function HesbahGame(
         roomCode={roomCode}
         phase={phase}
         onContinue={() => setExitSheetOpen(false)}
-        onLeave={handleExitLeave}
+        onPause={() => void pauseFromGame()}
+        onQuit={role === 'admin' ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onArena={() => void withdrawToArena()}
         onClose={() => setExitSheetOpen(false)}
-      />
-      <GameAdminLeaveConfirm
-        open={adminLeaveConfirmOpen}
-        competitionStarted={competitionStarted}
-        onPauseOnly={() => {
-          setAdminLeaveConfirmOpen(false);
-          void withdrawFromGame();
-        }}
-        onEndGame={() => {
-          setAdminLeaveConfirmOpen(false);
-          if (competitionStarted) setConfirmEarlyEndOpen(true);
-          else void cancelCompetition();
-        }}
-        onCancel={() => setAdminLeaveConfirmOpen(false)}
       />
     </>
   );

@@ -75,36 +75,155 @@ export const DEFAULT_QUESTION_SECS = 20;
 export const TIMER_PRESET_SECS = [20, 30, 45, 60];
 export const MIN_QUESTION_SECS = 5;
 export const MAX_QUESTION_SECS = 300;
+export const LIGHTNING_QUESTION_SECONDS = 5;
 export const SPEED_QUESTION_SECONDS = 10;
 export const FINAL_VOTE_SECONDS = 15;
 
-/** أدوات الإثارة — للمشرف (شرح + تفعيل) */
+/** أدوات الإثارة — للمشرف (كرت واحد نشط لكل جولة — بعد بدء المؤقت) */
 export const HESBAH_SPECIAL_TOOLS = [
   {
-    id: 'blind',
-    icon: '🙈',
-    title: 'جولة عميان',
+    id: 'risk2x',
+    icon: '🔥',
+    title: 'كرت خطر 2X',
+    tag: '2X−',
+    short: 'خطأ أو تكرار = ضعف الخصم',
+    desc: 'الإجابة الخاطئة أو المكررة تخصم ضعف نقاط درجتك — النار أكثر توهجاً!',
+  },
+  {
+    id: 'risk',
+    icon: '🔥',
+    title: 'كرت خطر',
+    tag: '±نقاط',
+    short: 'خطأ أو تكرار = خصم الدرجة',
+    desc: 'الإجابة الخاطئة أو المكررة تخصم نقاط الدرجة التي راهنت بها من مجموعك.',
+  },
+  {
+    id: 'triple',
+    icon: '💎',
+    title: 'كرت ثلاثي',
+    tag: 'X3',
+    short: 'ثلاثة أضعاف الدرجة',
+    desc: 'كل إجابة صحيحة تُحسب بثلاثة أضعاف الدرجة المختارة.',
+  },
+  {
+    id: 'lucky',
+    icon: '🎲',
+    title: 'كرت حظ',
+    tag: 'عشوائي',
+    short: 'درجة تُسحب عند الإرسال',
+    desc: 'لا يختار اللاعب درجته — النظام يسحب عشوائياً من درجاته المتبقية لحظة الإرسال.',
+  },
+  {
+    id: 'siege',
+    icon: '⚔️',
+    title: 'كرت حصار',
+    tag: 'عالي',
+    short: 'أعلى درجة عالية تلقائياً',
+    desc: 'لا يختار اللاعب درجته — عند الإرسال تُفرض أعلى درجة متبقية من الدرجات العالية.',
+  },
+  {
+    id: 'dark',
+    icon: '🕶️',
+    title: 'كرت ظلام',
     tag: 'إخفاء',
-    short: 'اللاعبون يرون التصنيف فقط',
-    desc: 'يختفي نص السؤال عن الشاشة — يظهر التصنيف فقط. اقرأ السؤال بصوتك للجميع. ممتاز للمفاجأة أو الأسئلة السمعية.',
-  },
-  {
-    id: 'speed',
-    icon: '⚡',
-    title: 'سرعة قصوى',
-    tag: '10 ث',
-    short: `مؤقت ثابت ${SPEED_QUESTION_SECONDS} ثوانٍ`,
-    desc: `يُقفل مدة السؤال على ${SPEED_QUESTION_SECONDS} ثوانٍ مهما كانت الإعدادات. يضغط على اللاعبين ويرفع الإثارة.`,
-  },
-  {
-    id: 'double',
-    icon: '✖️2',
-    title: 'كرت مضاعف',
-    tag: '×2',
-    short: 'ضعف نقاط الإجابة الصحيحة',
-    desc: 'كل إجابة صحيحة تُحسب بضعف الدرجة التي اختارها اللاعب. الخطأ يبقى صفراً — لا يضاعف الخسارة.',
+    short: 'لا نتائج فورية',
+    desc: 'لا تظهر البطاقات الحية حتى تكتمل كل الإجابات أو ينتهي الوقت.',
   },
 ];
+
+/** أدوات المتسابق — مرة واحدة طيلة المسابقة */
+export const HESBAH_PLAYER_POWERS = [
+  {
+    id: 'shield',
+    icon: '🛡️',
+    label: 'درع',
+    timing: 'قبل الإرسال',
+    tip: 'حماية من التكرار مع لاعب واحد',
+    desc: 'إذا تكررت إجابتك مع شخص واحد فقط — تُحمى. أكثر من ذلك يُستهلك الدرع بلا حماية.',
+  },
+  {
+    id: 'edit',
+    icon: '✏️',
+    label: 'تعديل',
+    timing: 'بعد الإرسال',
+    tip: 'غيّر إجابتك مرة واحدة',
+    desc: 'غيّر إجابتك مرة بعد الإرسال قبل انتهاء المؤقت.',
+  },
+  {
+    id: 'confidence',
+    icon: '💪',
+    label: 'ثقة',
+    tag: 'X2',
+    timing: 'قبل الإرسال',
+    tip: 'صح = درجتك ×2',
+    desc: 'إذا كانت إجابتك صحيحة — الدرجة المختارة ×2.',
+  },
+];
+
+export const HESBAH_SPECIAL_LABELS = Object.fromEntries(
+  HESBAH_SPECIAL_TOOLS.map((tool) => [tool.id, tool.title])
+);
+
+export function specialRoundTimerSecs() {
+  return null;
+}
+
+export function isFixedTimerSpecial() {
+  return false;
+}
+
+export function isScorelessPickSpecial(specialRound) {
+  return specialRound === 'lucky' || specialRound === 'siege';
+}
+
+export function isDarkRound(specialRound) {
+  return specialRound === 'dark';
+}
+
+export function allContestantsSubmitted(players, answers) {
+  const contestants = Object.entries(players || {}).filter(
+    ([, p]) => !p?.isHost && isActiveHesbahPlayer(p)
+  );
+  if (!contestants.length) return false;
+  return contestants.every(([id, p]) => {
+    const row = answers?.[id];
+    return !!(row?.answer?.trim() || p.submitted);
+  });
+}
+
+/** انتهى وقت الجولة (المؤقت توقّف) */
+export function isTimerEnded(game) {
+  return !!(game?.deadline && game.deadline <= Date.now());
+}
+
+/** البطاقات الحية للمتسابقين — كرت ظلام يخفيها حتى اكتمال الإرسال أو انتهاء الوقت */
+export function shouldRevealLiveFeed(game, players, answers) {
+  if (!isDarkRound(game?.specialRound)) return true;
+  if (game?.phase === 'grading' || game?.phase === 'roundResult' || game?.phase === 'leaderboard') {
+    return true;
+  }
+  if (game?.phase !== 'question') return true;
+  if (isTimerWaiting(game)) return false;
+  if (isTimerEnded(game)) return true;
+  if (isTimerRunning(game)) return allContestantsSubmitted(players, answers);
+  return false;
+}
+
+export function siegeMinScore(totalQ) {
+  return Math.ceil((Number(totalQ) || 15) / 2);
+}
+
+export function pickRandomAvailableScore(board, totalQ) {
+  const list = pickAvailableScores(board, totalQ);
+  if (!list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+export function pickHighestAvailableScore(board, totalQ, minScore = 1) {
+  const list = pickAvailableScores(board, totalQ).filter((s) => s >= minScore);
+  if (!list.length) return null;
+  return Math.max(...list);
+}
 export const HOT_STREAK_START_Q = 6;
 export const HOT_STREAK_NEED = 3;
 export const HOT_STREAK_BONUS = 5;
@@ -114,6 +233,7 @@ export const BOARD_CELL = {
   USED: 'used',
   WON: 'won',
   DOUBLE_WON: 'double_won',
+  TRIPLE_WON: 'triple_won',
   BURNED: 'burned',
   TIMEOUT: 'timeout',
 };
@@ -127,6 +247,8 @@ export function boardCellMeta(state) {
       return { className: 'hesbah-score-btn--won', badge: '✓', title: 'إجابة صحيحة!' };
     case BOARD_CELL.DOUBLE_WON:
       return { className: 'hesbah-score-btn--double', badge: '×2', title: 'صحيح — درجة مضاعفة!' };
+    case BOARD_CELL.TRIPLE_WON:
+      return { className: 'hesbah-score-btn--triple', badge: '×3', title: 'صحيح — ثلاثي!' };
     case BOARD_CELL.BURNED:
       return { className: 'hesbah-score-btn--burned', badge: '✕', title: 'إجابة خاطئة' };
     case BOARD_CELL.TIMEOUT:
@@ -206,10 +328,13 @@ export function hesbahPlayerPayload(name, colorIdx) {
     totalScore: 0,
     consecutiveCorrect: 0,
     isOnFire: false,
-    insuranceLeft: 2,
+    shieldUsed: false,
+    editUsed: false,
+    confidenceUsed: false,
     submittedAnswer: null,
     chosenScore: null,
-    insuranceUsed: false,
+    shieldActive: false,
+    confidenceActive: false,
     submitted: false,
   };
 }
@@ -241,7 +366,8 @@ function parseSecs(value) {
 
 /** مدة السؤال الحالي: تخصيص الجولة ← الافتراضي من اللوبي */
 export function resolveQuestionSecs(game) {
-  if (game?.specialRound === 'speed') return SPEED_QUESTION_SECONDS;
+  const fixedTimer = specialRoundTimerSecs(game?.specialRound);
+  if (fixedTimer) return fixedTimer;
   const round = parseSecs(game?.roundSecs);
   if (round) return round;
   const def = parseSecs(game?.questionSecs);
@@ -250,14 +376,17 @@ export function resolveQuestionSecs(game) {
 }
 
 export function activeRoundSecs(game) {
-  if (game?.specialRound === 'speed') return SPEED_QUESTION_SECONDS;
+  const fixedTimer = specialRoundTimerSecs(game?.specialRound);
+  if (fixedTimer) return fixedTimer;
   return parseSecs(game?.roundSecs) ?? parseSecs(game?.questionSecs) ?? DEFAULT_QUESTION_SECS;
 }
 
 /** مدة سؤال الجولة (ثوانٍ) — جولة السرعة ثابتة 10ث */
 export function questionDurationSec(game) {
   if (!game || typeof game === 'string') {
-    return game === 'speed' ? SPEED_QUESTION_SECONDS : DEFAULT_QUESTION_SECS;
+    if (game === 'lightning') return LIGHTNING_QUESTION_SECONDS;
+    if (game === 'speed') return SPEED_QUESTION_SECONDS;
+    return DEFAULT_QUESTION_SECS;
   }
   return resolveQuestionSecs(game);
 }
@@ -343,12 +472,35 @@ export function normalizeAnswer(text) {
     .replace(/[؟?!.,،؛:]/g, '');
 }
 
+/** مطابقة أوسع — يتجاهل الأرقام الزائدة (مثل: تين ≈ تين 66) */
+export function normalizeAnswerLoose(text) {
+  return normalizeAnswer(text)
+    .replace(/\s*\d+\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** مفتاح تجميع التكرار والمطابقة مع المشرف */
+export function answerDedupeKey(text) {
+  return normalizeAnswerLoose(text) || normalizeAnswer(text);
+}
+
+/** مقارنة إجابة متسابق مع مرجع المشرف */
+export function compareToHostAnswer(playerAnswer, hostAnswer) {
+  if (!hostAnswer?.trim() || !playerAnswer?.trim()) return null;
+  if (normalizeAnswer(playerAnswer) === normalizeAnswer(hostAnswer)) return 'exact';
+  if (normalizeAnswerLoose(playerAnswer) === normalizeAnswerLoose(hostAnswer)) return 'similar';
+  return null;
+}
+
 export function groupDuplicateAnswers(answersMap, players, hostAnswer = null) {
   const buckets = {};
   const pushItem = (item) => {
-    const key = normalizeAnswer(item.answer);
+    const key = answerDedupeKey(item.answer);
     if (!key) return;
-    if (!buckets[key]) buckets[key] = { answer: item.answer, items: [] };
+    if (!buckets[key]) {
+      buckets[key] = { answer: item.answer, dedupeKey: key, items: [] };
+    }
     buckets[key].items.push(item);
   };
 
@@ -358,7 +510,8 @@ export function groupDuplicateAnswers(answersMap, players, hostAnswer = null) {
       name: players[pid]?.name || '—',
       answer: row?.answer,
       chosenScore: row.chosenScore,
-      insuranceUsed: !!row.insuranceUsed,
+      shieldActive: !!row.shieldActive,
+      confidenceUsed: !!row.confidenceUsed,
       player: players[pid],
       isHost: false,
     });
@@ -370,7 +523,8 @@ export function groupDuplicateAnswers(answersMap, players, hostAnswer = null) {
       name: 'المشرف',
       answer: hostAnswer.answer,
       chosenScore: null,
-      insuranceUsed: false,
+      shieldActive: false,
+      confidenceUsed: false,
       player: { name: 'المشرف', initials: '👑', colorIdx: 0 },
       isHost: true,
     });
@@ -383,14 +537,15 @@ export function uniqueAnswerEntries(answersMap, players, duplicateKeys) {
   const dupSet = new Set(duplicateKeys);
   return Object.entries(answersMap || {})
     .filter(([pid, row]) => {
-      const key = normalizeAnswer(row?.answer);
+      const key = answerDedupeKey(row?.answer);
       return key && !dupSet.has(key);
     })
     .map(([pid, row]) => ({
       playerId: pid,
       answer: row.answer,
       chosenScore: row.chosenScore,
-      insuranceUsed: !!row.insuranceUsed,
+      shieldActive: !!row.shieldActive,
+      confidenceUsed: !!row.confidenceUsed,
       player: players[pid],
     }));
 }
@@ -411,15 +566,30 @@ export function computeFinalVoteWinner(votes) {
   return best;
 }
 
-export function scoreMultiplier(specialRound) {
-  return specialRound === 'double' ? 2 : 1;
+export function riskDeduction(base, specialRound) {
+  if (specialRound === 'risk2x') return base * 2;
+  if (specialRound === 'risk') return base;
+  return 0;
 }
 
-export function gradedPoints(base, correct, specialRound, insuranceUsed) {
-  const mult = scoreMultiplier(specialRound);
-  if (!correct) return 0;
-  if (insuranceUsed) return Math.floor((base * mult) / 2);
-  return base * mult;
+export function isRiskSpecial(specialRound) {
+  return specialRound === 'risk' || specialRound === 'risk2x';
+}
+
+export function gradedPoints(base, correct, specialRound, { confidenceUsed = false } = {}) {
+  if (!correct) {
+    return -riskDeduction(base, specialRound);
+  }
+  let mult = 1;
+  if (specialRound === 'triple') mult = 3;
+  let pts = base * mult;
+  if (confidenceUsed) pts *= 2;
+  return pts;
+}
+
+export function boardCellForCorrect(spec) {
+  if (spec === 'triple') return BOARD_CELL.TRIPLE_WON;
+  return BOARD_CELL.WON;
 }
 
 export function pickAvailableScores(board, totalQ) {

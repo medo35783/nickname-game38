@@ -34,6 +34,7 @@ export default function HesbahLobby({
   onStart,
   onShare,
   onExitRequest,
+  onOpenGuide,
 }) {
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const list = Object.entries(players || {})
@@ -170,6 +171,12 @@ export default function HesbahLobby({
         <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
           يفضّل انضمام لاعبين اثنين على الأقل
         </div>
+      )}
+
+      {onOpenGuide && (
+        <button type="button" className="btn bgh mt2 hesbah-guide-open-btn" onClick={onOpenGuide}>
+          📖 كيف تلعب؟ — الدليل الكامل
+        </button>
       )}
 
       {startConfirmOpen && (

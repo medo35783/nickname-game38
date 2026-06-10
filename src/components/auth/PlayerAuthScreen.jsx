@@ -90,7 +90,7 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
     <div>
       {!compact ? (
         <p className="psub" style={{ textAlign: 'center', marginBottom: 12 }}>
-          اختياري — لحفظ اشتراكك بين الأجهزة
+          اختياري — افتح شارة الساحة (+300 نقطة ترحيب)
         </p>
       ) : null}
 

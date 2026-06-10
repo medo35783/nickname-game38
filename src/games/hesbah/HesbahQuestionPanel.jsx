@@ -62,6 +62,7 @@ export default function HesbahQuestionPanel({
   isFinalBet,
   finalBetScore,
   supervisorNotes,
+  compact = false,
 }) {
   const isHost = role === 'host';
   const mode = isHost ? 'host' : playerMode || 'visible';
@@ -80,6 +81,7 @@ export default function HesbahQuestionPanel({
     pending ? 'hesbah-question-panel--pending' : '',
     blindPick ? 'hesbah-question-panel--blind-pick' : '',
     showText && !isHost ? 'hesbah-question-panel--visible' : '',
+    compact ? 'hesbah-question-panel--compact' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -91,7 +93,9 @@ export default function HesbahQuestionPanel({
           <span className="hesbah-question-panel__label-tag">❓ السؤال</span>
         </span>
         {isHost && <span className="hesbah-question-panel__role-badge">للمشرف</span>}
-        {!isHost && <span className="hesbah-question-panel__role-badge hesbah-question-panel__role-badge--player">للمتسابق</span>}
+        {!isHost && !compact && (
+          <span className="hesbah-question-panel__role-badge hesbah-question-panel__role-badge--player">للمتسابق</span>
+        )}
       </div>
 
       {status}
@@ -120,7 +124,9 @@ export default function HesbahQuestionPanel({
           <span className="hesbah-question-panel__pending-icon">{pendingCopy.icon}</span>
           <p className="hesbah-question-panel__pending-title">{pendingCopy.title}</p>
           <p className="hesbah-question-panel__pending-hint">{pendingCopy.hint}</p>
-          <p className="hesbah-question-panel__pending-note">{pendingCopy.note}</p>
+          {!compact && pendingCopy.note && (
+            <p className="hesbah-question-panel__pending-note">{pendingCopy.note}</p>
+          )}
         </div>
       )}
 

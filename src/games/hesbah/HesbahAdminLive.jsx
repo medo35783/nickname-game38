@@ -1,5 +1,4 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import Av from '../../shared/Av';
 import LiveConnectionBar from '../titles/LiveConnectionBar';
 import HesbahCountdown from './HesbahCountdown';
 import HesbahRoomMeta from './HesbahRoomMeta';
@@ -8,14 +7,13 @@ import HesbahAdminLeaderboard from './HesbahAdminLeaderboard';
 import {
   groupDuplicateAnswers,
   uniqueAnswerEntries,
-  normalizeAnswer,
+  answerDedupeKey,
   questionDurationSec,
   activeRoundSecs,
   HESBAH_SPECIAL_TOOLS,
-  HESBAH_ACCENT_CSS,
-  HESBAH_SCORE_BG_CSS,
-  HESBAH_BORDER_CSS,
+  isFixedTimerSpecial,
   hesbahHostQuestionFlags,
+  isDarkRound,
 } from './HesbahHelpers';
 import HesbahQuestionPanel from './HesbahQuestionPanel';
 import HesbahTimerPicker from './HesbahTimerPicker';
@@ -24,8 +22,9 @@ import HesbahLiveAnswersPanel, {
   HesbahParticipantRoster,
   useHesbahLiveAnswers,
 } from './HesbahLiveAnswers';
-import HesbahConfirmModal from './HesbahConfirmModal';
+import HesbahAdminGrading from './HesbahAdminGrading';
 import HesbahTopNav from './HesbahTopNav';
+import HesbahConfirmModal from './HesbahConfirmModal';
 
 const PHASE_LABELS = {
   question: 'جولة سؤال',
@@ -65,6 +64,7 @@ export default function HesbahAdminLive({
   canEarlyEnd = false,
   onExitRequest,
   hostParticipates,
+  onOpenGuide,
 }) {
   const [adminTab, setAdminTab] = useState('round');
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
@@ -72,12 +72,14 @@ export default function HesbahAdminLive({
   const grading = phase === 'grading';
   const timerWaiting = phase === 'question' && !game?.deadline;
   const timerRunning = !!(game?.deadline && game.deadline > Date.now());
+  const timerStarted = phase === 'question' && !timerWaiting;
+  const special = game?.specialRound;
+  const darkRound = isDarkRound(special);
   const maxSec = questionDurationSec(game);
   const roundSecsUi = activeRoundSecs(game);
-  const hasRoundOverride = game?.roundSecs != null && game?.specialRound !== 'speed';
+  const hasRoundOverride = game?.roundSecs != null && !isFixedTimerSpecial(game?.specialRound);
   const totalQ = game?.totalQ || 15;
   const currentQ = game?.currentQ || 1;
-  const special = game?.specialRound;
   const progressPct = Math.min(100, Math.round((currentQ / totalQ) * 100));
   const hostQuestion =
     game?.hostQuestionText?.trim() || game?.questionText?.trim() || '';
@@ -92,7 +94,7 @@ export default function HesbahAdminLive({
     [answers, players, hostAnswer, hostParticipates]
   );
   const dupKeys = useMemo(
-    () => new Set(dupGroups.map((g) => normalizeAnswer(g.answer))),
+    () => new Set(dupGroups.map((g) => g.dedupeKey || answerDedupeKey(g.answer))),
     [dupGroups]
   );
   const uniques = useMemo(
@@ -104,7 +106,7 @@ export default function HesbahAdminLive({
     const ids = Object.keys(answers || {});
     if (!ids.length) return true;
     return ids.every((id) => {
-      const key = normalizeAnswer(answers[id]?.answer);
+      const key = answerDedupeKey(answers[id]?.answer);
       if (dupKeys.has(key)) return duplicateMarked[key] !== undefined;
       return verdicts[id] === 'correct' || verdicts[id] === 'wrong';
     });
@@ -145,7 +147,7 @@ export default function HesbahAdminLive({
             <p className="hesbah-admin-timer-hint">📱 السؤال يظهر للاعبين بعد «بدء المؤقت»</p>
           ) : null}
           <p className="hesbah-admin-micro">افتراضي {game?.questionSecs ?? 20} ث</p>
-          {game?.specialRound !== 'speed' && (
+          {!isFixedTimerSpecial(game?.specialRound) && (
             <>
               <HesbahTimerPicker compact activeSecs={roundSecsUi} onSelect={onRoundSecsChange} />
               {hasRoundOverride && (
@@ -224,6 +226,11 @@ export default function HesbahAdminLive({
             🏆 الترتيب
           </button>
         </nav>
+        {onOpenGuide && (
+          <button type="button" className="hesbah-guide-open-btn hesbah-guide-open-btn--inline" onClick={onOpenGuide}>
+            📖 الدليل
+          </button>
+        )}
       </div>
 
       <header className="hesbah-admin-hero">
@@ -258,10 +265,10 @@ export default function HesbahAdminLive({
           {canEarlyEnd && (
             <button
               type="button"
-              className="hesbah-admin-early-end"
+              className="hesbah-admin-early-end game-admin-end-btn"
               onClick={() => setConfirmEndOpen(true)}
             >
-              🏁 إنهاء وإعلان الفائز
+              🏁 إنهاء اللعبة وإعلان الفائز
             </button>
           )}
         </div>
@@ -271,17 +278,6 @@ export default function HesbahAdminLive({
         <HesbahAdminLeaderboard players={players} roomCode={roomCode} game={game} />
       ) : (
         <>
-          {phase === 'question' && (
-            <section className="hesbah-admin-panel hesbah-admin-tools-panel">
-              <HesbahAdminTools
-                activeSpecial={special}
-                timerRunning={timerRunning}
-                onSetSpecial={onSetSpecial}
-                onEndTimer={onEndTimer}
-              />
-            </section>
-          )}
-
           <HesbahQuestionPanel
             role="host"
             questionText={hostQuestion}
@@ -308,6 +304,15 @@ export default function HesbahAdminLive({
                 {timerColumn}
                 {hostColumn}
               </div>
+              <div className="hesbah-admin-tools-wrap">
+                <HesbahAdminTools
+                  activeSpecial={special}
+                  timerRunning={timerRunning}
+                  timerWaiting={timerWaiting}
+                  onSetSpecial={onSetSpecial}
+                  onEndTimer={onEndTimer}
+                />
+              </div>
             </section>
           )}
 
@@ -319,124 +324,36 @@ export default function HesbahAdminLive({
             />
           )}
 
-          {phase === 'question' && !hostParticipates && (
+          {timerStarted && (
             <HesbahLiveAnswersPanel
-              highlight
-              title="📡 مباشر"
-              help={HESBAH_LIVE_OPS_HELP}
+              highlight={!hostParticipates}
+              title={darkRound ? '📡 مباشر — المشرف يرى الكل' : hostParticipates ? '📡 حيّ' : '📡 مباشر'}
+              help={hostParticipates ? HESBAH_LIVE_HOST_HELP : HESBAH_LIVE_OPS_HELP}
               cards={liveCards}
+              darkMode={darkRound}
               emptyMessage={
                 timerRunning
-                  ? 'بانتظار أول إجابة…'
-                  : 'بعد بدء المؤقت تظهر الإجابات هنا مباشرة'
+                  ? darkRound
+                    ? '🕶️ ظلام — المتسابقون لا يرون الإجابات؛ أنت تراها هنا فوراً'
+                    : 'بانتظار أول إجابة…'
+                  : 'انتهى الوقت — راجع الإجابات قبل التصحيح'
               }
-            />
-          )}
-
-          {phase === 'question' && hostParticipates && hostSent && (
-            <HesbahLiveAnswersPanel
-              title="📡 حيّ"
-              help={HESBAH_LIVE_HOST_HELP}
-              cards={liveCards}
-              emptyMessage="بانتظار إجابات الآخرين…"
             />
           )}
 
           {grading && (
             <>
-              {hostParticipates && hostAnswer?.answer?.trim() && (
-                <section
-                  className="hesbah-admin-panel hesbah-admin-ref"
-                  style={{
-                    borderColor: HESBAH_ACCENT_CSS,
-                    background: HESBAH_SCORE_BG_CSS,
-                  }}
-                >
-                  <h3 className="hesbah-admin-panel__title">👑 مرجع المشرف</h3>
-                  <p className="hesbah-admin-ref__answer">{hostAnswer.answer}</p>
-                </section>
-              )}
-
-              {dupGroups.length > 0 && (
-                <section className="hesbah-admin-panel">
-                  <h3 className="hesbah-admin-panel__title">🔁 إجابات مكررة</h3>
-                  {dupGroups.map((g) => {
-                    const key = normalizeAnswer(g.answer);
-                    const marked = duplicateMarked[key];
-                    return (
-                      <div
-                        key={key}
-                        className={`hesbah-grade-box hesbah-admin-grade ${marked ? 'is-marked-dup' : ''}`}
-                      >
-                        <div className="hesbah-admin-grade__answer">{g.answer}</div>
-                        <div className="hesbah-admin-grade__who">
-                          {g.items.map((it) =>
-                            it.isHost
-                              ? `👑 ${it.name} (عرض)`
-                              : `${it.name} · درجة ${it.chosenScore ?? '—'}`
-                          ).join(' · ')}
-                        </div>
-                        {g.items.some((it) => it.isHost) && (
-                          <div className="hesbah-admin-grade__warn">⚠ تطابق مع المشرف</div>
-                        )}
-                        <button
-                          type="button"
-                          className={`btn bsm ${marked ? 'bg' : 'bgh'}`}
-                          style={marked ? { background: 'var(--red)' } : undefined}
-                          onClick={() => markDuplicate(key, !marked)}
-                        >
-                          {marked ? '✓ مكرر — صفر' : 'اعتماد كتكرار'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </section>
-              )}
-
-              <section className="hesbah-admin-panel">
-                <h3 className="hesbah-admin-panel__title">✨ إجابات فريدة</h3>
-                {uniques.length === 0 ? (
-                  <p className="hesbah-admin-panel__hint">لا توجد إجابات فريدة</p>
-                ) : (
-                  uniques.map((u) => {
-                    const v = verdicts[u.playerId];
-                    return (
-                      <div
-                        key={u.playerId}
-                        className={`hesbah-grade-box hesbah-admin-grade ${
-                          v === 'correct' ? 'is-correct' : v === 'wrong' ? 'is-wrong' : ''
-                        }`}
-                      >
-                        <div className="hesbah-admin-grade__row">
-                          <Av p={u.player} sz={36} />
-                          <div>
-                            <div className="hesbah-admin-grade__name">{u.player?.name}</div>
-                            <div className="hesbah-admin-grade__answer">{u.answer}</div>
-                            <div className="hesbah-admin-grade__score">درجة: {u.chosenScore}</div>
-                          </div>
-                        </div>
-                        <div className="hesbah-admin-grade__actions">
-                          <button
-                            type="button"
-                            className={`btn bsm ${v === 'correct' ? 'bg' : 'bgh'}`}
-                            onClick={() => toggleVerdict(u.playerId, 'correct')}
-                          >
-                            ✅ صحيح
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn bsm ${v === 'wrong' ? 'bg' : 'bgh'}`}
-                            style={v === 'wrong' ? { background: 'var(--red)' } : undefined}
-                            onClick={() => toggleVerdict(u.playerId, 'wrong')}
-                          >
-                            ❌ خطأ
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </section>
+              <HesbahAdminGrading
+                hostParticipates={hostParticipates}
+                hostAnswer={hostAnswer}
+                dupGroups={dupGroups}
+                duplicateMarked={duplicateMarked}
+                uniques={uniques}
+                verdicts={verdicts}
+                special={special}
+                onMarkDuplicate={markDuplicate}
+                onToggleVerdict={toggleVerdict}
+              />
 
               {!allGraded && (
                 <p className="hesbah-admin-footnote">صنّف الكل ثم أظهر النتيجة</p>
@@ -461,10 +378,10 @@ export default function HesbahAdminLive({
               {canEarlyEnd && (
                 <button
                   type="button"
-                  className="btn br hesbah-admin-cta hesbah-admin-cta--end"
+                  className="btn br hesbah-admin-cta hesbah-admin-cta--end game-admin-end-btn"
                   onClick={() => setConfirmEndOpen(true)}
                 >
-                  🏁 إنهاء المسابقة وإعلان الفائز
+                  🏁 إنهاء اللعبة وإعلان الفائز
                 </button>
               )}
             </>
