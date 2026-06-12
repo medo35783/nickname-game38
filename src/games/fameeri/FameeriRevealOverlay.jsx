@@ -177,7 +177,12 @@ function AnimatedHuntNum({ target }) {
  * مشهد كشف نتيجة الهجوم — سينمائي مع تشويق وعدّاد رقمي ومؤثرات بصرية.
  * عرض فقط — المراحل والتوقيت يتحكّم بها FameeriGame (suspense → weapon → result).
  */
-export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue }) {
+export default function FameeriRevealOverlay({
+  qReveal,
+  showContinue = false,
+  onContinue,
+  showAdminChrome = true,
+}) {
   if (!qReveal) return null;
 
   const wEmoji = weaponEmoji(qReveal);
@@ -204,7 +209,7 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
   return (
     <div className={`q-reveal ${bgClass}`} role="dialog" aria-modal="true" aria-label="كشف الهجوم">
       <RevealBackdrop resultType={resultType} phase={qReveal.phase} />
-      <PhaseProgress phase={qReveal.phase} />
+      {showAdminChrome && <PhaseProgress phase={qReveal.phase} />}
 
       <div className="q-reveal-legend">
         <div className="q-reveal-legend__ribbon">⚔️ كشف الهجوم</div>
@@ -334,6 +339,10 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
         <button className="btn bg mt3 q-reveal-continue" type="button" onClick={onContinue}>
           ▶️ متابعة
         </button>
+      )}
+
+      {!showContinue && qReveal.phase === 'result' && (
+        <p className="q-reveal-player-wait">⏳ بانتظار المشرف…</p>
       )}
     </div>
   );

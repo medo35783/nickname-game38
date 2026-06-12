@@ -1,5 +1,5 @@
 /** شريط علوي — اسم المجموعة، القميري، دور اللاعب */
-export default function FameeriPlayerHud({ groupName, birds, isLeader, playMode, round }) {
+export default function FameeriPlayerHud({ groupName, birds, isLeader, leaderName, playMode, round }) {
   return (
     <header className="fameeri-player-hud">
       <div className="fameeri-player-hud__left">
@@ -8,7 +8,9 @@ export default function FameeriPlayerHud({ groupName, birds, isLeader, playMode,
           {isLeader ? (
             <span className="fameeri-player-badge leader">👑 قائد — تتحكم بالهجوم والدرع</span>
           ) : (
-            <span className="fameeri-player-badge member">🎯 متسابق — اقترح إجابات للقائد</span>
+            <span className="fameeri-player-badge member">
+              🎯 متسابق{leaderName ? ` · القائد: ${leaderName}` : ' — اقترح للقائد'}
+            </span>
           )}
         </div>
       </div>

@@ -2,16 +2,24 @@ import { useMemo, useState } from 'react';
 import { Q_WEAPONS } from '../../core/constants';
 import { attackResultMeta, filterAttacks, fmtAttackTime, sortedAttacks } from './fameeriAdminHelpers';
 import FameeriAdminDuel from './FameeriAdminDuel';
+import FameeriAdminGroupRoster from './FameeriAdminGroupRoster';
 
-function LogEntry({ a, index, total }) {
+function LogEntry({ a, index, total, groupId }) {
   const meta = attackResultMeta(a);
   const seq = total - index;
   const wDef = Q_WEAPONS.find((w) => w.id === a.weapon);
+  const role =
+    groupId && a.attackerId === groupId
+      ? 'هجوم'
+      : groupId && a.targetId === groupId
+        ? 'دفاع'
+        : null;
 
   return (
     <div className={`fameeri-admin-log-entry tone-${meta.tone}`}>
       <div className="fameeri-admin-log-entry__rail">
         <span className="fameeri-admin-log-entry__seq">#{seq}</span>
+        {role && <span className="fameeri-admin-log-entry__role">{role}</span>}
         {fmtAttackTime(a.timestamp) && (
           <span className="fameeri-admin-log-entry__time">{fmtAttackTime(a.timestamp)}</span>
         )}
@@ -33,7 +41,7 @@ function LogEntry({ a, index, total }) {
   );
 }
 
-export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
+export default function FameeriAdminBattleLog({ qGList, qAttacks, qMList = [] }) {
   const [view, setView] = useState('timeline');
   const [filterKey, setFilterKey] = useState('');
 
@@ -118,10 +126,18 @@ export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
       {view === 'groups' && (
         <div className="fameeri-admin-log-groups">
           {qGList.map((g) => {
-            const off = allSorted.filter((a) => a.attackerId === g.id);
-            const def = allSorted.filter((a) => a.targetId === g.id);
-            const hunted = off.filter((a) => a.result === 'success').reduce((s, a) => s + (a.hunted || 0), 0);
-            const lost = def.filter((a) => a.result === 'success').reduce((s, a) => s + (a.hunted || 0), 0);
+            const members = qMList.filter((m) => m.groupId === g.id);
+            const groupRows = allSorted.filter(
+              (a) => a.attackerId === g.id || a.targetId === g.id
+            );
+            const off = groupRows.filter((a) => a.attackerId === g.id);
+            const def = groupRows.filter((a) => a.targetId === g.id);
+            const hunted = off
+              .filter((a) => a.result === 'success')
+              .reduce((s, a) => s + (a.hunted || 0), 0);
+            const lost = def
+              .filter((a) => a.result === 'success')
+              .reduce((s, a) => s + (a.hunted || 0), 0);
 
             return (
               <div key={g.id} className="fameeri-admin-log-group-card">
@@ -134,32 +150,24 @@ export default function FameeriAdminBattleLog({ qGList, qAttacks }) {
                   <span className="fameeri-admin-log-stat ok">🎯 صاد {hunted}</span>
                   <span className="fameeri-admin-log-stat bad">💔 خسر {lost}</span>
                 </div>
-                {off.length === 0 && def.length === 0 ? (
+                {members.length > 0 && (
+                  <div className="fameeri-admin-log-group-card__roster">
+                    <FameeriAdminGroupRoster members={members} compact />
+                  </div>
+                )}
+                {groupRows.length === 0 ? (
                   <div className="fameeri-admin-log-empty small">لا أحداث</div>
                 ) : (
-                  <div className="fameeri-admin-log-group-feed">
-                    {off.slice(0, 6).map((a, i) => {
-                      const meta = attackResultMeta(a);
-                      return (
-                        <div key={`o-${i}`} className={`fameeri-admin-log-mini tone-${meta.tone}`}>
-                          <span className="fameeri-admin-log-mini__dir atk">⚔️</span>
-                          <span className="fameeri-admin-log-mini__text">
-                            → <b>{a.targetName}</b> · 🌳{a.tree} · {a.weaponName} — {meta.icon}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {def.slice(0, 6).map((a, i) => {
-                      const meta = attackResultMeta(a);
-                      return (
-                        <div key={`d-${i}`} className={`fameeri-admin-log-mini tone-${meta.tone}`}>
-                          <span className="fameeri-admin-log-mini__dir def">🎯</span>
-                          <span className="fameeri-admin-log-mini__text">
-                            ← <b>{a.attackerName}</b> · 🌳{a.tree} — {meta.icon}
-                          </span>
-                        </div>
-                      );
-                    })}
+                  <div className="fameeri-admin-log-timeline fameeri-admin-log-timeline--nested">
+                    {groupRows.map((a, i) => (
+                      <LogEntry
+                        key={`${g.id}-${a.timestamp}-${a.attackerId}-${i}`}
+                        a={a}
+                        index={i}
+                        total={groupRows.length}
+                        groupId={g.id}
+                      />
+                    ))}
                   </div>
                 )}
               </div>

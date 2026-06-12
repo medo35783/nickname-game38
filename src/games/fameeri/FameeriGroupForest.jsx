@@ -1,5 +1,5 @@
 import { Q_TREES, Q_TOTAL } from '../../core/constants';
-import { resolveTreesInitial, sumTrees } from './fameeriForestHelpers.js';
+import { resolveTreesInitial, sumTrees, computeTreeLosses } from './fameeriForestHelpers.js';
 
 /** غابة المجموعة — توزيع القميري على الأشجار + خصم بعد الهجوم */
 export default function FameeriGroupForest({
@@ -28,7 +28,8 @@ export default function FameeriGroupForest({
   const initial = resolveTreesInitial(group, attacks, groupId);
   const totalOnTrees = sumTrees(trees);
   const totalRemaining = group.totalRemaining ?? totalOnTrees;
-  const totalLost = Q_TOTAL - (totalRemaining || 0);
+  const treeLosses = computeTreeLosses(initial, trees);
+  const totalLost = treeLosses.reduce((s, x) => s + x.lost, 0);
 
   return (
     <div className={`${embedded ? '' : 'card '}fameeri-forest${compact ? ' fameeri-forest--compact' : ''}${embedded ? ' fameeri-forest--embedded' : ''}`}>
@@ -44,6 +45,15 @@ export default function FameeriGroupForest({
           )}
         </div>
       </div>
+      {treeLosses.length > 0 && (
+        <div className="fameeri-forest__lost-breakdown" aria-label="تفصيل الصيد حسب الشجرة">
+          {treeLosses.map(({ tree, lost }) => (
+            <span key={tree} className="fameeri-forest__lost-chip">
+              🌳 {tree} <strong>−{lost}</strong>
+            </span>
+          ))}
+        </div>
+      )}
       {showHint && (
         <div className="fameeri-forest__hint">🔒 توزيعكم سري — لا تشاركوه مع الخصم</div>
       )}
@@ -53,6 +63,7 @@ export default function FameeriGroupForest({
           const count = parseInt(trees[tree], 10) || 0;
           const start = parseInt(initial[tree], 10) || 0;
           const lostFromStart = Math.max(0, start - count);
+          const wiped = count === 0 && lostFromStart > 0;
           const isHit = hitFlash?.tree === tree;
           const isTarget = underAttackTree === tree;
           const isShield = shieldTree === tree;
@@ -61,6 +72,7 @@ export default function FameeriGroupForest({
 
           let cellClass = 'fameeri-forest-cell';
           if (empty) cellClass += ' empty';
+          if (wiped) cellClass += ' wiped';
           if (lostFromStart > 0 && !empty) cellClass += ' depleted';
           if (isHit) cellClass += ' hit';
           if (isTarget) cellClass += ' targeted';
@@ -78,6 +90,11 @@ export default function FameeriGroupForest({
               <span className="fameeri-forest-cell__name">{tree}</span>
               <span className="fameeri-forest-cell__count">{count}</span>
               {lostFromStart > 0 && (
+                <span className={`fameeri-forest-cell__lost${wiped ? ' fameeri-forest-cell__lost--wiped' : ''}`}>
+                  −{lostFromStart}
+                </span>
+              )}
+              {lostFromStart > 0 && !wiped && (
                 <span className="fameeri-forest-cell__was">كان {start}</span>
               )}
             </div>

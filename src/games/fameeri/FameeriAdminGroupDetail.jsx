@@ -1,6 +1,7 @@
 import { Q_WEAPONS } from '../../core/constants';
 import { groupWeaponsTotal, initialWeaponsTotal } from './fameeriAdminHelpers';
 import FameeriGroupForest from './FameeriGroupForest';
+import FameeriAdminGroupRoster from './FameeriAdminGroupRoster';
 
 function WeaponPill({ weapon, qty }) {
   const empty = (qty || 0) <= 0;
@@ -16,6 +17,7 @@ function WeaponPill({ weapon, qty }) {
 /** بطاقة تفصيلية — تبويب الإحصائيات */
 export default function FameeriAdminGroupDetail({
   group,
+  members = [],
   turnGroupId,
   cursedTree,
   rank,
@@ -40,6 +42,11 @@ export default function FameeriAdminGroupDetail({
           <span className="fameeri-admin-intel__birds">{group.totalRemaining ?? 0}</span>
           <span>🐦</span>
         </div>
+      </div>
+
+      <div className="fameeri-admin-detail__section fameeri-admin-detail__roster">
+        <div className="fameeri-admin-detail__label">👥 أعضاء الفريق ({members.length})</div>
+        <FameeriAdminGroupRoster members={members} />
       </div>
 
       <div className="fameeri-admin-detail__section">

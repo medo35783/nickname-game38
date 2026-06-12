@@ -9,6 +9,7 @@ import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import FameeriRevealOverlay from './FameeriRevealOverlay';
 import { openFameeriPrintableReport } from './fameeriPrintReport';
 import { patchLeaderByUid } from './fameeriLeaderIndex';
+import { bindFameeriMemberPresence } from './fameeriMemberPresence';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import FameeriGuideModal from './FameeriGuideModal';
 import { ROOM_CODE_PLACEHOLDER, GROUP_MEMBER_NAME_PLACEHOLDER } from '../../core/formLabels';
@@ -24,7 +25,7 @@ import {
 import { markQuestionAsUsed } from './fameeriBankProgress';
 import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
 import { buildAdminAnswerContext } from './fameeriAdminAnswers';
-import { cancelCurrentAttack } from './fameeriAdminResolve';
+import { cancelCurrentAttack, continueAfterReveal } from './fameeriAdminResolve';
 import { pickSpeedQuestionWeapon, resolveSpeedWinner } from './fameeriSpeedResolve';
 import {
   drawQuestionForWeapon,
@@ -158,6 +159,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   const [qGameState, setQGameState] = useState(null);
   const [qGroups, setQGroups]     = useState({});
   const [qMembers, setQMembers]   = useState({});      // أعضاء الغرفة
+  const [qPresence, setQPresence] = useState({});
   const [qAttacks, setQAttacks]   = useState({});
   const [qJoinInput, setQJoinInput] = useState('');
   const [qJoinErr, setQJoinErr]   = useState('');
@@ -204,11 +206,13 @@ const FameeriGame = forwardRef(function FameeriGame(
     const qpRef = dbRef(db, `qrooms/${qRoom}/groups`);
     const qaRef = dbRef(db, `qrooms/${qRoom}/attacks`);
     const qmRef = dbRef(db, `qrooms/${qRoom}/members`);
+    const qprRef = dbRef(db, `qrooms/${qRoom}/presence`);
     onValue(qgRef, snap=>setQGameState(snap.val()));
     onValue(qpRef, snap=>setQGroups(snap.val()||{}));
     onValue(qaRef, snap=>setQAttacks(snap.val()||{}));
     onValue(qmRef, snap=>setQMembers(snap.val()||{}));
-    return ()=>{ off(qgRef); off(qpRef); off(qaRef); off(qmRef); };
+    onValue(qprRef, snap=>setQPresence(snap.val()||{}));
+    return ()=>{ off(qgRef); off(qpRef); off(qaRef); off(qmRef); off(qprRef); };
   }, [qRoom]);
 
   /** تصحيح دور المشرف إن كان uid قد تأخر عن القراءة الأولى */
@@ -714,6 +718,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
     if (!memberId || !code) return;
     remove(dbRef(db, `qrooms/${code}/members/${memberId}`)).catch(() => {});
+    remove(dbRef(db, `qrooms/${code}/presence/${memberId}`)).catch(() => {});
   };
 
   const endFameeriCompetition = async () => {
@@ -1059,6 +1064,30 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
   };
 
+  const handleContinueReveal = async () => {
+    const lrSnap = qGameState?.lastResult;
+    setQReveal(null);
+    await continueAfterReveal({
+      qRoom,
+      qGameState,
+      qGList,
+      lrSnap,
+      recordRoundCompleted,
+    });
+  };
+
+  const renderRevealOverlay = () => {
+    if (!qReveal) return null;
+    return (
+      <FameeriRevealOverlay
+        qReveal={qReveal}
+        showContinue={isAdmin && qReveal.phase === 'result'}
+        onContinue={isAdmin ? () => void handleContinueReveal() : undefined}
+        showAdminChrome={isAdmin}
+      />
+    );
+  };
+
   const assignGroupLeader = async (groupId, member) => {
     const members = qMList.filter((m) => m.groupId === groupId);
     const updates = {};
@@ -1258,6 +1287,13 @@ const FameeriGame = forwardRef(function FameeriGame(
     if (!uid || !qRoom || !qGroupId || qRole === 'admin' || qRole === 'spectator') return;
     void set(dbRef(db, `qrooms/${qRoom}/memberByUid/${uid}`), qGroupId).catch(() => {});
   }, [qRoom, qGroupId, qRole]);
+
+  // حضور اللاعبين — يظهر للمشرف في لوحة الفرق
+  useEffect(() => {
+    if (!qRoom || !qMyId || qRole === 'admin' || qRole === 'spectator') return undefined;
+    if (!qMyMember?.ownerUid) return undefined;
+    return bindFameeriMemberPresence(db, qRoom, qMyId);
+  }, [qRoom, qMyId, qRole, qMyMember?.ownerUid]);
 
   useEffect(() => {
     const ids = Object.keys(qGameState?.speedClaims || {});
@@ -1504,9 +1540,7 @@ const FameeriGame = forwardRef(function FameeriGame(
 </div>);}
 
     if (gameScreen === 'qumairi_play') {
-      const myAtks = Object.values(qAttacks || {})
-        .filter((a) => a.attackerId === qGroupId || a.targetId === qGroupId)
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      const qGroupMembers = qMList.filter((m) => m.groupId === qGroupId);
       const shieldAttack =
         qCurrentAttack ||
         (shieldWindow?.winnerGroupId && qGameState?.speedClaims?.[shieldWindow.winnerGroupId]) ||
@@ -1514,16 +1548,19 @@ const FameeriGame = forwardRef(function FameeriGame(
 
       if (isAdmin) {
         return (
-          <div className="scr">
+          <div className={`scr${qReveal ? ' fameeri-reveal-active' : ''}`}>
             <GameTopNav onBack={openExitSheet} sticky />
+            {renderRevealOverlay()}
             <FameeriAdminPlay
               qRoom={qRoom}
               qGameState={qGameState}
               qGList={qGList}
+              qMList={qMList}
+              qPresence={qPresence}
+              assignGroupLeader={assignGroupLeader}
               qGroups={qGroups}
               qAttacks={qAttacks}
               qReveal={qReveal}
-              setQReveal={setQReveal}
               qCountdown={qCountdown}
               qActiveQuestion={qActiveQuestion}
               qActiveAnswer={qActiveAnswer}
@@ -1566,8 +1603,9 @@ const FameeriGame = forwardRef(function FameeriGame(
       }
 
       return (
-        <div className="scr">
+        <div className={`scr${qReveal ? ' fameeri-reveal-active' : ''}`}>
           <GameTopNav onBack={openExitSheet} sticky />
+          {renderRevealOverlay()}
           <FameeriPlayerPlay
           qReveal={qReveal}
           qTurnOverlay={qTurnOverlay}
@@ -1578,6 +1616,8 @@ const FameeriGame = forwardRef(function FameeriGame(
           qAnswerPhaseDuringTimer={qAnswerPhaseDuringTimer}
           qMyGroup={qMyGroup}
           qGroupId={qGroupId}
+          qGroupMembers={qGroupMembers}
+          qMyId={qMyId}
           isLeader={isLeader}
           qActiveQuestion={qActiveQuestion}
           qCanAnswer={qCanAnswer}
@@ -1602,7 +1642,6 @@ const FameeriGame = forwardRef(function FameeriGame(
           shieldAttack={shieldAttack}
           onActivateShield={activateShield}
           shieldActivating={shieldActivating}
-          myAtks={myAtks}
         />
         </div>
       );

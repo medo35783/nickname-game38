@@ -1,7 +1,8 @@
-/** تبويبات شاشة اللاعب — مجموعتي / القتال */
-export default function FameeriPlayerTabs({ active, onChange, groupBadge, battleBadge }) {
+/** تبويبات شاشة اللاعب — مجموعتي / الفريق / الهجوم */
+export default function FameeriPlayerTabs({ active, onChange, groupBadge, teamBadge, battleBadge }) {
   const tabs = [
     { id: 'group', label: '🌳 مجموعتي', badge: groupBadge },
+    { id: 'team', label: '👥 الفريق', badge: teamBadge },
     { id: 'battle', label: '⚔️ الهجوم', badge: battleBadge },
   ];
 

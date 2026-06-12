@@ -129,7 +129,7 @@ export default function FameeriSpectatorView({
   } else {
     // playing
     if (reveal) {
-      stage = <FameeriRevealOverlay qReveal={reveal} showContinue={false} />;
+      stage = <FameeriRevealOverlay qReveal={reveal} showAdminChrome={false} />;
     } else if (currentQuestion?.adminOnly && currentQuestion.revealToPlayers) {
       const revealedAnswer = gameState?.answerVerdict?.revealedAnswer;
       stage = (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import FameeriRevealOverlay from './FameeriRevealOverlay';
-import FameeriGroupChat from './FameeriGroupChat';
 import FameeriPlayerHud from './FameeriPlayerHud';
+import FameeriGroupLog from './FameeriGroupLog';
+import FameeriGroupRoster from './FameeriGroupRoster';
 import FameeriPlayerArsenal from './FameeriPlayerArsenal';
 import FameeriPlayerShieldPanel from './FameeriPlayerShieldPanel';
 import FameeriPlayerAttackPanel from './FameeriPlayerAttackPanel';
@@ -51,7 +51,7 @@ function AttackSentCard({ title, targetName, tree, weaponName, weaponId, hint })
   );
 }
 
-/** شاشة اللعب — تبويبان: مجموعتي | الهجوم والأدوات */
+/** شاشة اللعب — تبويبات: مجموعتي | الفريق | الهجوم */
 export default function FameeriPlayerPlay({
   qReveal,
   qTurnOverlay,
@@ -62,6 +62,8 @@ export default function FameeriPlayerPlay({
   qAnswerPhaseDuringTimer,
   qMyGroup,
   qGroupId,
+  qGroupMembers,
+  qMyId,
   isLeader,
   qActiveQuestion,
   qCanAnswer,
@@ -86,7 +88,6 @@ export default function FameeriPlayerPlay({
   shieldAttack,
   onActivateShield,
   shieldActivating,
-  myAtks,
 }) {
   const prevTreesRef = useRef(null);
   const [hitFlash, setHitFlash] = useState(null);
@@ -182,14 +183,13 @@ export default function FameeriPlayerPlay({
 
   return (
     <div className="scr fameeri-player-play">
-      {qReveal && <FameeriRevealOverlay qReveal={qReveal} showContinue={false} />}
-
       {/* ── رأس ثابت: HUD + تنبيهات ── */}
       <div className="fameeri-player-sticky">
         <FameeriPlayerHud
           groupName={qMyGroup?.name}
           birds={qMyGroup?.totalRemaining}
           isLeader={isLeader}
+          leaderName={qGroupMembers?.find((m) => m.role === 'leader')?.name}
           playMode={qGameState?.phase === 'playing' ? qGameState?.playMode : null}
           round={qGameState?.round}
         />
@@ -200,7 +200,9 @@ export default function FameeriPlayerPlay({
           </div>
         )}
 
-        {answerVerdict && !qReveal && <FameeriVerdictBanner verdict={answerVerdict} />}
+        {answerVerdict && !qReveal && !qGameState?.showResult && (
+          <FameeriVerdictBanner verdict={answerVerdict} />
+        )}
 
         {qTimer && !qReveal && qCountdown !== null && (qCurrentAttack || qGameState?.speedBatchActive) && (
           <div className="fameeri-player-timer-bar" aria-live="polite">
@@ -251,6 +253,7 @@ export default function FameeriPlayerPlay({
           active={tab}
           onChange={setTab}
           groupBadge={groupBadge}
+          teamBadge={qGroupMembers?.length > 1 ? String(qGroupMembers.length) : null}
           battleBadge={battleBadge}
         />
       </div>
@@ -268,47 +271,26 @@ export default function FameeriPlayerPlay({
               underAttackTree={underAttackTree}
               highlightTree={qReveal?.tree}
             />
-            <div className="card fameeri-player-log">
-              <div className="ctitle">📋 سجل مجموعتي</div>
-              {myAtks.length === 0 ? (
-                <div className="fameeri-log-empty">لا أحداث بعد — اصطد قميري الخصم!</div>
-              ) : (
-                myAtks.slice(0, 12).map((a, i) => (
-                  <div
-                    key={i}
-                    className={`feed-item fameeri-log-item${a.result === 'shielded' ? ' shield' : ''}`}
-                    style={{
-                      borderColor:
-                        a.attackerId === qGroupId
-                          ? a.result === 'success'
-                            ? 'var(--green)'
-                            : 'var(--red)'
-                          : 'var(--red)',
-                    }}
-                  >
-                    {a.attackerId === qGroupId
-                      ? `${a.result === 'success' ? '🎯' : '❌'} هاجمت ${a.targetName} / 🌳${a.tree} — ${
-                          a.result === 'success' ? 'نجاح' : 'فشل'
-                        }`
-                      : `⚔️ هاجمتكم ${a.attackerName} على 🌳${a.tree}${
-                          a.result === 'success'
-                            ? ` — صُيد ${a.hunted ?? 0} قميري 🐦`
-                            : a.result === 'shielded'
-                              ? ' — 🛡️ صد الدرع!'
-                              : ' — لم يصب'
-                        }`}
-                  </div>
-                ))
-              )}
-            </div>
-            {qGroupId && (
-              <FameeriGroupChat
-                qRoom={qRoom}
-                groupId={qGroupId}
-                me={{ uid: authUid, name: qMyName }}
-                accent={accent}
-              />
-            )}
+            <FameeriGroupLog
+              attacks={qAttacks}
+              groupId={qGroupId}
+              groupName={qMyGroup?.name}
+            />
+          </div>
+        )}
+
+        {tab === 'team' && (
+          <div className="fameeri-player-tab-pane">
+            <FameeriGroupRoster
+              members={qGroupMembers}
+              groupName={qMyGroup?.name}
+              meUid={authUid}
+              meMemberId={qMyId}
+              qRoom={qRoom}
+              groupId={qGroupId}
+              meName={qMyName}
+              accent={accent}
+            />
           </div>
         )}
 

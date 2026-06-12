@@ -39,6 +39,44 @@ export function filterAttacks(attacks, filterKey) {
   });
 }
 
+/** وصف النتيجة من منظور مجموعة معيّنة (لاعب) */
+export function playerAttackResultMeta(a, groupId) {
+  const isAttacker = a.attackerId === groupId;
+  const isDefender = a.targetId === groupId;
+
+  if (isDefender) {
+    if (a.result === 'success') {
+      const n = a.hunted ?? 0;
+      return {
+        label: n > 0 ? `صُيد ${n} من شجرة ${a.tree || '—'}` : `أُصيبت شجرة ${a.tree || '—'} — فارغة`,
+        tone: 'fail',
+        icon: '💔',
+      };
+    }
+    if (a.result === 'shielded') {
+      return { label: 'صدّنا الهجوم بالدرع', tone: 'shield', icon: '🛡️' };
+    }
+    return { label: 'الهجوم لم يصب — لم نخسر', tone: 'ok', icon: '✅' };
+  }
+
+  if (isAttacker) {
+    if (a.result === 'success') {
+      const n = a.hunted ?? 0;
+      return {
+        label: n > 0 ? `صاد ${n} من شجرة ${a.tree || '—'}` : `نجاح — شجرة ${a.tree || '—'} فارغة`,
+        tone: 'ok',
+        icon: '🎯',
+      };
+    }
+    if (a.result === 'shielded') {
+      return { label: 'الدرع صدّ هجومنا', tone: 'shield', icon: '🛡️' };
+    }
+    return { label: 'إجابة خاطئة — فشل هجومنا', tone: 'fail', icon: '❌' };
+  }
+
+  return attackResultMeta(a);
+}
+
 /** وقت نسبي بسيط */
 export function fmtAttackTime(ts) {
   if (!ts) return '';

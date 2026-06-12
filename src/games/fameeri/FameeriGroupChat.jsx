@@ -7,8 +7,15 @@ import { auth, db } from '../../core/firebase';
  * محادثة خاصة لكل مجموعة (نصية) — يراها أعضاء المجموعة فقط.
  * تُخزَّن خارج مسار qrooms (في qchats) لتُحجب عن بقية المجموعات على مستوى القواعد.
  */
-export default function FameeriGroupChat({ qRoom, groupId, me, accent = 'var(--fameeri-primary)' }) {
-  const [open, setOpen] = useState(false);
+export default function FameeriGroupChat({
+  qRoom,
+  groupId,
+  me,
+  accent = 'var(--fameeri-primary)',
+  defaultOpen = false,
+  embedded = false,
+}) {
+  const [open, setOpen] = useState(defaultOpen || embedded);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -84,17 +91,24 @@ export default function FameeriGroupChat({ qRoom, groupId, me, accent = 'var(--f
   };
 
   return (
-    <div className="card" style={{ padding: open ? '12px' : '10px 12px' }}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
-      >
-        <span className="ctitle" style={{ margin: 0 }}>💬 محادثة المجموعة</span>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{open ? '▼ إخفاء' : `▲ عرض (${msgs.length})`}</span>
-      </button>
+    <div className={`card fameeri-group-chat${embedded ? ' fameeri-group-chat--embedded' : ''}`} style={{ padding: open ? '12px' : '10px 12px' }}>
+      {embedded ? (
+        <div className="fameeri-group-chat__head">
+          <span className="ctitle" style={{ margin: 0 }}>💬 محادثة الفريق</span>
+          {msgs.length > 0 && <span className="fameeri-group-chat__count">{msgs.length} رسالة</span>}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="fameeri-group-chat__toggle"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="ctitle" style={{ margin: 0 }}>💬 محادثة المجموعة</span>
+          <span className="fameeri-group-chat__toggle-hint">{open ? '▼ إخفاء' : `▲ عرض (${msgs.length})`}</span>
+        </button>
+      )}
 
-      {open && (
+      {(open || embedded) && (
         <>
           <div style={{ maxHeight: 230, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, margin: '10px 0', padding: 4 }}>
             {msgs.length === 0 && (

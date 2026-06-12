@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ref as dbRef, update } from 'firebase/database';
 import { db } from '../../firebase';
 import { Q_TREES } from '../../core/constants';
 import { playSound } from '../../core/helpers';
 import { applySpeedRoundWrong } from './fameeriSpeedRound';
-import { startAttackTimer, resolveAttackFail, continueAfterReveal, beginShieldWindow, finalizeShieldWindowIfDue, SHIELD_WINDOW_SEC } from './fameeriAdminResolve';
+import { startAttackTimer, resolveAttackFail, beginShieldWindow, finalizeShieldWindowIfDue, SHIELD_WINDOW_SEC } from './fameeriAdminResolve';
 import { poolStats } from './fameeriQuestionPool';
 import { pickSpeedQuestionWeapon } from './fameeriSpeedResolve';
 import FameeriAdminStepper from './FameeriAdminStepper';
@@ -12,8 +12,8 @@ import FameeriAdminAttack from './FameeriAdminAttack';
 import FameeriAdminBattleLog from './FameeriAdminBattleLog';
 import FameeriAdminRibbon from './FameeriAdminRibbon';
 import FameeriAdminGroupDetail from './FameeriAdminGroupDetail';
+import FameeriAdminTeamsPanel from './FameeriAdminTeamsPanel';
 import FameeriAdminDuel from './FameeriAdminDuel';
-import FameeriRevealOverlay from './FameeriRevealOverlay';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
 import FameeriAdminCommandCenter, { isCommandCenterActive } from './FameeriAdminCommandCenter';
 import AdminQuestionView from '../../question-bank/AdminQuestionView';
@@ -23,10 +23,12 @@ export default function FameeriAdminPlay({
   qRoom,
   qGameState,
   qGList,
+  qMList = [],
+  qPresence = {},
+  assignGroupLeader,
   qGroups,
   qAttacks,
   qReveal,
-  setQReveal,
   qCountdown,
   qActiveQuestion,
   qActiveAnswer,
@@ -77,6 +79,21 @@ export default function FameeriAdminPlay({
 
   const sorted = [...qGList].sort((a, b) => (b.totalRemaining || 0) - (a.totalRemaining || 0));
   const leader = sorted[0];
+
+  const membersByGroup = useMemo(() => {
+    const map = {};
+    qMList.forEach((m) => {
+      if (!m.groupId) return;
+      if (!map[m.groupId]) map[m.groupId] = [];
+      map[m.groupId].push(m);
+    });
+    return map;
+  }, [qMList]);
+
+  const unassignedMembers = useMemo(
+    () => qMList.filter((m) => !m.groupId),
+    [qMList]
+  );
 
   const [shieldCountdown, setShieldCountdown] = useState(null);
 
@@ -152,18 +169,6 @@ export default function FameeriAdminPlay({
     await update(dbRef(db, `qrooms/${qRoom}/game`), { turnGroup: gid });
   };
 
-  const handleContinueReveal = async () => {
-    const lrSnap = qGameState?.lastResult;
-    setQReveal(null);
-    await continueAfterReveal({
-      qRoom,
-      qGameState,
-      qGList,
-      lrSnap,
-      recordRoundCompleted,
-    });
-  };
-
   const liveMode = isCommandCenterActive({
     qCurrentAttack,
     qActiveQuestion,
@@ -221,14 +226,6 @@ export default function FameeriAdminPlay({
 
   return (
     <div className={`fameeri-admin-play${liveMode ? ' fameeri-admin-play--live' : ''}`}>
-      {qReveal && (
-        <FameeriRevealOverlay
-          qReveal={qReveal}
-          showContinue={qReveal.phase === 'result'}
-          onContinue={() => void handleContinueReveal()}
-        />
-      )}
-
       <FameeriAdminStepper phase="playing" roomCode={qRoom} assistMode={assistMode} />
 
       {/* شريط الحالة */}
@@ -243,6 +240,15 @@ export default function FameeriAdminPlay({
           <div className="fameeri-admin-status__sub">وضع السرعة — الجميع يُرسل ثم المشرف يحسم</div>
         )}
       </div>
+
+      <FameeriAdminTeamsPanel
+        qGList={qGList}
+        membersByGroup={membersByGroup}
+        presenceMap={qPresence}
+        unassigned={unassignedMembers}
+        assignGroupLeader={assignGroupLeader}
+        assistMode={assistMode}
+      />
 
       {qGameState?.answerVerdict && !qReveal && (
         <FameeriVerdictBanner verdict={qGameState.answerVerdict} />
@@ -414,6 +420,7 @@ export default function FameeriAdminPlay({
           </div>
           <FameeriAdminRibbon
             groups={sorted}
+            membersByGroup={membersByGroup}
             turnGroupId={turnGroupId}
             onSelectTurn={!isSpeed && !qCurrentAttack ? setTurn : undefined}
             selectable={!isSpeed && !qCurrentAttack}
@@ -551,6 +558,7 @@ export default function FameeriAdminPlay({
             <FameeriAdminGroupDetail
               key={g.id}
               group={g}
+              members={membersByGroup[g.id] || []}
               turnGroupId={turnGroupId}
               cursedTree={qGameState?.cursedTree}
               rank={i + 1}
@@ -563,7 +571,7 @@ export default function FameeriAdminPlay({
         </div>
       )}
 
-      {tab === 'log' && <FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} />}
+      {tab === 'log' && <FameeriAdminBattleLog qGList={qGList} qAttacks={qAttacks} qMList={qMList} />}
 
       {/* إنهاء المسابقة — مخفي أثناء حسم السؤال لتقليل التشتيت */}
       <div className={`fameeri-admin-footer${liveMode && tab === 'qflow' && qActiveQuestion ? ' fameeri-admin-footer--hidden' : ''}`}>

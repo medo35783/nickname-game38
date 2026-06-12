@@ -25,3 +25,15 @@ export function sumTrees(trees) {
   if (!trees) return 0;
   return Q_TREES.reduce((s, t) => s + (parseInt(trees[t], 10) || 0), 0);
 }
+
+/** خسائر القميري لكل شجرة (من التوزيع الأصلي إلى الحالي) */
+export function computeTreeLosses(initial, current) {
+  const losses = [];
+  Q_TREES.forEach((tree) => {
+    const start = parseInt(initial?.[tree], 10) || 0;
+    const now = parseInt(current?.[tree], 10) || 0;
+    const lost = Math.max(0, start - now);
+    if (lost > 0) losses.push({ tree, lost, start, now });
+  });
+  return losses;
+}

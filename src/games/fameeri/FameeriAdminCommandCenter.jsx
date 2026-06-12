@@ -13,6 +13,7 @@ import FameeriAdminAnswerVerdict from './FameeriAdminAnswerVerdict';
 import FameeriSpeedAdminPanel from './FameeriSpeedAdminPanel';
 
 const TIMER_PRESETS = [15, 30, 45, 60];
+const SPEED_TIMER_PRESETS = [10, 20, 35];
 
 function CmdVerdictBar({ ariaLabel, ok, fail }) {
   return (
@@ -148,6 +149,8 @@ export default function FameeriAdminCommandCenter({
   const showSpeedVerdict = showSpeedFlow && speedBatchActive;
   const showAttackVerdict = !inShield && !isSpeed && !!qCurrentAttack && (hasQuestion || manualFlow);
   const showSequentialAttack = !!qCurrentAttack && !(isSpeed && speedBatchActive);
+  const showGeneralTimer = !inShield && !isSpeed && (hasQuestion || manualFlow);
+  const showSpeedTimer = showSpeedFlow;
 
   const wDef = attack ? Q_WEAPONS.find((w) => w.id === attack.weapon) : null;
 
@@ -432,8 +435,8 @@ export default function FameeriAdminCommandCenter({
         </div>
       )}
 
-      {/* المؤقت — تجهيز أو يعمل (مع أو بدون سؤال) */}
-      {(hasQuestion || manualFlow) && !inShield && (
+      {/* المؤقت — الدور المتتابع فقط */}
+      {showGeneralTimer && (
         <div className={`fameeri-cmd-timer card${timerRunning ? ' live' : ''}`}>
           {!timerRunning && (
             <>
@@ -496,30 +499,72 @@ export default function FameeriAdminCommandCenter({
             </>
           )}
           {attackVerdictBar}
-          {speedVerdictBar}
         </div>
       )}
 
-      {/* وضع السرعة — بدء المؤقت (قبل السؤال أو معه) */}
-      {showSpeedFlow && !speedBatchActive && !inShield && (
-        <div className="fameeri-cmd-speed-start card">
-          <div className="fameeri-cmd-speed-start__title">⚡ بدء جولة السرعة</div>
-          <p className="fameeri-cmd-speed-start__hint">
-            شغّل المؤقت ثم أظهر السؤال والخيارات — القاديان يجيبان، والنظام يحدد الفائز تلقائياً.
-          </p>
-          <div className="fameeri-admin-pills">
-            {[10, 20, 35].map((s) => (
-              <button
-                key={s}
-                type="button"
-                className="btn bg bsm"
-                disabled={!canStartSpeedTimer}
-                onClick={() => onStartSpeedTimer?.(s)}
-              >
-                {s}ث
-              </button>
-            ))}
-          </div>
+      {/* مؤقت السرعة — واحد فقط */}
+      {showSpeedTimer && (
+        <div className={`fameeri-cmd-timer card fameeri-cmd-timer--speed${timerRunning ? ' live' : ''}`}>
+          {!timerRunning && !speedBatchActive && (
+            <>
+              <div className="fameeri-cmd-timer__title">⚡ مؤقت السرعة والحكم</div>
+              <p className="fameeri-cmd-timer__hint" style={{ marginBottom: 10 }}>
+                شغّل المؤقت ثم أظهر السؤال والخيارات — الأسرع والأصح يفوز تلقائياً.
+              </p>
+              <div className="fameeri-admin-pills">
+                {SPEED_TIMER_PRESETS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="btn bg bsm"
+                    disabled={!canStartSpeedTimer}
+                    onClick={() => onStartSpeedTimer?.(s)}
+                  >
+                    {s}ث
+                  </button>
+                ))}
+              </div>
+              <div className="fameeri-admin-inline-form" style={{ marginTop: 8 }}>
+                <input
+                  type="number"
+                  className="inp"
+                  placeholder="ثوانٍ"
+                  value={qCustomTimer ?? ''}
+                  onChange={(e) => setQCustomTimer?.(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn bg bsm"
+                  disabled={!canStartSpeedTimer}
+                  onClick={() => {
+                    const s = Math.min(35, parseInt(qCustomTimer, 10) || 20);
+                    onStartSpeedTimer?.(s);
+                  }}
+                >
+                  ▶️ بدء
+                </button>
+              </div>
+            </>
+          )}
+
+          {(timerRunning || speedBatchActive) && (
+            <>
+              <div className="fameeri-cmd-timer__title">
+                {timerExpired ? '⏰ انتهى الوقت — احكم الآن' : '⚡ الوقت المتبقي'}
+              </div>
+              <div className={`fameeri-cmd-timer__ring${countdownUrgent || timerExpired ? ' urgent' : ''}`}>
+                <span className="fameeri-cmd-timer__num">
+                  {countdown !== null ? (countdown > 0 ? countdown : '⏰') : '…'}
+                </span>
+              </div>
+              <p className="fameeri-cmd-timer__hint">
+                {timerExpired
+                  ? '⏰ انتهى الوقت — احكم بالأسفل'
+                  : 'بانتظار إجابات القادة — يمكنك الحكم في أي وقت'}
+              </p>
+            </>
+          )}
+          {speedVerdictBar}
         </div>
       )}
 

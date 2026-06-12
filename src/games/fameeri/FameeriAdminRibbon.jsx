@@ -4,6 +4,7 @@ import { groupWeaponsTotal } from './fameeriAdminHelpers';
 /** شريط مجموعات مدمج — بدون تكرار البطاقات الكبيرة */
 export default function FameeriAdminRibbon({
   groups,
+  membersByGroup = {},
   turnGroupId,
   onSelectTurn,
   selectable = false,
@@ -13,6 +14,8 @@ export default function FameeriAdminRibbon({
       {groups.map((g) => {
         const isTurn = turnGroupId === g.id;
         const wTotal = groupWeaponsTotal(g);
+        const members = membersByGroup[g.id] || [];
+        const leader = members.find((m) => m.role === 'leader');
         const inner = (
           <>
             <div className="fameeri-admin-ribbon__top">
@@ -20,6 +23,18 @@ export default function FameeriAdminRibbon({
               <span className="fameeri-group-name">{g.name}</span>
               <span className="fameeri-admin-ribbon__birds">{g.totalRemaining ?? 0} 🐦</span>
             </div>
+            {members.length > 0 && (
+              <div className="fameeri-admin-ribbon__team">
+                {leader ? (
+                  <span className="fameeri-admin-ribbon__leader">👑 {leader.name}</span>
+                ) : (
+                  <span className="fameeri-admin-ribbon__leader warn">⚠️ بدون قائد</span>
+                )}
+                {members.length > 1 && (
+                  <span className="fameeri-admin-ribbon__count">+{members.length - 1}</span>
+                )}
+              </div>
+            )}
             <div className="fameeri-admin-ribbon__wpns">
               {Q_WEAPONS.map((w) => {
                 const q = g.weapons?.[w.id] ?? 0;
