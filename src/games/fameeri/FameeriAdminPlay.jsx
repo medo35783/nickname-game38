@@ -6,6 +6,7 @@ import { playSound } from '../../core/helpers';
 import { applySpeedRoundWrong } from './fameeriSpeedRound';
 import { startAttackTimer, resolveAttackFail, continueAfterReveal, beginShieldWindow, finalizeShieldWindowIfDue, SHIELD_WINDOW_SEC } from './fameeriAdminResolve';
 import { poolStats } from './fameeriQuestionPool';
+import { pickSpeedQuestionWeapon } from './fameeriSpeedResolve';
 import FameeriAdminStepper from './FameeriAdminStepper';
 import FameeriAdminAttack from './FameeriAdminAttack';
 import FameeriAdminBattleLog from './FameeriAdminBattleLog';
@@ -48,6 +49,8 @@ export default function FameeriAdminPlay({
   onGoAccount,
   speedWinSelect,
   setSpeedWinSelect,
+  qSpeedResolution,
+  qKey,
   speedRoundSecs,
   setSpeedRoundSecs,
   qCustomTimer,
@@ -70,8 +73,7 @@ export default function FameeriAdminPlay({
   const playMode = qGameState?.playMode || 'sequential';
   const isSpeed = playMode === 'speed';
   const claimIds = Object.keys(qGameState?.speedClaims || {});
-  const needPickWinner = claimIds.length > 1;
-  const canStartSpeedTimer = !needPickWinner || !!speedWinSelect;
+  const canStartSpeedTimer = claimIds.length > 0;
 
   const sorted = [...qGList].sort((a, b) => (b.totalRemaining || 0) - (a.totalRemaining || 0));
   const leader = sorted[0];
@@ -207,7 +209,9 @@ export default function FameeriAdminPlay({
 
   const drawWeapon =
     qCurrentAttack?.weapon ||
+    (qSpeedResolution?.winnerId && qGameState?.speedClaims?.[qSpeedResolution.winnerId]?.weapon) ||
     (speedWinSelect && qGameState?.speedClaims?.[speedWinSelect]?.weapon) ||
+    pickSpeedQuestionWeapon(qGameState?.speedClaims) ||
     (claimIds.length === 1 ? qGameState?.speedClaims?.[claimIds[0]]?.weapon : null);
 
   const poolTotal = poolStats(qPool).total;
@@ -339,15 +343,22 @@ export default function FameeriAdminPlay({
             playSound('countdown_last');
           }}
           onSpeedVerdictOk={async () => {
-            const ids = claimIds;
-            if (ids.length > 1 && !speedWinSelect) return;
-            const win = ids.length === 1 ? ids[0] : speedWinSelect;
+            const win =
+              qSpeedResolution?.winnerId ||
+              speedWinSelect ||
+              (claimIds.length === 1 ? claimIds[0] : null);
+            if (!win) {
+              notify('بانتظار اعتماد إجابات القادة', 'info');
+              return;
+            }
             await beginShieldWindow(qRoom, {
               winnerGroupId: win,
               attack: qGameState?.speedClaims?.[win],
             });
             playSound('suspense');
           }}
+          qSpeedResolution={qSpeedResolution}
+          qKey={qKey}
           onSpeedVerdictFail={async () => {
             await applySpeedRoundWrong({ qRoom, qGameState, qGroups });
             playSound('countdown_last');
@@ -470,36 +481,10 @@ export default function FameeriAdminPlay({
               <div className="fameeri-admin-wait-hint">⏳ انتظر المجموعات تُرسل طلباتها</div>
             )}
 
-            {isSpeed && !qGameState?.speedBatchActive && claimIds.length > 0 && (
-              <>
-                <div className="fameeri-admin-action-card__tag speed" style={{ marginTop: 12 }}>
-                  📨 طلبات السرعة ({claimIds.length})
-                </div>
-                {Object.entries(qGameState.speedClaims || {}).map(([gid, c]) => (
-                  <div key={gid} className="fameeri-admin-claim-row">
-                    <FameeriAdminDuel
-                      attackerName={c.attackerName}
-                      targetName={c.targetName}
-                      tree={c.tree}
-                      weaponName={c.weaponName}
-                      size="sm"
-                    />
-                  </div>
-                ))}
-                {needPickWinner && (
-                  <div className="ig" style={{ marginTop: 10 }}>
-                    <label className="lbl">المجموعة الفائزة عند «صح»</label>
-                    <select className="inp" value={speedWinSelect} onChange={(e) => setSpeedWinSelect(e.target.value)}>
-                      <option value="">— اختر —</option>
-                      {claimIds.map((gid) => (
-                        <option key={gid} value={gid}>
-                          {qGList.find((x) => x.id === gid)?.name || gid}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </>
+            {isSpeed && claimIds.length > 0 && (
+              <p className="fameeri-admin-wait-hint" style={{ marginTop: 12 }}>
+                📨 {claimIds.length} طلب سرعة — انتقل لتبويب «السؤال والحسم» لبدء المؤقت
+              </p>
             )}
           </div>
 

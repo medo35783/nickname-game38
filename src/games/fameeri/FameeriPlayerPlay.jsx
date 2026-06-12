@@ -10,7 +10,7 @@ import FameeriPlayerTabs from './FameeriPlayerTabs';
 import PlayerQuestionView from '../../question-bank/PlayerQuestionView';
 import FameeriVerdictBanner from './FameeriVerdictBanner';
 import FameeriAttackDisplay from './FameeriAttackDisplay';
-import { Q_TREES } from '../../core/constants';
+import { Q_TREES, Q_WEAPONS } from '../../core/constants';
 
 function WaitCard({ icon, title, sub }) {
   return (
@@ -22,12 +22,31 @@ function WaitCard({ icon, title, sub }) {
   );
 }
 
-function SentCard({ title, detail, hint }) {
+function AttackSentCard({ title, targetName, tree, weaponName, weaponId, hint }) {
+  const wDef = weaponId ? Q_WEAPONS.find((w) => w.id === weaponId) : null;
+  const weaponLabel = weaponName || wDef?.name || '—';
+  const weaponIcon = wDef?.icon || '⚔️';
+
   return (
     <div className="card fameeri-attack-sent">
       <div className="fameeri-attack-sent__title">{title}</div>
-      <div className="fameeri-attack-sent__detail">{detail}</div>
-      <div className="fameeri-attack-sent__hint">{hint}</div>
+      <div className="fameeri-attack-sent__summary">
+        <div className="fameeri-attack-sent__chip fameeri-attack-sent__chip--target">
+          <span className="fameeri-attack-sent__chip-label">الهدف</span>
+          <span className="fameeri-attack-sent__chip-value">{targetName || '—'}</span>
+        </div>
+        <div className="fameeri-attack-sent__chip fameeri-attack-sent__chip--tree">
+          <span className="fameeri-attack-sent__chip-label">الشجرة</span>
+          <span className="fameeri-attack-sent__chip-value">🌳 {tree || '—'}</span>
+        </div>
+        <div className="fameeri-attack-sent__chip fameeri-attack-sent__chip--weapon">
+          <span className="fameeri-attack-sent__chip-label">السلاح</span>
+          <span className="fameeri-attack-sent__chip-value">
+            {weaponIcon} {weaponLabel}
+          </span>
+        </div>
+      </div>
+      {hint && <div className="fameeri-attack-sent__hint">{hint}</div>}
     </div>
   );
 }
@@ -302,7 +321,7 @@ export default function FameeriPlayerPlay({
                   {qCanAnswer && (
                     <span className="fameeri-question-dock__pill">
                       {qGameState?.playMode === 'speed'
-                        ? '⚡ الجميع يجيبون'
+                        ? '⚡ أجب بسرعة'
                         : isLeader
                           ? '👑 اعتمد الإجابة'
                           : '🎯 اقترح'}
@@ -331,9 +350,12 @@ export default function FameeriPlayerPlay({
             />
 
             {isLeader && qMySpeedClaim && !qCurrentAttack && !qGameState?.speedBatchActive && !qReveal && (
-              <SentCard
+              <AttackSentCard
                 title="✅ هجومك مُرسَل"
-                detail={`→ ${qMySpeedClaim.targetName} · 🌳 ${qMySpeedClaim.tree} · ${qMySpeedClaim.weaponName}`}
+                targetName={qMySpeedClaim.targetName}
+                tree={qMySpeedClaim.tree}
+                weaponName={qMySpeedClaim.weaponName}
+                weaponId={qMySpeedClaim.weapon}
                 hint="انتظر المشرف يبدأ المؤقت ويحسم الجولة"
               />
             )}
@@ -343,9 +365,12 @@ export default function FameeriPlayerPlay({
               !qTimer &&
               !qReveal &&
               !shieldWindow && (
-                <SentCard
+                <AttackSentCard
                   title="✅ الهجوم قيد الحسم"
-                  detail={`→ ${qCurrentAttack.targetName} · 🌳 ${qCurrentAttack.tree} · ${qCurrentAttack.weaponName}`}
+                  targetName={qCurrentAttack.targetName}
+                  tree={qCurrentAttack.tree}
+                  weaponName={qCurrentAttack.weaponName}
+                  weaponId={qCurrentAttack.weapon}
                   hint="انتظر المشرف يفعّل المؤقت ثم يعلن النتيجة"
                 />
               )}

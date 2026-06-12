@@ -517,11 +517,69 @@
   margin-top: 14px;
   padding: 14px 18px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.38);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
   animation: qCardRise 0.55s ease 0.35s both;
   max-width: 340px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.q-reveal .q-reveal-result-line {
+  margin-top: 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+
+.q-reveal .q-reveal-result-sub {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.q-reveal .q-reveal-hunt-count {
+  color: #ffd54f;
+  font-size: 1.15em;
+}
+
+.q-reveal-result-head--empty {
+  color: #ffd54f !important;
+  text-shadow: 0 0 28px rgba(255, 213, 79, 0.45);
+}
+
+.q-reveal-result-card--success {
+  border-color: rgba(46, 204, 113, 0.45);
+  background: rgba(0, 40, 10, 0.55);
+}
+
+.q-reveal-result-card--empty {
+  border-color: rgba(255, 193, 7, 0.45);
+  background: rgba(50, 35, 0, 0.55);
+}
+
+.q-reveal-result-card--fail {
+  border-color: rgba(230, 57, 80, 0.45);
+  background: rgba(40, 0, 8, 0.55);
+}
+
+.q-reveal-result-card--shield {
+  border-color: rgba(206, 147, 216, 0.45);
+  background: rgba(30, 0, 50, 0.55);
+}
+
+.q-reveal .q-reveal-legend__meta {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.q-reveal .q-reveal-legend__label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.q-reveal .q-reveal-phase-sub,
+.q-reveal .q-suspense {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 @keyframes qCardRise {

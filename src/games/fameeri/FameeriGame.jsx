@@ -25,6 +25,7 @@ import { markQuestionAsUsed } from './fameeriBankProgress';
 import { saveAdminSession, loadAdminSession, clearAdminSessionLocal } from './fameeriSessionStore';
 import { buildAdminAnswerContext } from './fameeriAdminAnswers';
 import { cancelCurrentAttack } from './fameeriAdminResolve';
+import { pickSpeedQuestionWeapon, resolveSpeedWinner } from './fameeriSpeedResolve';
 import {
   drawQuestionForWeapon,
   findInStructuredPool,
@@ -739,10 +740,12 @@ const FameeriGame = forwardRef(function FameeriGame(
   const qKey = qActiveQuestion ? qActiveQuestion.id || qActiveQuestion.text || null : null;
   const qWrittenText = isWrittenTextQuestion(qActiveQuestion);
   const qPlayMode = qGameState?.playMode || 'sequential';
+  const qSpeedClaimIds = Object.keys(qGameState?.speedClaims || {});
   const qIsSpeedRound = qPlayMode === 'speed' && !!qGameState?.speedBatchActive;
   const qIsSequentialAttack = qPlayMode !== 'speed' && !!qCurrentAttack;
   const qCanAnswerGroup =
-    qIsSpeedRound || (qIsSequentialAttack && qCurrentAttack?.attackerId === qGroupId);
+    (qIsSpeedRound && qSpeedClaimIds.includes(qGroupId)) ||
+    (qIsSequentialAttack && qCurrentAttack?.attackerId === qGroupId);
   const qCanAnswer =
     !!qActiveQuestion &&
     !!qActiveQuestion.revealOptions &&
@@ -797,12 +800,20 @@ const FameeriGame = forwardRef(function FameeriGame(
     qMList,
     qCurrentAttack,
     isSpeed: qPlayMode === 'speed' && !!qGameState?.speedBatchActive,
-    speedAnsweringGroupId: (() => {
-      const ids = Object.keys(qGameState?.speedClaims || {});
-      if (ids.length === 1) return ids[0];
-      return speedWinSelect || null;
-    })(),
+    speedClaimIds: qSpeedClaimIds,
+    speedAnsweringGroupId: speedWinSelect || qSpeedClaimIds[0] || null,
   });
+
+  const qSpeedResolution =
+    qPlayMode === 'speed' && qKey && qActiveQuestion
+      ? resolveSpeedWinner({
+          claimIds: qSpeedClaimIds,
+          qGList,
+          qKey,
+          options: qActiveQuestion.options || [],
+          correctAnswer: qActiveAnswer,
+        })
+      : null;
 
   const qAdminPendingGroups = qAdminAnswerContext?.manualOnly
     ? []
@@ -982,7 +993,7 @@ const FameeriGame = forwardRef(function FameeriGame(
       }
       const groupBase = `qrooms/${qRoom}/groups/${qGroupId}`;
       await update(dbRef(db), {
-        [`${groupBase}/finalAnswer`]: { q: qKey, opt, by: qMyName || '' },
+        [`${groupBase}/finalAnswer`]: { q: qKey, opt, by: qMyName || '', submittedAt: Date.now() },
         [`${groupBase}/leaderUid`]: uid,
         [`${groupBase}/leaderMemberId`]: qMyId,
         ...patchLeaderByUid(qRoom, uid, qGroupId),
@@ -1006,13 +1017,11 @@ const FameeriGame = forwardRef(function FameeriGame(
     const claims = qGameState?.speedClaims || {};
     const ids = Object.keys(claims);
     if (!ids.length) return null;
-    const winId =
-      qGameState?.speedBatchActive && ids.length === 1
-        ? ids[0]
-        : speedWinSelect && claims[speedWinSelect]
-          ? speedWinSelect
-          : ids[0];
-    return claims[winId]?.weapon || null;
+    if (qSpeedResolution?.winnerId && claims[qSpeedResolution.winnerId]?.weapon) {
+      return claims[qSpeedResolution.winnerId].weapon;
+    }
+    if (speedWinSelect && claims[speedWinSelect]?.weapon) return claims[speedWinSelect].weapon;
+    return pickSpeedQuestionWeapon(claims) || claims[ids[0]]?.weapon || null;
   };
 
   useEffect(() => {
@@ -1260,8 +1269,12 @@ const FameeriGame = forwardRef(function FameeriGame(
       setSpeedWinSelect(ids[0]);
       return;
     }
+    if (qGameState?.speedBatchActive && qSpeedResolution?.winnerId) {
+      setSpeedWinSelect(qSpeedResolution.winnerId);
+      return;
+    }
     setSpeedWinSelect((prev) => (ids.includes(prev) ? prev : ''));
-  }, [qGameState?.speedClaims]);
+  }, [qGameState?.speedClaims, qGameState?.speedBatchActive, qSpeedResolution?.winnerId, qGList]);
 
   useEffect(() => {
     const ph = qGameState?.phase || 'lobby';
@@ -1533,6 +1546,8 @@ const FameeriGame = forwardRef(function FameeriGame(
               onGoAccount={onGoAccount}
               speedWinSelect={speedWinSelect}
               setSpeedWinSelect={setSpeedWinSelect}
+              qSpeedResolution={qSpeedResolution}
+              qKey={qKey}
               speedRoundSecs={speedRoundSecs}
               setSpeedRoundSecs={setSpeedRoundSecs}
               qCustomTimer={qCustomTimer}

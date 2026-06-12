@@ -8,9 +8,9 @@ import {
 } from '../../question-bank/questionSession';
 import AdminQuestionRevealControls from '../../question-bank/AdminQuestionRevealControls';
 import AdminActingRevealControls from '../../question-bank/AdminActingRevealControls';
-import FameeriAdminDuel from './FameeriAdminDuel';
 import FameeriAttackDisplay from './FameeriAttackDisplay';
 import FameeriAdminAnswerVerdict from './FameeriAdminAnswerVerdict';
+import FameeriSpeedAdminPanel from './FameeriSpeedAdminPanel';
 
 const TIMER_PRESETS = [15, 30, 45, 60];
 
@@ -81,6 +81,8 @@ export default function FameeriAdminCommandCenter({
   onVerdictFail,
   onSpeedVerdictOk,
   onSpeedVerdictFail,
+  qSpeedResolution = null,
+  qKey = null,
   accent = 'var(--fameeri-primary)',
 }) {
   const [teamsDetailOpen, setTeamsDetailOpen] = useState(false);
@@ -142,11 +144,12 @@ export default function FameeriAdminCommandCenter({
   const countdown = inShield ? shieldCountdown : qCountdown;
   const countdownUrgent = countdown !== null && countdown <= 5 && countdown > 0;
   const timerExpired = timerRunning && countdown !== null && countdown <= 0;
-  const showSpeedVerdict = isSpeed && !qCurrentAttack && claimIds.length > 0 && !inShield;
-  const showAttackVerdict = !inShield && !!qCurrentAttack && (hasQuestion || manualFlow);
+  const showSpeedFlow = isSpeed && !qCurrentAttack && claimIds.length > 0 && !inShield;
+  const showSpeedVerdict = showSpeedFlow && speedBatchActive;
+  const showAttackVerdict = !inShield && !isSpeed && !!qCurrentAttack && (hasQuestion || manualFlow);
+  const showSequentialAttack = !!qCurrentAttack && !(isSpeed && speedBatchActive);
 
   const wDef = attack ? Q_WEAPONS.find((w) => w.id === attack.weapon) : null;
-  const groupName = (gid) => qGList.find((g) => g.id === gid)?.name || gid;
 
   const attackVerdictBar = showAttackVerdict && qCurrentAttack && (
     <CmdVerdictBar
@@ -164,17 +167,25 @@ export default function FameeriAdminCommandCenter({
     />
   );
 
+  const speedOkSuggested = qSpeedResolution?.autoVerdict === true;
+  const speedFailSuggested = qSpeedResolution?.autoVerdict === false;
+  const speedOkDisabled = !qSpeedResolution?.canJudgeOk;
+  const speedFailDisabled = !qSpeedResolution?.canJudgeFail;
+
   const speedVerdictBar = showSpeedVerdict && (
     <CmdVerdictBar
       ariaLabel="حكم السرعة"
       ok={{
-        className: 'fameeri-cmd-verdict fameeri-cmd-verdict--ok',
+        className: `fameeri-cmd-verdict fameeri-cmd-verdict--ok${speedOkSuggested ? ' suggested' : ''}`,
         onClick: onSpeedVerdictOk,
-        disabled: claimIds.length > 1 && !speedWinSelect,
+        disabled: speedOkDisabled,
+        sub: 'تفعيل هجوم الفائز',
       }}
       fail={{
-        className: 'fameeri-cmd-verdict fameeri-cmd-verdict--fail',
+        className: `fameeri-cmd-verdict fameeri-cmd-verdict--fail${speedFailSuggested ? ' suggested' : ''}`,
         onClick: onSpeedVerdictFail,
+        disabled: speedFailDisabled,
+        sub: 'الجميع أخطأ',
       }}
     />
   );
@@ -196,8 +207,23 @@ export default function FameeriAdminCommandCenter({
         ))}
       </div>
 
-      {/* الهجوم */}
-      {attack && (
+      {/* السرعة — طلبات وإجابات */}
+      {showSpeedFlow && (
+        <FameeriSpeedAdminPanel
+          claimIds={claimIds}
+          speedClaims={speedClaims}
+          qGList={qGList}
+          qKey={qKey}
+          qActiveQuestion={qActiveQuestion}
+          qActiveAnswer={qActiveAnswer}
+          speedBatchActive={speedBatchActive}
+          winnerId={speedWinSelect || qSpeedResolution?.winnerId}
+          accent={accent}
+        />
+      )}
+
+      {/* الهجوم المتتابع فقط */}
+      {showSequentialAttack && attack && (
         <FameeriAttackDisplay
           attack={{
             ...attack,
@@ -470,76 +496,30 @@ export default function FameeriAdminCommandCenter({
             </>
           )}
           {attackVerdictBar}
-        </div>
-      )}
-
-      {/* وضع السرعة — طلبات قبل المؤقت */}
-      {isSpeed && !qCurrentAttack && claimIds.length > 0 && !speedBatchActive && !inShield && (
-        <div className="fameeri-cmd-speed card">
-          <div className="fameeri-cmd-speed__title">📨 طلبات السرعة ({claimIds.length})</div>
-          {Object.entries(speedClaims || {}).map(([gid, c]) => (
-            <div key={gid} className="fameeri-admin-claim-row">
-              <FameeriAdminDuel
-                attackerName={c.attackerName}
-                targetName={c.targetName}
-                tree={c.tree}
-                weaponName={c.weaponName}
-                size="sm"
-              />
-            </div>
-          ))}
-          {claimIds.length > 1 && (
-            <div className="ig" style={{ marginTop: 10 }}>
-              <label className="lbl">المجموعة الفائزة عند «صح»</label>
-              <select
-                className="inp"
-                value={speedWinSelect}
-                onChange={(e) => setSpeedWinSelect?.(e.target.value)}
-              >
-                <option value="">— اختر —</option>
-                {claimIds.map((gid) => (
-                  <option key={gid} value={gid}>
-                    {groupName(gid)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {!canStartSpeedTimer && claimIds.length > 1 && (
-            <p className="fameeri-cmd-timer__wait">اختر المجموعة الفائزة لتفعيل المؤقت</p>
-          )}
-        </div>
-      )}
-
-      {/* وضع السرعة — مؤقت */}
-      {isSpeed && !qCurrentAttack && !hasQuestion && claimIds.length > 0 && !inShield && (
-        <div className={`fameeri-cmd-timer card${timerRunning ? ' live' : ''}`}>
-          {!timerRunning && (
-            <>
-              <div className="fameeri-cmd-timer__title">⚡ حسم السرعة — المؤقت</div>
-              <div className="fameeri-admin-pills">
-                {[10, 20, 35].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="btn bg bsm"
-                    disabled={!canStartSpeedTimer}
-                    onClick={() => onStartSpeedTimer?.(s)}
-                  >
-                    {s}ث
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {timerRunning && (
-            <div className={`fameeri-cmd-timer__ring${countdownUrgent ? ' urgent' : ''}`}>
-              <span className="fameeri-cmd-timer__num">
-                {countdown !== null ? (countdown > 0 ? countdown : '⏰') : '…'}
-              </span>
-            </div>
-          )}
           {speedVerdictBar}
+        </div>
+      )}
+
+      {/* وضع السرعة — بدء المؤقت (قبل السؤال أو معه) */}
+      {showSpeedFlow && !speedBatchActive && !inShield && (
+        <div className="fameeri-cmd-speed-start card">
+          <div className="fameeri-cmd-speed-start__title">⚡ بدء جولة السرعة</div>
+          <p className="fameeri-cmd-speed-start__hint">
+            شغّل المؤقت ثم أظهر السؤال والخيارات — القاديان يجيبان، والنظام يحدد الفائز تلقائياً.
+          </p>
+          <div className="fameeri-admin-pills">
+            {[10, 20, 35].map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="btn bg bsm"
+                disabled={!canStartSpeedTimer}
+                onClick={() => onStartSpeedTimer?.(s)}
+              >
+                {s}ث
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

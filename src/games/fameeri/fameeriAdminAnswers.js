@@ -54,6 +54,7 @@ export function buildAdminAnswerContext({
   qMList,
   qCurrentAttack,
   isSpeed = false,
+  speedClaimIds = [],
   speedAnsweringGroupId = null,
 }) {
   if (!qKey || !qActiveQuestion) return null;
@@ -84,7 +85,10 @@ export function buildAdminAnswerContext({
   const options = Array.isArray(qActiveQuestion.options) ? qActiveQuestion.options : [];
 
   const answeringIds = (() => {
-    if (isSpeed) return qGList.map((g) => g.id);
+    if (isSpeed) {
+      if (Array.isArray(speedClaimIds) && speedClaimIds.length) return speedClaimIds;
+      return qGList.map((g) => g.id);
+    }
     if (qCurrentAttack?.attackerId) return [qCurrentAttack.attackerId];
     return [];
   })();
@@ -105,12 +109,23 @@ export function buildAdminAnswerContext({
   const attacker = groups.find((g) => g.isAttacker) || null;
   const primary = attacker || answering.find((g) => g.submitted) || answering[0] || null;
 
+  let autoVerdict = primary?.submitted ? primary.correct : null;
+  if (isSpeed && answering.length > 1) {
+    const allSubmitted = answering.every((g) => g.submitted);
+    if (allSubmitted) {
+      const correctOnes = answering.filter((g) => g.correct);
+      autoVerdict = correctOnes.length > 0 ? true : false;
+    } else {
+      autoVerdict = null;
+    }
+  }
+
   return {
     groups,
     answering,
     attacker,
     primary,
     pendingNames: answering.filter((g) => !g.submitted).map((g) => g.name),
-    autoVerdict: primary?.submitted ? primary.correct : null,
+    autoVerdict,
   };
 }

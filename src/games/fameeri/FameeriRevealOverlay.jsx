@@ -138,6 +138,15 @@ function WeaponSpeedlines() {
   );
 }
 
+/** بطاقة الحكم — بدون تكرار أسماء المجموعات (موجودة أعلى الشاشة) */
+function RevealVerdictCard({ type, children }) {
+  return (
+    <div className={`q-reveal-result-card q-reveal-result-card--${type}`}>
+      <div className="q-reveal-result-line">{children}</div>
+    </div>
+  );
+}
+
 function AnimatedHuntNum({ target }) {
   const [display, setDisplay] = useState(0);
   const frameRef = useRef(null);
@@ -265,14 +274,9 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
               ))}
             </div>
             <AnimatedHuntNum target={qReveal.hunted} />
-            <div className="q-reveal-result-card">
-              <div className="q-reveal-result-line">
-                <strong>{qReveal.attackerName}</strong> اصطاد{' '}
-                <strong className="q-reveal-hunt-count">{qReveal.hunted}</strong> قميري من{' '}
-                <strong>{qReveal.targetName}</strong>
-              </div>
-              <div className="q-reveal-result-sub">من شجرة «{qReveal.tree}»</div>
-            </div>
+            <RevealVerdictCard type="success">
+              تم اصطياد <strong className="q-reveal-hunt-count">{qReveal.hunted}</strong> قميري
+            </RevealVerdictCard>
           </>
         )}
 
@@ -289,14 +293,9 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
             <div className="q-reveal-result-head q-reveal-result-head--shield q-reveal-result-head--impact q-reveal-pop">
               صد الهجوم!
             </div>
-            <div className="q-reveal-result-card">
-              <div className="q-reveal-result-line">
-                <strong>{qReveal.targetName}</strong> فعّلت الدرع على 🌳{qReveal.tree}
-              </div>
-              <div className="q-reveal-result-sub">
-                {qReveal.attackerName} لم يصطد أي قميري — السلاح أُهدر
-              </div>
-            </div>
+            <RevealVerdictCard type="shield">
+              🛡️ الدرع صد الهجوم — لا صيد · السلاح أُهدر
+            </RevealVerdictCard>
           </>
         )}
 
@@ -306,12 +305,10 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
               <div className="q-empty-face">😂</div>
               <div className="q-reveal-dust" aria-hidden />
             </div>
-            <div className="q-reveal-result-head q-reveal-result-head--impact">شجرة فارغة!</div>
-            <div className="q-reveal-result-card">
-              <div className="q-reveal-result-line">
-                <strong>{qReveal.attackerName}</strong> هاجم <strong>{qReveal.targetName}</strong> — لا قميري هنا
-              </div>
+            <div className="q-reveal-result-head q-reveal-result-head--empty q-reveal-result-head--impact">
+              شجرة فارغة!
             </div>
+            <RevealVerdictCard type="empty">لا قميري — الهجوم بلا كسب</RevealVerdictCard>
           </>
         )}
 
@@ -326,12 +323,7 @@ export default function FameeriRevealOverlay({ qReveal, showContinue, onContinue
             <div className="q-reveal-result-head q-reveal-result-head--fail q-reveal-result-head--impact">
               الهجوم لم يُحسب
             </div>
-            <div className="q-reveal-result-card">
-              <div className="q-reveal-result-line">
-                <strong>{qReveal.attackerName}</strong> لم يصب <strong>{qReveal.targetName}</strong>
-              </div>
-              <div className="q-reveal-result-sub">إجابة خاطئة — لا صيد</div>
-            </div>
+            <RevealVerdictCard type="fail">إجابة خاطئة — لا صيد</RevealVerdictCard>
           </>
         )}
 
