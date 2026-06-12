@@ -98,7 +98,7 @@ export default function HesbahPlay({
     hostAnswer,
     !!game?.hostParticipates
   );
-  const revealLive = shouldRevealLiveFeed(game, players, answers);
+  const revealLive = shouldRevealLiveFeed(game);
 
   const hud = (body) => (
     <HesbahPlayerHud
@@ -268,7 +268,7 @@ export default function HesbahPlay({
           </div>
           {!revealLive ? (
             <p className="hesbah-play-hint hesbah-play-hint--dark">
-              🕶️ ظلام — النتائج بعد اكتمال الإجابات أو انتهاء الوقت
+              🕶️ ظلام — الإجابات تظهر بعد انتهاء وقت الجولة
             </p>
           ) : liveCards.length === 0 ? (
             <p className="hesbah-play-wait">بانتظار إجابات الآخرين…</p>

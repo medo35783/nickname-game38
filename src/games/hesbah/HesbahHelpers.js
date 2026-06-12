@@ -127,7 +127,7 @@ export const HESBAH_SPECIAL_TOOLS = [
     title: 'كرت ظلام',
     tag: 'إخفاء',
     short: 'لا نتائج فورية',
-    desc: 'لا تظهر البطاقات الحية حتى تكتمل كل الإجابات أو ينتهي الوقت.',
+    desc: 'لا تظهر البطاقات الحية للمتسابقين حتى ينتهي وقت الجولة.',
   },
 ];
 
@@ -196,17 +196,16 @@ export function isTimerEnded(game) {
   return !!(game?.deadline && game.deadline <= Date.now());
 }
 
-/** البطاقات الحية للمتسابقين — كرت ظلام يخفيها حتى اكتمال الإرسال أو انتهاء الوقت */
-export function shouldRevealLiveFeed(game, players, answers) {
+/** البطاقات الحية للمتسابقين — كرت ظلام يخفيها حتى انتهاء وقت الجولة */
+export function shouldRevealLiveFeed(game) {
   if (!isDarkRound(game?.specialRound)) return true;
   if (game?.phase === 'grading' || game?.phase === 'roundResult' || game?.phase === 'leaderboard') {
     return true;
   }
   if (game?.phase !== 'question') return true;
   if (isTimerWaiting(game)) return false;
-  if (isTimerEnded(game)) return true;
-  if (isTimerRunning(game)) return allContestantsSubmitted(players, answers);
-  return false;
+  if (isTimerRunning(game)) return false;
+  return isTimerEnded(game);
 }
 
 export function siegeMinScore(totalQ) {
@@ -531,6 +530,27 @@ export function groupDuplicateAnswers(answersMap, players, hostAnswer = null) {
   }
 
   return Object.values(buckets).filter((b) => b.items.length > 1);
+}
+
+/** الدرع يحمي عند التكرار مع شخص واحد فقط (مشرف أو لاعب آخر) */
+export function shieldProtectsInDuplicateGroup(group) {
+  return (group?.items?.length ?? 0) === 2;
+}
+
+export function isShieldProtectedDuplicate(row, group) {
+  return !!row?.shieldActive && shieldProtectsInDuplicateGroup(group);
+}
+
+export function duplicateGroupShieldHint(group) {
+  const shielded = (group?.items || []).filter((it) => !it.isHost && it.shieldActive);
+  if (!shielded.length) return null;
+  if (shieldProtectsInDuplicateGroup(group)) {
+    const withHost = group.items.some((it) => it.isHost);
+    return withHost
+      ? '🛡️ تأمين مفعّل — تُحسب الدرجة رغم التكرار مع المشرف'
+      : '🛡️ تأمين مفعّل — تُحسب الدرجة رغم التكرار';
+  }
+  return '🛡️ درع مفعّل — تكرار مع أكثر من شخص فلا حماية';
 }
 
 export function uniqueAnswerEntries(answersMap, players, duplicateKeys) {

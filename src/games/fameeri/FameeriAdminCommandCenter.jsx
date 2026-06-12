@@ -273,8 +273,9 @@ export default function FameeriAdminCommandCenter({
                 const leaderMiss = isLeaderChoice && !leaderPick.correct;
                 const optionClass = [
                   'admin-q-option',
+                  leaderOk ? 'admin-q-option--leader-correct' : '',
                   leaderMiss ? 'admin-q-option--leader-wrong' : '',
-                  leaderOk || (isCorrectAnswer && !leaderPick) ? 'admin-q-option--correct' : '',
+                  !leaderPick && isCorrectAnswer ? 'admin-q-option--correct' : '',
                   isCorrectAnswer && leaderMiss ? 'admin-q-option--correct-hint' : '',
                 ]
                   .filter(Boolean)
@@ -288,7 +289,7 @@ export default function FameeriAdminCommandCenter({
                       <span
                         className={`admin-q-option__badge admin-q-option__badge--leader${leaderOk ? ' ok' : ' miss'}`}
                       >
-                        {leaderOk ? '👑 ✓ القائد' : '👑 ✗ القائد'}
+                        {leaderOk ? '👑 القائد ✅' : '👑 القائد ❌'}
                       </span>
                     )}
                     {isCorrectAnswer && !isLeaderChoice && (
@@ -301,13 +302,10 @@ export default function FameeriAdminCommandCenter({
           )}
 
           {leaderPick && (
-            <p className={`fameeri-cmd-question__leader${leaderPick.correct ? ' ok' : ' miss'}`}>
-              👑 اختيار القائد{leaderPick.by ? ` (${leaderPick.by})` : ''}:{' '}
-              <strong>
-                {leaderPick.letter ? `${leaderPick.letter} — ` : ''}
-                {leaderPick.optText}
-              </strong>
-              {leaderPick.correct ? ' ✅' : ' ❌'}
+            <p className={`fameeri-cmd-question__verdict-hint${leaderPick.correct ? ' ok' : ' miss'}`}>
+              {leaderPick.correct
+                ? `✅ إجابة صحيحة — القائد${leaderPick.by ? ` (${leaderPick.by})` : ''} أصاب · اضغط «صح» بالأسفل`
+                : `❌ إجابة خاطئة — القائد${leaderPick.by ? ` (${leaderPick.by})` : ''} أخطأ · اضغط «خطأ» بالأسفل`}
             </p>
           )}
 

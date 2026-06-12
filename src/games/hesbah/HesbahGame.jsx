@@ -48,6 +48,7 @@ import {
   computeFinalVoteWinner,
   groupDuplicateAnswers,
   answerDedupeKey,
+  isShieldProtectedDuplicate,
   gradedPoints,
   BOARD_CELL,
   boardCellForCorrect,
@@ -906,10 +907,8 @@ const HesbahGame = forwardRef(function HesbahGame(
       game?.hostParticipates ? hostAnswer : null
     );
     const dupKeys = new Set(dupGroups.map((g) => g.dedupeKey || answerDedupeKey(g.answer)));
-    const dupContestantCount = (answerKey) => {
-      const group = dupGroups.find((g) => (g.dedupeKey || answerDedupeKey(g.answer)) === answerKey);
-      return group?.items.filter((it) => !it.isHost).length ?? 0;
-    };
+    const dupGroupForKey = (answerKey) =>
+      dupGroups.find((g) => (g.dedupeKey || answerDedupeKey(g.answer)) === answerKey);
     const spec = game?.specialRound;
     const currentQ = game?.currentQ || 1;
     const summary = [];
@@ -926,22 +925,34 @@ const HesbahGame = forwardRef(function HesbahGame(
       const bKey = String(base);
       const isDupMarked = dupKeys.has(key) && duplicateMarked[key];
 
-      if (isDupMarked) {
-        const groupSize = dupContestantCount(key);
-        const shieldOn = !!row.shieldActive;
-        const shieldProtects = shieldOn && groupSize === 2;
+      const dupGroup = dupGroupForKey(key);
+      const shieldProtects = isDupMarked && isShieldProtectedDuplicate(row, dupGroup);
 
-        if (shieldProtects) {
-          delta = 0;
-        } else {
-          delta = -riskDeduction(base, spec);
-          const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
-          board[bKey] = BOARD_CELL.BURNED;
-          playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
-          playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = 0;
-          playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = false;
-          hotStreak[pid] = 0;
+      if (isDupMarked && shieldProtects) {
+        correct = true;
+        delta = gradedPoints(base, true, spec, { confidenceUsed: !!row.confidenceUsed });
+        const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
+        board[bKey] = boardCellForCorrect(spec);
+        playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
+        if (currentQ >= HOT_STREAK_START_Q) {
+          const streak = (p.consecutiveCorrect || 0) + 1;
+          let bonus = 0;
+          let onFire = !!p.isOnFire;
+          if (streak >= HOT_STREAK_NEED) onFire = true;
+          if (onFire && streak >= HOT_STREAK_NEED + 1) bonus = HOT_STREAK_BONUS;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = streak;
+          playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = onFire;
+          hotStreak[pid] = streak;
+          delta += bonus;
         }
+      } else if (isDupMarked) {
+        delta = -riskDeduction(base, spec);
+        const board = { ...(playerUpdates[`srooms/${roomCode}/players/${pid}/board`] || p.board || {}) };
+        board[bKey] = BOARD_CELL.BURNED;
+        playerUpdates[`srooms/${roomCode}/players/${pid}/board`] = board;
+        playerUpdates[`srooms/${roomCode}/players/${pid}/consecutiveCorrect`] = 0;
+        playerUpdates[`srooms/${roomCode}/players/${pid}/isOnFire`] = false;
+        hotStreak[pid] = 0;
       } else if (v === 'correct') {
         correct = true;
         delta = gradedPoints(base, true, spec, { confidenceUsed: !!row.confidenceUsed });
@@ -978,7 +989,8 @@ const HesbahGame = forwardRef(function HesbahGame(
           player: p,
           delta,
           correct,
-          risk2x: spec === 'risk2x' && (v === 'wrong' || isDupMarked),
+          shieldProtected: shieldProtects,
+          risk2x: spec === 'risk2x' && (v === 'wrong' || (isDupMarked && !shieldProtects)),
         });
       }
     }); 
@@ -1133,17 +1145,14 @@ const HesbahGame = forwardRef(function HesbahGame(
     setExitSheetOpen(false);
     const code = roomCode;
     const pid = myId;
+    const savedRole = role;
     const savedName = players[pid]?.name || joinName;
 
-    try {
-      if (role === 'admin' && code) {
-        await recordSessionEnd('hesbah', code, false);
-        persistHesbahSession({ roomCode: code, role: 'admin', myId: pid, myName: savedName });
-      } else if (role === 'player' && code && pid) {
-        persistHesbahSession({ roomCode: code, role: 'player', myId: pid, myName: savedName });
-      }
-    } catch {
-      /* ignore */
+    if (savedRole === 'admin' && code) {
+      recordSessionEnd('hesbah', code, false).catch(() => {});
+      persistHesbahSession({ roomCode: code, role: 'admin', myId: pid, myName: savedName });
+    } else if (savedRole === 'player' && code && pid) {
+      persistHesbahSession({ roomCode: code, role: 'player', myId: pid, myName: savedName });
     }
 
     setSavedSession(readSavedHesbah());
@@ -1156,18 +1165,14 @@ const HesbahGame = forwardRef(function HesbahGame(
     const code = roomCode;
     const pid = myId;
 
-    try {
-      if (pid && code) {
-        await purgePlayerFromRoom(code, pid);
-      }
-      clearHesbahSession();
-    } catch {
-      /* ignore */
-    }
-
+    clearHesbahSession();
     setSavedSession({});
     resetHesbahRoomState();
     notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+
+    if (pid && code) {
+      purgePlayerFromRoom(code, pid).catch(() => {});
+    }
   };
 
   const withdrawToArena = async () => {

@@ -117,7 +117,7 @@ export default function HesbahLiveAnswersPanel({
       <HesbahPanelTitle help={help} helpLabel="شرح">{title}</HesbahPanelTitle>
       {darkMode && (
         <p className="hesbah-admin-live-feed__dark-note">
-          🕶️ كرت ظلام — المتسابقون لا يرون البطاقات حتى اكتمال الإرسال أو انتهاء الوقت
+          🕶️ كرت ظلام — المتسابقون لا يرون البطاقات حتى انتهاء وقت الجولة
         </p>
       )}
       <div className="hesbah-admin-live-feed__list">

@@ -339,22 +339,38 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   const withdrawFromCompetition = async () => {
     setExitSheetOpen(false);
-    if (myId && roomCode) {
-      try {
-        await remove(ref(db, `rooms/${roomCode}/players/${myId}`));
-      } catch {
-        /* ignore */
-      }
-    }
+    const pid = myId;
+    const code = roomCode;
     localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
     resetTitlesRoomState();
     notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+    if (!pid || !code) return;
+    try {
+      await update(ref(db, `rooms/${code}/players/${pid}`), { status: 'withdrawn' });
+    } catch {
+      remove(ref(db, `rooms/${code}/players/${pid}`)).catch(() => {});
+    }
   };
 
   const cancelCompetitionFromExit = async () => {
     setExitSheetOpen(false);
-    await cancelCompetition();
+    const code = roomCode;
     resetTitlesRoomState();
+    if (!code) return;
+    try {
+      recordSessionEnd('titles', code, true).catch(() => {});
+      await update(gameRef(code), {
+        phase: 'ended',
+        cancelled: true,
+        endedAt: Date.now(),
+      });
+      localStorage.removeItem('ng_session');
+      localStorage.removeItem('ng_admin_session');
+      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+    } catch {
+      notify('تعذّر إلغاء المسابقة — حاول مجدداً', 'error');
+    }
   };
 
   /** مسح جلسة الألقاب بالكامل */
@@ -608,9 +624,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         // REJOIN — player already registered
         const [existingId, existingData] = existing;
         try {
+          const rejoinPatch = {};
+          if (existingData.status === 'withdrawn') rejoinPatch.status = 'active';
           const arenaFields = await fetchArenaFieldsForJoin();
-          if (Object.keys(arenaFields).length) {
-            await update(ref(db, `rooms/${joinInput}/players/${existingId}`), arenaFields);
+          Object.assign(rejoinPatch, arenaFields);
+          if (Object.keys(rejoinPatch).length) {
+            await update(ref(db, `rooms/${joinInput}/players/${existingId}`), rejoinPatch);
           }
         } catch {
           /* قد يمنعها قواعد Firebase — لا تعطل العودة */

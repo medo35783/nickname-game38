@@ -8,6 +8,7 @@ function formatDelta(delta) {
 }
 
 function resultMeta(row) {
+  if (row.shieldProtected && row.delta > 0) return { cls: 'win', label: '🛡️ تأمين — ربح' };
   if (row.delta > 0) return { cls: 'win', label: '✓ ربح' };
   if (row.missed) return { cls: 'loss', label: '⏱ لم يُرسل' };
   if (row.delta < 0) return { cls: 'loss', label: '✕ خسارة' };

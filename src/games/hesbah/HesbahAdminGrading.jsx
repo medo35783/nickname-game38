@@ -2,6 +2,8 @@ import Av from '../../shared/Av';
 import {
   answerDedupeKey,
   compareToHostAnswer,
+  duplicateGroupShieldHint,
+  shieldProtectsInDuplicateGroup,
 } from './HesbahHelpers';
 
 function HostMatchBadge({ match }) {
@@ -25,6 +27,8 @@ function DuplicateGroupCard({ group, marked, special, onToggle }) {
   const hasHost = group.items.some((it) => it.isHost);
   const hostItem = group.items.find((it) => it.isHost);
   const displayAnswers = [...new Set(group.items.map((it) => it.answer?.trim()).filter(Boolean))];
+  const shieldHint = duplicateGroupShieldHint(group);
+  const shieldAwardsPoints = shieldProtectsInDuplicateGroup(group) && group.items.some((it) => !it.isHost && it.shieldActive);
 
   return (
     <div
@@ -54,7 +58,14 @@ function DuplicateGroupCard({ group, marked, special, onToggle }) {
             <div key={it.playerId} className="hesbah-admin-grade__who-row">
               <Av p={it.player} sz={28} />
               <span>
-                <strong>{it.name}</strong>
+                <strong>
+                  {it.name}
+                  {it.shieldActive && (
+                    <span className="hesbah-grade-shield-badge" title="تأمين مفعّل">
+                      🛡️ تأمين
+                    </span>
+                  )}
+                </strong>
                 <em>{it.answer}</em>
                 <small>درجة {it.chosenScore ?? '—'}</small>
               </span>
@@ -66,18 +77,26 @@ function DuplicateGroupCard({ group, marked, special, onToggle }) {
         <div className="hesbah-admin-grade__warn">⚠️ مطابقة/قرب من إجابة المشرف</div>
       )}
 
+      {shieldHint && (
+        <div className={`hesbah-admin-grade__shield-note ${shieldAwardsPoints ? 'is-protected' : ''}`}>
+          {shieldHint}
+        </div>
+      )}
+
       <button
         type="button"
         className={`btn bsm ${marked ? 'bg' : 'bgh'}`}
-        style={marked ? { background: 'var(--red)' } : undefined}
+        style={marked && !shieldAwardsPoints ? { background: 'var(--red)' } : undefined}
         onClick={() => onToggle(key, !marked)}
       >
         {marked
-          ? special === 'risk2x'
-            ? '✓ مكرر — ضعف خصم'
-            : special === 'risk'
-              ? '✓ مكرر — خصم'
-              : '✓ مكرر — صفر'
+          ? shieldAwardsPoints
+            ? '✓ مكرر — 🛡️ محمي (تُحسب الدرجة)'
+            : special === 'risk2x'
+              ? '✓ مكرر — ضعف خصم'
+              : special === 'risk'
+                ? '✓ مكرر — خصم'
+                : '✓ مكرر — صفر'
           : 'اعتماد كتكرار'}
       </button>
     </div>

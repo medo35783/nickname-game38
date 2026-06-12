@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ARENA_BACK_LABEL } from '../core/constants';
 import { getGameBrand } from './gameBrands';
 
@@ -18,10 +19,26 @@ export default function GameExitSheet({
   onClose,
 }) {
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!open) setConfirmQuit(false);
+    if (!open) {
+      setConfirmQuit(false);
+      setBusy(false);
+    }
   }, [open]);
+
+  const runAction = async (action) => {
+    if (busy || typeof action !== 'function') return;
+    setBusy(true);
+    try {
+      await Promise.resolve(action());
+    } catch {
+      /* الإشعار يُعالَج في اللعبة */
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -29,70 +46,74 @@ export default function GameExitSheet({
   const isAdmin = role === 'admin';
   const gameEnded = phase === 'final' || phase === 'ended';
 
-  const handleOverlayClick = confirmQuit ? () => setConfirmQuit(false) : onClose;
+  const handleOverlayClick = () => {
+    if (busy) return;
+    if (confirmQuit) setConfirmQuit(false);
+    else onClose?.();
+  };
 
-  if (confirmQuit) {
-    const title = isAdmin ? 'إلغاء المسابقة؟' : 'انسحاب من المسابقة؟';
-    const message = isAdmin
-      ? 'المتسابقون سيُخرجون من الغرفة — لا يمكن العودة لهذه الغرفة.'
-      : 'ستُسجَّل كمنسحب — يمكنك العودة لاحقاً برمز الغرفة ونفس اسمك.';
-    const confirmLabel = isAdmin ? 'نعم، إلغاء المسابقة' : 'نعم، انسحاب';
-
-    return (
-      <div className="game-exit-overlay" role="presentation" onClick={handleOverlayClick}>
-        <div
-          className={`game-exit-sheet game-exit-sheet--${game} game-exit-sheet--confirm`}
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="game-exit-confirm-title"
-          onClick={(e) => e.stopPropagation()}
+  const sheet = confirmQuit ? (
+    <div className="game-exit-overlay" role="presentation" onClick={handleOverlayClick}>
+      <div
+        className={`game-exit-sheet game-exit-sheet--${game} game-exit-sheet--confirm`}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="game-exit-confirm-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="game-exit-sheet__close"
+          aria-label="رجوع للخيارات"
+          disabled={busy}
+          onClick={() => setConfirmQuit(false)}
         >
+          ✕
+        </button>
+
+        <div className="game-exit-sheet__head">
+          <span className="game-exit-sheet__emoji" aria-hidden>
+            {isAdmin ? '⚠️' : '🚪'}
+          </span>
+          <h2 id="game-exit-confirm-title" className="game-exit-sheet__title">
+            {isAdmin ? 'إلغاء المسابقة؟' : 'انسحاب من المسابقة؟'}
+          </h2>
+          <p className="game-exit-sheet__lead">
+            {isAdmin
+              ? 'المتسابقون سيُخرجون من الغرفة — لا يمكن العودة لهذه الغرفة.'
+              : 'ستُسجَّل كمنسحب — يمكنك العودة لاحقاً برمز الغرفة ونفس اسمك.'}
+          </p>
+        </div>
+
+        <div className="game-exit-sheet__choices">
           <button
             type="button"
-            className="game-exit-sheet__close"
-            aria-label="رجوع للخيارات"
-            onClick={() => setConfirmQuit(false)}
+            className="game-exit-card game-exit-card--end"
+            disabled={busy}
+            onClick={() => void runAction(onQuit)}
           >
-            ✕
-          </button>
-
-          <div className="game-exit-sheet__head">
-            <span className="game-exit-sheet__emoji" aria-hidden>
-              {isAdmin ? '⚠️' : '🚪'}
+            <span className="game-exit-card__icon" aria-hidden>
+              {isAdmin ? '🛑' : '👋'}
             </span>
-            <h2 id="game-exit-confirm-title" className="game-exit-sheet__title">
-              {title}
-            </h2>
-            <p className="game-exit-sheet__lead">{message}</p>
-          </div>
-
-          <div className="game-exit-sheet__choices">
-            <button
-              type="button"
-              className="game-exit-card game-exit-card--end"
-              onClick={() => {
-                setConfirmQuit(false);
-                onQuit?.();
-              }}
-            >
-              <span className="game-exit-card__icon" aria-hidden>
-                {isAdmin ? '🛑' : '👋'}
+            <span className="game-exit-card__body">
+              <span className="game-exit-card__title">
+                {busy ? 'جاري التنفيذ…' : isAdmin ? 'نعم، إلغاء المسابقة' : 'نعم، انسحاب'}
               </span>
-              <span className="game-exit-card__body">
-                <span className="game-exit-card__title">{confirmLabel}</span>
-              </span>
-            </button>
-          </div>
-
-          <button type="button" className="game-exit-sheet__back-btn" onClick={() => setConfirmQuit(false)}>
-            ↩ لا — أرجع للخيارات
+            </span>
           </button>
         </div>
-      </div>
-    );
-  }
 
-  return (
+        <button
+          type="button"
+          className="game-exit-sheet__back-btn"
+          disabled={busy}
+          onClick={() => setConfirmQuit(false)}
+        >
+          ↩ لا — أرجع للخيارات
+        </button>
+      </div>
+    </div>
+  ) : (
     <div className="game-exit-overlay" role="presentation" onClick={handleOverlayClick}>
       <div
         className={`game-exit-sheet game-exit-sheet--${game}`}
@@ -101,7 +122,13 @@ export default function GameExitSheet({
         aria-labelledby="game-exit-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="game-exit-sheet__close" aria-label="إغلاق والبقاء" onClick={onClose}>
+        <button
+          type="button"
+          className="game-exit-sheet__close"
+          aria-label="إغلاق والبقاء"
+          disabled={busy}
+          onClick={() => onClose?.()}
+        >
           ✕
         </button>
 
@@ -120,7 +147,12 @@ export default function GameExitSheet({
         </div>
 
         <div className="game-exit-sheet__choices">
-          <button type="button" className="game-exit-card game-exit-card--continue" onClick={onContinue}>
+          <button
+            type="button"
+            className="game-exit-card game-exit-card--continue"
+            disabled={busy}
+            onClick={() => void runAction(onContinue)}
+          >
             <span className="game-exit-card__icon" aria-hidden>
               {gameEnded ? '📊' : '✅'}
             </span>
@@ -136,7 +168,12 @@ export default function GameExitSheet({
 
           {!gameEnded && (
             <>
-              <button type="button" className="game-exit-card game-exit-card--pause" onClick={onPause}>
+              <button
+                type="button"
+                className="game-exit-card game-exit-card--pause"
+                disabled={busy}
+                onClick={() => void runAction(onPause)}
+              >
                 <span className="game-exit-card__icon" aria-hidden>
                   ⏸️
                 </span>
@@ -152,7 +189,12 @@ export default function GameExitSheet({
                 </span>
               </button>
 
-              <button type="button" className="game-exit-card game-exit-card--end" onClick={() => setConfirmQuit(true)}>
+              <button
+                type="button"
+                className="game-exit-card game-exit-card--end"
+                disabled={busy}
+                onClick={() => setConfirmQuit(true)}
+              >
                 <span className="game-exit-card__icon" aria-hidden>
                   {isAdmin ? '🛑' : '👋'}
                 </span>
@@ -171,7 +213,12 @@ export default function GameExitSheet({
           )}
 
           {gameEnded && (
-            <button type="button" className="game-exit-card game-exit-card--arena" onClick={onArena}>
+            <button
+              type="button"
+              className="game-exit-card game-exit-card--arena"
+              disabled={busy}
+              onClick={() => void runAction(onArena)}
+            >
               <span className="game-exit-card__icon" aria-hidden>
                 🏟️
               </span>
@@ -185,6 +232,8 @@ export default function GameExitSheet({
       </div>
     </div>
   );
+
+  return createPortal(sheet, document.body);
 }
 
 /** زر رجوع موحّد */

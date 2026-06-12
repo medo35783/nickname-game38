@@ -40,7 +40,7 @@ export function getHesbahPlayerAlerts(game, me) {
     alerts.push({ key: 'siege', text: `⚔️ كرت حصار — أعلى درجة ${siegeMinScore(game?.totalQ || 15)}+ تلقائياً` });
   }
   if (game?.specialRound === 'dark') {
-    alerts.push({ key: 'dark', text: '🕶️ كرت ظلام — لا نتائج فورية' });
+    alerts.push({ key: 'dark', text: '🕶️ كرت ظلام — الإجابات بعد انتهاء الوقت' });
   }
   if (me?.isOnFire) alerts.push({ key: 'fire', text: '🔥 أنت مشتعل — بونص +5 عند الإصابة' });
   if (game?.finalVoteActive) alerts.push({ key: 'vote', text: '🗳️ صوّت للسؤال الحاسم' });

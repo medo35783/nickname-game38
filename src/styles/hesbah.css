@@ -3528,6 +3528,37 @@
   margin: 6px 0;
 }
 
+.hesbah-grade-shield-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.hesbah-admin-grade__shield-note {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--hesbah-muted);
+}
+
+.hesbah-admin-grade__shield-note.is-protected {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+}
+
 .hesbah-admin-grade__actions {
   display: flex;
   gap: 8px;

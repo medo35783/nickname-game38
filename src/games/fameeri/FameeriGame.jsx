@@ -687,22 +687,32 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   const cancelCompetitionFromExit = async () => {
     setExitSheetOpen(false);
-    await cancelFameeriCompetition();
+    const code = qRoom;
     resetFameeriRoomState();
+    if (!code) return;
+    try {
+      await recordSessionEnd('fameeri', code, true).catch(() => {});
+      await update(dbRef(db, `qrooms/${code}/game`), {
+        phase: 'ended',
+        cancelled: true,
+        endedAt: Date.now(),
+      });
+      localStorage.removeItem('ng_qumairi');
+      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+    } catch {
+      notify('تعذّر إلغاء المسابقة — حاول مجدداً', 'error');
+    }
   };
 
   const withdrawFromCompetition = async () => {
     setExitSheetOpen(false);
-    if (qMyId && qRoom) {
-      try {
-        await remove(dbRef(db, `qrooms/${qRoom}/members/${qMyId}`));
-      } catch {
-        /* ignore */
-      }
-    }
+    const memberId = qMyId;
+    const code = qRoom;
     localStorage.removeItem('ng_qumairi');
     resetFameeriRoomState();
     notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+    if (!memberId || !code) return;
+    remove(dbRef(db, `qrooms/${code}/members/${memberId}`)).catch(() => {});
   };
 
   const endFameeriCompetition = async () => {
