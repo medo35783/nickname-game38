@@ -251,7 +251,10 @@ export default function FameeriAdminPlay({
       />
 
       {qGameState?.answerVerdict && !qReveal && (
-        <FameeriVerdictBanner verdict={qGameState.answerVerdict} />
+        <FameeriVerdictBanner
+          verdict={qGameState.answerVerdict}
+          attack={shieldTargetAttack || qCurrentAttack}
+        />
       )}
 
       <div className="fameeri-admin-tabs">

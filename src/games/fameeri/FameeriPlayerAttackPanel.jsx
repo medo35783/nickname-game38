@@ -98,7 +98,7 @@ export default function FameeriPlayerAttackPanel({
         >
           <div className="fameeri-attack-step__head">
             <span className="fameeri-attack-step__num">②</span>
-            <span className="fameeri-attack-step__title">اختر الشجرة على غابة الخصم</span>
+            <span className="fameeri-attack-step__title">{'اختر الشجرة على غابة الخص\u0645'}</span>
             {step2Done && <span className="fameeri-attack-step__picked">🌳 {attackTarget.tree}</span>}
           </div>
           <div className="fameeri-tree-grid">
@@ -173,9 +173,9 @@ export default function FameeriPlayerAttackPanel({
 
       {currentStep < 4 && (
         <p className="fameeri-attack-next-hint">
-          {currentStep === 1 && '← ابدأ باختيار مجموعة الخصم'}
-          {currentStep === 2 && '← اختر شجرة الهجوم'}
-          {currentStep === 3 && '← اختر السلاح ثم أطلق'}
+          {currentStep === 1 && 'الخطوة 1: اختر مجموعة الخص\u0645'}
+          {currentStep === 2 && 'الخطوة 2: اختر شجرة الهجوم'}
+          {currentStep === 3 && 'الخطوة 3: اختر السلاح ثم أطلق'}
         </p>
       )}
     </div>

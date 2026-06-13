@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import '../../styles/fameeri-reveal.css';
+import FameeriMatchSummary from './FameeriMatchSummary';
 
 const WEAPON_EMOJI = {
   showzel: '💥',
@@ -114,26 +115,12 @@ function DigitalCountdown({ active }) {
   );
 }
 
-function WeaponSpeedlines() {
-  const lines = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        '--rot': `${i * 30}deg`,
-        delay: `${i * 0.03}s`,
-      })),
-    []
-  );
-
+function WeaponFlash({ emoji }) {
   return (
-    <div className="q-reveal-speedlines" aria-hidden>
-      {lines.map((l) => (
-        <span
-          key={l.id}
-          className="q-reveal-speedline"
-          style={{ '--rot': l['--rot'], animationDelay: l.delay }}
-        />
-      ))}
+    <div className="q-reveal-weapon-flash">
+      <div className="q-shake">
+        <div className="q-weapon-flash">{emoji}</div>
+      </div>
     </div>
   );
 }
@@ -212,29 +199,17 @@ export default function FameeriRevealOverlay({
       {showAdminChrome && <PhaseProgress phase={qReveal.phase} />}
 
       <div className="q-reveal-legend">
-        <div className="q-reveal-legend__ribbon">⚔️ كشف الهجوم</div>
+        <div className="q-reveal-legend__ribbon">🎬 كشف الهجوم</div>
 
-        <div className="q-reveal-legend__duel">
-          <div className="q-reveal-legend__side q-reveal-legend__side--atk">
-            <span className="q-reveal-legend__label">المهاجم</span>
-            <span className="q-reveal-legend__name">{qReveal.attackerName || '—'}</span>
-          </div>
-          <div className="q-reveal-legend__vs" aria-hidden>
-            ⚔️
-          </div>
-          <div className="q-reveal-legend__side q-reveal-legend__side--def">
-            <span className="q-reveal-legend__label">الهدف</span>
-            <span className="q-reveal-legend__name">{qReveal.targetName || '—'}</span>
-          </div>
-        </div>
-
-        <div className="q-reveal-legend__meta">
-          <span>🌳 {qReveal.tree}</span>
-          <span className="q-reveal-legend__dot">·</span>
-          <span>
-            {wEmoji} {qReveal.weaponName || qReveal.weapon}
-          </span>
-        </div>
+        <FameeriMatchSummary
+          attackerName={qReveal.attackerName}
+          targetName={qReveal.targetName}
+          tree={qReveal.tree}
+          weaponName={qReveal.weaponName || qReveal.weapon}
+          weaponIcon={wEmoji}
+          size="sm"
+          variant="reveal"
+        />
       </div>
 
       <div className={`q-scene${qReveal.phase === 'result' ? ' q-scene--result' : ''}`} key={qReveal.phase}>
@@ -259,10 +234,7 @@ export default function FameeriRevealOverlay({
 
         {qReveal.phase === 'weapon' && (
           <div className="q-reveal-weapon">
-            <WeaponSpeedlines />
-            <div className="q-shake">
-              <div className="q-weapon-flash">{wEmoji}</div>
-            </div>
+            <WeaponFlash emoji={wEmoji} />
             <div className="q-reveal-phase-title">إطلاق السلاح!</div>
             <div className="q-reveal-phase-sub">{qReveal.weaponName || qReveal.weapon}</div>
           </div>
@@ -288,7 +260,6 @@ export default function FameeriRevealOverlay({
         {qReveal.phase === 'result' && qReveal.type === 'shielded' && (
           <>
             <div className="q-reveal-shield-scene">
-              <div className="q-reveal-shield-grid" aria-hidden />
               <div className="q-reveal-shield-burst" aria-hidden />
               <div className="q-reveal-shield-icon q-reveal-pop">🛡️</div>
               <div className="q-reveal-shield-spark" aria-hidden>

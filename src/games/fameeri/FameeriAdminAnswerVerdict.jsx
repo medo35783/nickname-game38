@@ -64,7 +64,7 @@ export default function FameeriAdminAnswerVerdict({
           </div>
         )}
         <div className="fameeri-cmd-auto__hint ok">
-          → المؤقت و ✅/❌ متاحان دائماً — بدء التحدي اختياري للشاشة. عند «صح» تظهر الإجابة للجميع.
+          المؤقت و ✅/❌ متاحان دائماً — بدء التحدي اختياري للشاشة. عند «صح» تظهر الإجابة للجميع.
         </div>
       </div>
     );
@@ -136,8 +136,8 @@ export default function FameeriAdminAnswerVerdict({
       {answerCtx.autoVerdict != null && (
         <div className={`fameeri-cmd-auto__hint${answerCtx.autoVerdict ? ' ok' : ' miss'}`}>
           {answerCtx.autoVerdict
-            ? '→ اضغط ✅ صح بالأسفل لتأكيد نجاح الهجوم'
-            : '→ اضغط ❌ خطأ بالأسفل لتأكيد فشل الهجوم'}
+            ? 'اضغط ✅ صح بالأسفل لتأكيد نجاح الهجوم'
+            : 'اضغط ❌ خطأ بالأسفل لتأكيد فشل الهجوم'}
         </div>
       )}
 

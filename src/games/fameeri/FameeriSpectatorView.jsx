@@ -224,7 +224,10 @@ export default function FameeriSpectatorView({
       <div className="card" style={{ minHeight: 320, display: 'flex', flexDirection: 'column', justifyContent: 'center', border: `1.5px solid ${accent}` }}>
         {gameState?.answerVerdict && !reveal && (
           <div style={{ padding: '0 0 12px' }}>
-            <FameeriVerdictBanner verdict={gameState.answerVerdict} />
+            <FameeriVerdictBanner
+              verdict={gameState.answerVerdict}
+              attack={currentAttack}
+            />
           </div>
         )}
         {stage}

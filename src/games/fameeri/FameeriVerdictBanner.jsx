@@ -1,9 +1,15 @@
+import { Q_WEAPONS } from '../../core/constants';
+import FameeriMatchSummary from './FameeriMatchSummary';
+
 /**
  * إعلان حكم المشرف (صح / خطأ) — يظهر لجميع المجموعات فور الضغط.
  */
-export default function FameeriVerdictBanner({ verdict }) {
+export default function FameeriVerdictBanner({ verdict, attack }) {
   if (!verdict?.timestamp) return null;
   const ok = !!verdict.correct;
+  const atkName = attack?.attackerName || verdict.attackerName;
+  const tgtName = attack?.targetName || verdict.targetName;
+  const wDef = attack?.weapon ? Q_WEAPONS.find((w) => w.id === attack.weapon) : null;
 
   return (
     <div
@@ -18,11 +24,17 @@ export default function FameeriVerdictBanner({ verdict }) {
       {ok && verdict.revealedAnswer && (
         <div className="fameeri-verdict-banner__answer">«{verdict.revealedAnswer}»</div>
       )}
-      {(verdict.attackerName || verdict.targetName) && (
-        <div className="fameeri-verdict-banner__duel">
-          <span className="fameeri-verdict-banner__attacker">{verdict.attackerName}</span>
-          <span className="fameeri-verdict-banner__arrow">⚔️</span>
-          <span className="fameeri-verdict-banner__target">{verdict.targetName}</span>
+      {(atkName || tgtName) && (
+        <div className="fameeri-verdict-banner__match">
+          <FameeriMatchSummary
+            attackerName={atkName}
+            targetName={tgtName}
+            tree={attack?.tree}
+            weaponName={attack?.weaponName}
+            weaponIcon={wDef?.icon}
+            size="sm"
+            variant="banner"
+          />
         </div>
       )}
       {ok && (

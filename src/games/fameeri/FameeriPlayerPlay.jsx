@@ -201,7 +201,7 @@ export default function FameeriPlayerPlay({
         )}
 
         {answerVerdict && !qReveal && !qGameState?.showResult && (
-          <FameeriVerdictBanner verdict={answerVerdict} />
+          <FameeriVerdictBanner verdict={answerVerdict} attack={shieldAttack || qCurrentAttack} />
         )}
 
         {qTimer && !qReveal && qCountdown !== null && (qCurrentAttack || qGameState?.speedBatchActive) && (
@@ -230,7 +230,7 @@ export default function FameeriPlayerPlay({
           />
         )}
 
-        {qCurrentAttack && !showShieldPanel && (
+        {qCurrentAttack && !showShieldPanel && !qReveal && !qGameState?.showResult && (
           <FameeriAttackDisplay
             attack={qCurrentAttack}
             badge="⚔️ هجوم جاري"

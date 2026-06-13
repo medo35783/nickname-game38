@@ -2557,6 +2557,43 @@ button.fameeri-admin-ribbon__item:active{transform:scale(.98)}
 [data-theme="dark"] .fameeri-attack-display{
   background:rgba(255,92,114,.08);border-color:rgba(255,92,114,.35);
 }
+.fameeri-match-summary{display:flex;flex-direction:column;gap:6px;width:100%}
+.fameeri-match-summary__row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fameeri-match-chip{
+  display:flex;flex-direction:column;gap:3px;padding:8px 9px;border-radius:10px;
+  border:1.5px solid var(--border-faint);background:var(--surface);min-width:0;text-align:center;
+}
+.fameeri-match-chip__label{font-size:9px;font-weight:900;color:var(--muted)}
+.fameeri-match-chip__value{
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.fameeri-match-chip--atk{border-color:rgba(0,105,92,.25)}
+.fameeri-match-chip--atk .fameeri-match-chip__value{color:var(--fameeri-primary)}
+.fameeri-match-chip--tgt{border-color:rgba(230,57,80,.25)}
+.fameeri-match-chip--tgt .fameeri-match-chip__value{color:var(--red)}
+.fameeri-match-chip--tree .fameeri-match-chip__value{color:var(--fameeri-primary)}
+.fameeri-match-chip--wpn .fameeri-match-chip__value{color:var(--gold)}
+.fameeri-match-summary--sm .fameeri-match-chip{padding:6px 7px}
+.fameeri-match-summary--sm .fameeri-match-chip__value{font-size:12px}
+.fameeri-match-summary--reveal .fameeri-match-chip{
+  background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);
+}
+.fameeri-match-summary--reveal .fameeri-match-chip--atk .fameeri-match-chip__value{color:var(--gold)}
+.fameeri-match-summary--reveal .fameeri-match-chip--tgt .fameeri-match-chip__value{color:#ff8a80}
+.fameeri-match-summary--reveal .fameeri-match-chip__label{color:rgba(255,255,255,.55)}
+.fameeri-match-summary--banner .fameeri-match-chip{padding:6px 8px}
+.fameeri-match-summary--shield .fameeri-match-chip{
+  background:rgba(156,39,176,.08);border-color:rgba(156,39,176,.22);
+}
+.fameeri-verdict-banner__match{margin-top:10px;text-align:start}
+.fameeri-shield-panel__match{margin:8px 0 10px}
+.fameeri-attack-display .fameeri-match-summary{margin-top:6px}
+.q-reveal-legend .fameeri-match-summary{margin-top:8px}
+.fameeri-reveal-active > *:not(.q-reveal){
+  visibility:hidden;pointer-events:none;max-height:0;overflow:hidden;margin:0!important;padding:0!important;border:none!important;
+}
+.fameeri-admin-duel{display:block;padding:0;margin:4px 0;background:transparent;border:none}
 .fameeri-attack-display .fameeri-admin-duel{margin:0}
 .fameeri-attack-display__badge{
   display:inline-block;font-size:10px;font-weight:900;
@@ -3008,12 +3045,6 @@ button.fameeri-admin-ribbon__item:active{transform:scale(.98)}
 .fameeri-verdict-banner--ok .fameeri-verdict-banner__title{color:var(--green)}
 .fameeri-verdict-banner--fail .fameeri-verdict-banner__title{color:var(--red)}
 .fameeri-verdict-banner__msg{font-size:12px;font-weight:700;color:var(--text);margin-top:4px}
-.fameeri-verdict-banner__duel{
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  margin-top:10px;font-size:14px;font-weight:900;
-}
-.fameeri-verdict-banner__attacker{color:var(--gold)}
-.fameeri-verdict-banner__target{color:var(--red)}
 .fameeri-verdict-banner__hint{
   margin-top:8px;font-size:10px;font-weight:700;color:var(--muted);line-height:1.45;
 }
