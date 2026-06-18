@@ -98,7 +98,7 @@
           "$playerId": {
             ".read": "$roomCode.matches(/^[0-9]{4}$/)",
             ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('rooms').child($roomCode).child('adminId').val() == auth.uid || (!data.exists() && newData.child('ownerUid').val() == auth.uid && newData.child('name').isString() && newData.child('nick').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 80 && newData.child('nick').val().length > 0 && newData.child('nick').val().length <= 80 && newData.child('status').isString()) || (data.exists() && !newData.exists() && data.child('ownerUid').val() == auth.uid) || (data.exists() && newData.exists() && data.child('ownerUid').val() == auth.uid && newData.child('name').val() == data.child('name').val() && newData.child('nick').val() == data.child('nick').val() && ((newData.child('status').val() == 'withdrawn' && data.child('status').val() == 'active') || (newData.child('status').val() == 'active' && data.child('status').val() == 'withdrawn'))))",
-            ".validate": "!newData.exists() || (newData.hasChild('name') && newData.hasChild('nick') && newData.hasChild('status') && newData.child('name').isString() && newData.child('nick').isString() && newData.child('status').isString() && (!newData.hasChild('ownerUid') || newData.child('ownerUid').isString()) && newData.child('name').val().length <= 80 && newData.child('nick').val().length <= 80)"
+            ".validate": "!newData.exists() || (newData.hasChild('name') && newData.hasChild('nick') && newData.hasChild('status') && newData.child('name').isString() && newData.child('nick').isString() && newData.child('status').isString() && (!newData.hasChild('ownerUid') || newData.child('ownerUid').isString()) && (!newData.hasChild('sessionToken') || newData.child('sessionToken').isString()) && (!newData.hasChild('pinHash') || newData.child('pinHash').isString()) && newData.child('name').val().length <= 80 && newData.child('nick').val().length <= 80)"
           }
         },
         "currentRound": {
@@ -171,7 +171,7 @@
           "$memberId": {
             ".read": "$roomCode.matches(/^[0-9]{4}$/)",
             ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('qrooms').child($roomCode).child('adminId').val() == auth.uid || (!data.exists() && newData.child('ownerUid').val() == auth.uid && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 80) || (data.exists() && data.child('ownerUid').val() == auth.uid && newData.child('ownerUid').val() == data.child('ownerUid').val()) || (data.exists() && !data.hasChild('ownerUid') && newData.child('ownerUid').val() == auth.uid && newData.child('name').val() == data.child('name').val() && newData.child('role').val() == data.child('role').val()) || (data.exists() && data.child('ownerUid').val() == auth.uid && newData.hasChild('answerPick') && newData.child('answerPick').hasChildren(['q', 'opt']) && newData.child('answerPick').child('opt').isNumber()) || (data.exists() && !newData.exists() && data.child('ownerUid').val() == auth.uid))",
-            ".validate": "!newData.exists() || (newData.hasChildren(['name', 'role']) && newData.child('name').isString() && newData.child('role').isString() && (!newData.hasChild('ownerUid') || newData.child('ownerUid').isString()))"
+            ".validate": "!newData.exists() || (newData.hasChildren(['name', 'role']) && newData.child('name').isString() && newData.child('role').isString() && (!newData.hasChild('ownerUid') || newData.child('ownerUid').isString()) && (!newData.hasChild('sessionToken') || newData.child('sessionToken').isString()) && (!newData.hasChild('pinHash') || newData.child('pinHash').isString()) && (!newData.hasChild('status') || newData.child('status').isString()))"
           }
         },
         "presence": {
@@ -232,7 +232,7 @@
           "$playerId": {
             ".read": "$roomCode.matches(/^[0-9]{4}$/)",
             ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('srooms').child($roomCode).child('adminId').val() == auth.uid || !data.exists() || data.exists())",
-            ".validate": "!newData.exists() || (newData.hasChild('name') && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 80)"
+            ".validate": "!newData.exists() || (newData.hasChild('name') && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 80 && (!newData.hasChild('ownerUid') || newData.child('ownerUid').isString()) && (!newData.hasChild('sessionToken') || newData.child('sessionToken').isString()) && (!newData.hasChild('pinHash') || newData.child('pinHash').isString()))"
           }
         },
         "answers": {

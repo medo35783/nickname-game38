@@ -32,9 +32,10 @@ export const ARENA_DEFAULT_ICON = '🎮';
 
 /** مزايا تسويقية — بطاقة شارة الساحة */
 export const ARENA_SIGNUP_BENEFITS = [
+  { icon: '🔐', text: 'ارجع للعبة بدون رقم سري — مقعدك مربوط بحسابك' },
   { icon: '☁️', text: 'أسئلتك تتذكّر — لا تتكرر بين جلساتك' },
   { icon: '🦅', text: 'اسمك وأيقونتك تظهر في كل لعبة' },
-  { icon: '⭐', text: 'نقاط الساحة تتراكم وتفتح أيقونات حصرية' },
+  { icon: '⭐', text: '80+ إنجاز — للمتسابقين والمشرفين' },
   { icon: '📱', text: 'استكمل من أي جهاز — جوال أو لابتوب' },
 ];
 
@@ -80,3 +81,57 @@ export function arenaPointsForRank(rank) {
   if (r === 2 || r === 3) return ARENA_RANK_POINTS[2];
   return ARENA_RANK_POINTS.default;
 }
+
+/** كيف تكسب نقاط الساحة */
+export const ARENA_POINTS_EARNING = [
+  { icon: '👑', label: 'المركز الأول', points: ARENA_RANK_POINTS[1], role: 'player' },
+  { icon: '🥈', label: 'المركز الثاني أو الثالث', points: ARENA_RANK_POINTS[2], role: 'player' },
+  { icon: '🎮', label: 'المشاركة في الجولة', points: ARENA_RANK_POINTS.default, role: 'player' },
+  {
+    icon: '🎛️',
+    label: 'إنهاء جلسة كمشرف',
+    points: `${ARENA_HOST_BASE} + ${ARENA_HOST_PER_PLAYER}×لاعب`,
+    role: 'host',
+  },
+  { icon: '🎁', label: 'مكافأة الترحيب (مرة واحدة)', points: ARENA_WELCOME_BONUS, role: 'all' },
+];
+
+/** مقابل النقاط — ما الذي تفتحه */
+export const ARENA_POINTS_REWARDS = [
+  {
+    minPoints: 0,
+    tierId: 'bronze',
+    label: 'برونزي',
+    icon: '🥉',
+    frame: 'إطار برونزي',
+    iconCount: 10,
+    perks: ['شارتك تظهر في كل لعبة', '10 أيقونات أساسية', 'تتبع إنجازاتك'],
+  },
+  {
+    minPoints: 500,
+    tierId: 'silver',
+    label: 'فضي',
+    icon: '⚪',
+    frame: 'إطار فضي لامع',
+    iconCount: 20,
+    perks: ['+10 أيقونات فضية', 'إنجاز مستوى فضي', 'ظهور أبرز في قاعة المجد'],
+  },
+  {
+    minPoints: 1500,
+    tierId: 'gold',
+    label: 'ذهبي',
+    icon: '🥇',
+    frame: 'إطار ذهبي فاخر',
+    iconCount: 30,
+    perks: ['+10 أيقونات ذهبية', 'إنجاز مستوى ذهبي', 'مكانة VIP في الساحة'],
+  },
+  {
+    minPoints: 3000,
+    tierId: 'legend',
+    label: 'أسطورة',
+    icon: '💫',
+    frame: 'إطار أسطوري متوهّج',
+    iconCount: 38,
+    perks: ['+8 أيقونات أسطورية', 'إنجاز أسطورة الساحة', 'قمة قاعة المجد'],
+  },
+];

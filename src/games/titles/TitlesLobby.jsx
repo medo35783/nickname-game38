@@ -12,6 +12,7 @@ import {
 } from '../../core/formLabels';
 import { isDecoyRequired } from './titlesRevealHelpers';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
+import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 
 export default function TitlesLobby(props) {
   const {
@@ -36,6 +37,7 @@ export default function TitlesLobby(props) {
     form,
     setForm,
     onAddManualPlayer,
+    onOpenGuide,
   } = props;
 
   const [decoyInput, setDecoyInput] = useState('');
@@ -184,6 +186,8 @@ export default function TitlesLobby(props) {
         <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
           الصفحة تتحدث تلقائياً عند بدء اللعبة 🚀
         </div>
+
+        <GameGuideOpenButton onClick={onOpenGuide} />
       </>
     );
   }
@@ -557,6 +561,8 @@ export default function TitlesLobby(props) {
           </button>
         </div>
       )}
+
+      <GameGuideOpenButton onClick={onOpenGuide} />
     </>
   );
 }

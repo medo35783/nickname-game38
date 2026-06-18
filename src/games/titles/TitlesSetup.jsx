@@ -7,6 +7,8 @@ import {
   PLAYER_NICK_HINT_FIRST,
   PLAYER_NICK_HINT_SECOND,
 } from '../../core/formLabels';
+import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import GameSeatPinField from '../../shared/GameSeatPinField';
 
 export default function TitlesSetup(props) {
   const {
@@ -22,10 +24,14 @@ export default function TitlesSetup(props) {
     setJoinNick,
     joinNick2,
     setJoinNick2,
+    joinPin,
+    setJoinPin,
     joinLoading,
     joinRoomNickMode,
     joinRoomModeLoading,
     joinRoom,
+    isLoggedIn,
+    onOpenGuide,
   } = props;
 
   const isDualMode = joinRoomNickMode === 2;
@@ -117,6 +123,19 @@ export default function TitlesSetup(props) {
             </div>
           </div>
         )}
+        {isLoggedIn ? (
+          <div className="game-seat-login-hint">
+            ✅ مسجّل دخول — مقعدك مربوط بحسابك وترجع للعبة بدون رقم سري
+          </div>
+        ) : (
+          <div className="game-seat-guest-pin-card">
+            <GameSeatPinField
+              value={joinPin}
+              onChange={setJoinPin}
+              disabled={joinInput.length === 4 && joinRoomModeLoading}
+            />
+          </div>
+        )}
         <div
           style={{
             background: 'rgba(240,192,64,.06)',
@@ -140,13 +159,14 @@ export default function TitlesSetup(props) {
             color: 'var(--muted)',
           }}
         >
-          🔄 إذا خرجت من اللعبة عن طريق الخطأ، أدخل نفس البيانات للرجوع
+          🔄 إذا خرجت: نفس الرمز والاسم واللقب{isLoggedIn ? '' : ' + رقمك السري'} للعودة
         </div>
         {joinErr && <div className="err-msg">⚠️ {joinErr}</div>}
       </div>
       <button type="button" className="btn bg" onClick={joinRoom} disabled={joinLoading || (joinInput.length === 4 && joinRoomModeLoading)}>
         {joinLoading ? '⏳ جارٍ الانضمام...' : '🚀 انضمام'}
       </button>
+      <GameGuideOpenButton onClick={onOpenGuide} />
     </div>
   );
 }

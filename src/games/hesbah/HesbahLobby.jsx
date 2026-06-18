@@ -6,6 +6,7 @@ import { HESBAH_ACCENT_CSS, HESBAH_BORDER_CSS, isActiveHesbahPlayer } from './He
 import HesbahRoomMeta from './HesbahRoomMeta';
 import HesbahTimerPicker from './HesbahTimerPicker';
 import HesbahTopNav from './HesbahTopNav';
+import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 
 const START_MODE_COPY = {
   participate: {
@@ -173,11 +174,7 @@ export default function HesbahLobby({
         </div>
       )}
 
-      {onOpenGuide && (
-        <button type="button" className="btn bgh mt2 hesbah-guide-open-btn" onClick={onOpenGuide}>
-          📖 كيف تلعب؟ — الدليل الكامل
-        </button>
-      )}
+      <GameGuideOpenButton onClick={onOpenGuide} className={isAdmin ? 'mt2 hesbah-guide-open-btn' : 'mt2'} />
 
       {startConfirmOpen && (
         <div className="hesbah-modal-overlay" role="presentation" onClick={() => setStartConfirmOpen(false)}>

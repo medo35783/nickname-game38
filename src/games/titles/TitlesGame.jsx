@@ -37,12 +37,28 @@ import TitlesGameSummary from './TitlesGameSummary';
 import { buildRoundAlert } from './roundAlertHelpers';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import TitlesGuideModal from './TitlesGuideModal';
+import GameQuickRules from '../../shared/GameQuickRules';
+import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import { TITLES_QUICK_RULES } from '../../shared/quickRulesContent';
 import StatsRemainingPanel from './stats/StatsRemainingPanel';
 import GameExitSheet from '../../shared/GameExitSheet';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
 import { formatOtherSessionsHint, getOtherActiveSessions, getSavedRoomForGame } from '../../shared/gameSessionRegistry';
+import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
+import {
+  findSeatByOwnerUid,
+  findSeatById,
+  findTitlesSeatByIdentity,
+  isRegistrationLocked,
+  isValidPin,
+  buildNewSeatSecurity,
+  verifyGuestSeatAccess,
+  writeGuestDeviceLock,
+  readGuestDeviceLock,
+  SEAT_ERRORS,
+} from '../../core/gameSeat';
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
   { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
@@ -55,12 +71,59 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
   const pendingOnboardingRef = useRef(null);
+  const [authUid, setAuthUid] = useState(auth.currentUser?.uid || null);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => setAuthUid(u?.uid || null));
+  }, []);
 
   useEffect(() => {
     if (!canCreateRoom || pendingOnboardingRef.current !== 'admin') return;
     pendingOnboardingRef.current = null;
     setShowOnboarding('admin');
   }, [canCreateRoom]);
+
+  const persistTitlesPlayerSession = (code, seatId, name, nick, sessionToken) => {
+    localStorage.setItem(
+      'ng_session',
+      JSON.stringify({
+        roomCode: code,
+        name: name.trim(),
+        nick: nick.trim(),
+        playerId: seatId,
+        sessionToken: sessionToken || undefined,
+      })
+    );
+    writeGuestDeviceLock('titles', code, seatId);
+  };
+
+  const applyTitlesPlayerRejoin = (code, seatId, seatData, gamePhase) => {
+    setMyId(seatId);
+    setMyNickLocal(seatData.nick);
+    setRoomCode(code);
+    setRole('player');
+    if (gamePhase === 'lobby') setGameScreen('lobby');
+    else if (gamePhase === 'attacking') setGameScreen('attack');
+    else if (gamePhase === 'revealing') setGameScreen('results');
+    else if (gamePhase === 'ended') setGameScreen('summary');
+  };
+
+  const finalizeTitlesPlayerRejoin = async (code, seatId, seatData, gamePhase) => {
+    try {
+      const rejoinPatch = {};
+      if (seatData.status === 'withdrawn') rejoinPatch.status = 'active';
+      const arenaFields = await fetchArenaFieldsForJoin();
+      Object.assign(rejoinPatch, arenaFields);
+      if (Object.keys(rejoinPatch).length) {
+        await update(ref(db, `rooms/${code}/players/${seatId}`), rejoinPatch);
+      }
+    } catch {
+      /* قد يمنعها قواعد Firebase — لا تعطل العودة */
+    }
+    persistTitlesPlayerSession(code, seatId, seatData.name, seatData.nick, seatData.sessionToken);
+    applyTitlesPlayerRejoin(code, seatId, seatData, gamePhase);
+    notify('✅ تم الرجوع للعبة!', 'success');
+  };
 
   const handleAdminEntry = () => {
     if (!canCreateRoom) {
@@ -85,6 +148,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [joinName, setJoinName] = useState('');
   const [joinNick, setJoinNick] = useState('');
   const [joinNick2, setJoinNick2] = useState('');
+  const [joinPin, setJoinPin] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinPreviewNickMode, setJoinPreviewNickMode] = useState(1);
   const [joinPreviewLoading, setJoinPreviewLoading] = useState(false);
@@ -305,17 +369,16 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       recordSessionEnd('titles', roomCode, false).catch(() => {});
       localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode }));
       localStorage.removeItem('ng_session');
-    } else if (role === 'player' && roomCode) {
-      localStorage.setItem(
-        'ng_session',
-        JSON.stringify({
-          roomCode,
-          playerId: myId,
-          myId,
-          nick: myNickLocal,
-          myNick: myNickLocal,
-        })
-      );
+    } else if (role === 'player' && roomCode && myId) {
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem('ng_session') || '{}');
+      } catch {
+        saved = {};
+      }
+      const playerName = players?.[myId]?.name || saved.name || joinName;
+      const playerNick = myNickLocal || saved.nick || joinNick;
+      persistTitlesPlayerSession(roomCode, myId, playerName, playerNick, saved.sessionToken);
       localStorage.removeItem('ng_admin_session');
     } else {
       localStorage.removeItem('ng_session');
@@ -344,7 +407,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
     resetTitlesRoomState();
-    notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+    notify('انسحبت — للعودة: نفس الرمز والاسم واللقب ورقمك السري', 'info');
     if (!pid || !code) return;
     try {
       await update(ref(db, `rooms/${code}/players/${pid}`), { status: 'withdrawn' });
@@ -612,48 +675,81 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         }
       }
 
-      if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
       const existingPlayers = Object.entries(data.players||{});
+      const isLoggedIn = !!hostUid;
+      let savedSession = {};
+      try {
+        const raw = localStorage.getItem('ng_session');
+        if (raw) savedSession = JSON.parse(raw);
+      } catch {
+        savedSession = {};
+      }
 
-      // Check if player already exists (rejoin)
-      const existing = existingPlayers.find(([id,p])=>
-        p.name?.trim()===joinName.trim() && p.nick?.trim()===joinNick.trim()
-      );
+      // ① مسجّل دخول — مقعده بـ ownerUid (رمز الغرفة فقط)
+      const byUid = findSeatByOwnerUid(existingPlayers, hostUid);
+      if (byUid) {
+        const [seatId, seatData] = byUid;
+        await finalizeTitlesPlayerRejoin(joinInput, seatId, seatData, gamePhase);
+        return;
+      }
 
-      if(existing) {
-        // REJOIN — player already registered
-        const [existingId, existingData] = existing;
-        try {
-          const rejoinPatch = {};
-          if (existingData.status === 'withdrawn') rejoinPatch.status = 'active';
-          const arenaFields = await fetchArenaFieldsForJoin();
-          Object.assign(rejoinPatch, arenaFields);
-          if (Object.keys(rejoinPatch).length) {
-            await update(ref(db, `rooms/${joinInput}/players/${existingId}`), rejoinPatch);
-          }
-        } catch {
-          /* قد يمنعها قواعد Firebase — لا تعطل العودة */
+      // ② جلسة الجهاز (token)
+      if (savedSession.roomCode === joinInput && savedSession.playerId && savedSession.sessionToken) {
+        const byToken = findSeatById(existingPlayers, savedSession.playerId);
+        if (byToken && byToken[1]?.sessionToken === savedSession.sessionToken) {
+          await finalizeTitlesPlayerRejoin(joinInput, byToken[0], byToken[1], gamePhase);
+          return;
         }
-        setMyId(existingId);
-        setMyNickLocal(existingData.nick);
-        setRoomCode(joinInput);
-        setRole('player');
-        // Save to localStorage for auto-rejoin
-        localStorage.setItem('ng_session', JSON.stringify({
-          roomCode: joinInput, name: joinName.trim(), nick: joinNick.trim(), playerId: existingId
-        }));
-        if(gamePhase==='lobby') setGameScreen('lobby');
-        else if(gamePhase==='attacking') setGameScreen('attack');
-        else if(gamePhase==='revealing') setGameScreen('results');
-        else if(gamePhase==='ended') setGameScreen('summary');
-        notify('✅ تم الرجوع للعبة!', 'success');
+      }
+
+      if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
+
+      // ③ نفس الاسم واللقب — يتطلب PIN للضيف
+      const byIdentity = findTitlesSeatByIdentity(existingPlayers, joinName, joinNick);
+      if (byIdentity) {
+        const [seatId, seatData] = byIdentity;
+        if (seatData.ownerUid && seatData.ownerUid !== hostUid) {
+          setJoinErr('هذا المقعد مربوط بحساب آخر — سجّل بنفس البريد');
+          return;
+        }
+        if (isLoggedIn && !seatData.ownerUid) {
+          try {
+            await update(ref(db, `rooms/${joinInput}/players/${seatId}`), { ownerUid: hostUid });
+            seatData.ownerUid = hostUid;
+          } catch {
+            /* optional link */
+          }
+        }
+        if (!isLoggedIn || !seatData.ownerUid) {
+          const access = await verifyGuestSeatAccess(seatData, seatId, joinInput, {
+            pin: joinPin,
+            sessionToken: savedSession.sessionToken,
+          });
+          if (!access.ok) {
+            setJoinErr(access.reason || SEAT_ERRORS.pinWrong);
+            return;
+          }
+        }
+        await finalizeTitlesPlayerRejoin(joinInput, seatId, seatData, gamePhase);
         return;
       }
 
       // NEW JOIN — player not registered yet
-      if(gamePhase!=='lobby'){
-        setJoinErr('اللعبة بدأت — لا يمكن الانضمام لأول مرة');
+      if(isRegistrationLocked(gamePhase)){
+        setJoinErr(SEAT_ERRORS.registrationClosed);
         return;
+      }
+
+      if (!isLoggedIn) {
+        if (!isValidPin(joinPin)) {
+          setJoinErr(SEAT_ERRORS.pinRequired);
+          return;
+        }
+        const guestLock = readGuestDeviceLock('titles', joinInput);
+        if (guestLock?.seatId) {
+          setJoinErr(SEAT_ERRORS.guestLocked);
+          return;
+        }
       }
       // check nick not taken — استخدام تطبيع اللقب
       const existingNicks = existingPlayers.flatMap(([,p])=>[p.nick,p.nick2].filter(Boolean));
@@ -680,6 +776,17 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       }
       const arenaFields = await fetchArenaFieldsForJoin();
       const newRef = push(playersRef(joinInput));
+      const seatId = newRef.key;
+      let security = { sessionToken: '' };
+      try {
+        security = await buildNewSeatSecurity(joinInput, seatId, {
+          isGuest: !isLoggedIn,
+          pin: joinPin,
+        });
+      } catch (e) {
+        setJoinErr(e.message || SEAT_ERRORS.pinRequired);
+        return;
+      }
       await set(newRef, {
         name: joinName.trim(),
         nick: joinNick.trim(),
@@ -687,18 +794,17 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         initials:mkInitials(joinName.trim()),
         colorIdx: existingPlayers.length % AV_COLORS.length,
         status:'active', missedRounds:0,
+        sessionToken: security.sessionToken,
+        ...(security.pinHash ? { pinHash: security.pinHash } : {}),
         ...(hostUid ? { ownerUid: hostUid } : {}),
         ...arenaFields,
       });
-      setMyId(newRef.key);
+      setMyId(seatId);
       setMyNickLocal(joinNick.trim());
       setRoomCode(joinInput);
       setRole('player');
-      // Clear old sessions and save new
       localStorage.removeItem('ng_admin_session');
-      localStorage.setItem('ng_session', JSON.stringify({
-        roomCode: joinInput, name: joinName.trim(), nick: joinNick.trim(), playerId: newRef.key
-      }));
+      persistTitlesPlayerSession(joinInput, seatId, joinName, joinNick, security.sessionToken);
       setGameScreen('lobby');
       notify('✅ انضممت للعبة! انتظر المشرف', 'success');
     } catch(e) {
@@ -1457,12 +1563,29 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
                 /* تجاهل */
               }
             }
-            setRoomCode(roomCode);
-            setRole('player');
-            setMyId(ps.playerId || ps.myId || null);
-            setMyNickLocal(ps.nick || ps.myNick || '');
-            setGameScreen('lobby');
-            return true;
+            const seatId = ps.playerId || ps.myId;
+            const seat = seatId ? roomData?.players?.[seatId] : null;
+            if (uid && seat?.ownerUid === uid) {
+              setRoomCode(roomCode);
+              setRole('player');
+              setMyId(seatId);
+              setMyNickLocal(seat.nick || ps.nick || '');
+              setGameScreen('lobby');
+              return true;
+            }
+            if (seat?.sessionToken && ps.sessionToken === seat.sessionToken) {
+              setRoomCode(roomCode);
+              setRole('player');
+              setMyId(seatId);
+              setMyNickLocal(seat.nick || ps.nick || '');
+              setGameScreen('lobby');
+              return true;
+            }
+            if (!seat) {
+              clearLsForRoom(roomCode);
+              return false;
+            }
+            return false;
           }
           return false;
         };
@@ -2443,20 +2566,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           <button type="button" className="btn bgh" style={{ marginTop: 4 }} onClick={() => setModal({ type: 'guide' })}>
             📖 كيف تلعب؟ — دليل للمشرف والمتسابق
           </button>
-          <div className="div">قوانين اللعبة</div>
-          {[
-            '🎭 اختر لقباً لا يمت بصلة لاهتماماتك',
-            '⚔️ الكل يهاجم في نفس الوقت — سرية تامة',
-            '🔓 النتائج تنكشف للجميع في لحظة واحدة',
-            '⏰ الوقت يحدده المشرف ويمكن تمديده',
-            '❌ جولتان بلا هجوم = خروج صامت بلا كشف لقبك',
-            '🚫 التعاون ممنوع — عقوبته الإخراج الفوري',
-            '👁️ الألقاب لا تُكشف كاملةً إلا في نهاية المسابقة',
-          ].map((r, i) => (
-            <div key={i} className="game-rule-row">
-              {r}
-            </div>
-          ))}
+          <GameQuickRules rules={TITLES_QUICK_RULES} />
         </div>
       );
     }
@@ -2476,10 +2586,14 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           setJoinNick={setJoinNick}
           joinNick2={joinNick2}
           setJoinNick2={setJoinNick2}
+          joinPin={joinPin}
+          setJoinPin={setJoinPin}
+          isLoggedIn={!!authUid}
           joinLoading={joinLoading}
           joinRoomNickMode={joinPreviewNickMode}
           joinRoomModeLoading={joinPreviewLoading}
           joinRoom={joinRoom}
+          onOpenGuide={() => setModal({ type: 'guide' })}
         />
       );
     }
@@ -2572,6 +2686,14 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       return (
         <div className="scr">
           <GameTopNav onBack={openExitSheet} sticky />
+          {role === 'player' && myId && (
+            <GameSeatWelcomeOverlay
+              gameId="titles"
+              seatId={myId}
+              isLoggedIn={!!authUid}
+              onSignup={() => setTab?.('account')}
+            />
+          )}
           <TitlesLobby
             roomCode={roomCode}
             role={role}
@@ -2590,6 +2712,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             startRound={startGameForLobby}
             notify={notify}
             myId={myId}
+            onOpenGuide={() => setModal({ type: 'guide' })}
           />
         </div>
       );

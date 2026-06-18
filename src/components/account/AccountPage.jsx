@@ -14,6 +14,7 @@ import ArenaBadge from '../../shared/ArenaBadge';
 import ArenaSignupPrompt from '../../shared/ArenaSignupPrompt';
 import ArenaIconPicker from '../../shared/ArenaIconPicker';
 import ArenaAchievementsGrid, { countUnlockedAchievements } from '../../shared/ArenaAchievementsGrid';
+import ArenaPointsRewardsCard from '../../shared/ArenaPointsRewardsCard';
 import ArenaBadgeSheet from '../../shared/ArenaBadgeSheet';
 import ArenaHallOfFame from '../../shared/ArenaHallOfFame';
 import useArenaProfile from '../../hooks/useArenaProfile';
@@ -436,6 +437,8 @@ export default function AccountPage({
                 )}
               </div>
 
+              <ArenaPointsRewardsCard points={points} />
+
               <div className="arena-badge-actions">
                 <button
                   type="button"
@@ -525,7 +528,7 @@ export default function AccountPage({
                 open={achSheetOpen}
                 onClose={() => setAchSheetOpen(false)}
                 title="إنجازات الساحة"
-                subtitle={`${countUnlockedAchievements(achievements)} من ${ARENA_ACHIEVEMENT_LIST.length} — العب أكثر لفتح الباقي`}
+                subtitle={`${countUnlockedAchievements(achievements)} من ${ARENA_ACHIEVEMENT_LIST.length} — تابع اللعب والاستضافة لفتح الباقي`}
                 icon="🏅"
                 bodyClassName="arena-sheet__body--achievements"
                 footer={

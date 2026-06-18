@@ -16,6 +16,7 @@ import {
   moveFameeriMemberToGroup,
   demoteFameeriLeader,
 } from './fameeriAdminLobbyManage';
+import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 
 export default function FameeriAdminLobby({
   qRoom,
@@ -38,6 +39,7 @@ export default function FameeriAdminLobby({
   QB_GAME_TYPE,
   authUid,
   onGoAccount,
+  onOpenGuide,
 }) {
   const unassigned = qMList.filter((m) => !m.groupId);
   const assistMode = !!qGameState?.assistMode;
@@ -431,6 +433,8 @@ export default function FameeriAdminLobby({
           </div>
         )}
       </div>
+
+      <GameGuideOpenButton onClick={onOpenGuide} />
     </>
   );
 }

@@ -25,7 +25,15 @@ export async function rewardArenaPlayerEnd({ uid, gameType, rank, roomCode }) {
 /**
  * مكافأة مشرف عند إنهاء جلسة ناجحة
  */
-export async function rewardArenaHostSession({ uid, gameType, playerCount = 0, completed = true, roomCode }) {
+export async function rewardArenaHostSession({
+  uid,
+  gameType,
+  playerCount = 0,
+  completed = true,
+  roomCode,
+  totalRounds = 0,
+  durationMinutes = 0,
+}) {
   if (!uid || !completed) return 0;
 
   let pts = ARENA_HOST_BASE;
@@ -37,6 +45,8 @@ export async function rewardArenaHostSession({ uid, gameType, playerCount = 0, c
     gameType,
     roomCode,
     playerCount,
+    totalRounds,
+    durationMinutes,
   });
   await updateWeeklyLeaderboard(uid, pts);
   return result;
@@ -55,7 +65,15 @@ export async function rewardCurrentPlayerIfRegistered({ gameType, rank, roomCode
 }
 
 /** يمنح نقاط المشرف إن كان لديه بريد مسجّل */
-export async function rewardHostIfRegistered({ uid, gameType, playerCount, completed, roomCode }) {
+export async function rewardHostIfRegistered({
+  uid,
+  gameType,
+  playerCount,
+  completed,
+  roomCode,
+  totalRounds = 0,
+  durationMinutes = 0,
+}) {
   if (!uid) return 0;
   try {
     const snap = await get(ref(db, `users/${uid}/profile`));
@@ -63,5 +81,13 @@ export async function rewardHostIfRegistered({ uid, gameType, playerCount, compl
   } catch {
     return 0;
   }
-  return rewardArenaHostSession({ uid, gameType, playerCount, completed, roomCode });
+  return rewardArenaHostSession({
+    uid,
+    gameType,
+    playerCount,
+    completed,
+    roomCode,
+    totalRounds,
+    durationMinutes,
+  });
 }

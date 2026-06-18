@@ -7,7 +7,7 @@ import {
   computeArenaTier,
   iconsUnlockedForPoints,
 } from './arena.constants';
-import { detectNewAchievements, didTierUpgrade } from './arenaAchievements';
+import { detectNewAchievements, didTierUpgrade, computeArenaStatDelta, computeEligibleAchievements } from './arenaAchievements';
 import { saveUsedQuestionIds } from '../games/fameeri/fameeriBankProgress';
 import { saveUsedHesbahQuestionIds } from '../games/hesbah/hesbahBankProgress';
 
@@ -60,6 +60,10 @@ export async function fetchArenaFieldsForJoin() {
   }
 }
 
+function emptyTypeCounts() {
+  return { titles: 0, fameeri: 0, hesbah: 0 };
+}
+
 function buildDefaultArenaFields(displayName = '') {
   const tier = computeArenaTier(ARENA_WELCOME_BONUS);
   return {
@@ -72,6 +76,16 @@ function buildDefaultArenaFields(displayName = '') {
     achievements: ['member'],
     welcomeBonusClaimed: true,
     displayName: displayName.slice(0, 80),
+    wins: 0,
+    podiums: 0,
+    gamesPlayed: 0,
+    gamesByType: emptyTypeCounts(),
+    winsByType: emptyTypeCounts(),
+    totalPlayersHosted: 0,
+    maxPlayersInSession: 0,
+    totalRoundsHosted: 0,
+    maxSessionMinutes: 0,
+    hostedByType: emptyTypeCounts(),
   };
 }
 
@@ -166,7 +180,72 @@ export async function ensureArenaProfile(userId, userLike = {}) {
   }
 
   await update(profileRef, patch);
+  await syncProfileAchievements(userId, { ...prev, ...patch });
   return { ...patch, isNewArenaProfile: false };
+}
+
+/** مزامنة الإنجازات من الإحصائيات — بدون احتفال */
+async function enrichProfileFromStats(userId, profile) {
+  try {
+    const statsSnap = await get(ref(db, `users/${userId}/stats`));
+    const stats = statsSnap.val();
+    if (!stats) return profile;
+
+    const enriched = { ...profile };
+    const gp = stats.gamesPlayed || {};
+    const playedTotal = (gp.titles || 0) + (gp.fameeri || 0) + (gp.hesbah || 0);
+
+    if (!Number(enriched.gamesPlayed) && (playedTotal || stats.completedGames)) {
+      enriched.gamesPlayed = playedTotal || Number(stats.completedGames) || 0;
+    }
+    if (!readTypeCount(enriched.gamesByType, 'titles') && playedTotal) {
+      enriched.gamesByType = {
+        titles: gp.titles || 0,
+        fameeri: gp.fameeri || 0,
+        hesbah: gp.hesbah || 0,
+      };
+    }
+    if (!Number(enriched.totalPlayersHosted) && stats.totalPlayerCount) {
+      enriched.totalPlayersHosted = Number(stats.totalPlayerCount) || 0;
+    }
+    if (!Number(enriched.totalRoundsHosted) && stats.totalRounds) {
+      enriched.totalRoundsHosted = Number(stats.totalRounds) || 0;
+    }
+    if (!Number(enriched.maxSessionMinutes) && stats.totalDurationMinutes && stats.totalRealSessions) {
+      const avg = stats.totalDurationMinutes / stats.totalRealSessions;
+      enriched.maxSessionMinutes = Math.round(avg);
+    }
+    return enriched;
+  } catch {
+    return profile;
+  }
+}
+
+function readTypeCount(obj, type) {
+  return Number(obj?.[type]) || 0;
+}
+
+export async function syncProfileAchievements(userId, profileLike = null) {
+  if (!userId) return [];
+
+  const profileRef = ref(db, `users/${userId}/profile`);
+  let profile = profileLike;
+  if (!profile) {
+    const snap = await get(profileRef);
+    if (!snap.exists()) return [];
+    profile = snap.val() || {};
+  }
+
+  profile = await enrichProfileFromStats(userId, profile);
+  const existing = Array.isArray(profile.achievements) ? profile.achievements : [];
+  const eligible = computeEligibleAchievements(profile);
+  const merged = [...new Set([...existing, ...eligible])];
+  const toAdd = merged.filter((id) => !existing.includes(id));
+
+  if (toAdd.length) {
+    await update(profileRef, { achievements: merged });
+  }
+  return toAdd;
 }
 
 /** تحديث اسم العرض في الشارة + Firebase Auth */
@@ -233,20 +312,18 @@ export async function awardArenaPoints(userId, points, meta = {}) {
   const prevTier = prev.tier || 'bronze';
   const nextPoints = (Number(prev.arenaPoints) || 0) + pts;
   const tier = computeArenaTier(nextPoints);
-  const gamesHosted =
-    meta.type === 'host_complete'
-      ? (Number(prev.gamesHosted) || 0) + 1
-      : Number(prev.gamesHosted) || 0;
+  const statDelta = computeArenaStatDelta(prev, meta);
 
   const nextState = {
     arenaPoints: nextPoints,
     tier: tier.id,
     tierLabel: tier.label,
     avatarFrame: tier.frame,
-    gamesHosted,
+    ...statDelta,
   };
 
-  const newAchievementIds = detectNewAchievements(prev, { ...prev, ...nextState }, meta);
+  const mergedProfile = { ...prev, ...nextState };
+  const newAchievementIds = detectNewAchievements(prev, mergedProfile, meta);
   const existingAchievements = Array.isArray(prev.achievements) ? prev.achievements : [];
   const mergedAchievements = [...new Set([...existingAchievements, ...newAchievementIds])];
 

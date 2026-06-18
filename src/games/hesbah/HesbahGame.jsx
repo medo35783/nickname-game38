@@ -22,10 +22,26 @@ import HesbahLeaderboardList from './HesbahLeaderboardList';
 import HesbahPlayerLeaderboard from './HesbahPlayerLeaderboard';
 import HesbahTopNav from './HesbahTopNav';
 import HesbahGuideModal from './HesbahGuideModal';
+import GameQuickRules from '../../shared/GameQuickRules';
+import { HESBAH_QUICK_RULES } from '../../shared/quickRulesContent';
 import { GameSessionChecking } from '../../shared/GameTopNav';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasHesbahCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
+import GameSeatPinField from '../../shared/GameSeatPinField';
+import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
+import {
+  findSeatByOwnerUid,
+  findSeatById,
+  findSeatByName,
+  isRegistrationLocked,
+  isValidPin,
+  buildNewSeatSecurity,
+  verifyGuestSeatAccess,
+  writeGuestDeviceLock,
+  readGuestDeviceLock,
+  SEAT_ERRORS,
+} from '../../core/gameSeat';
 import {
   readSavedHesbah,
   persistHesbahSession,
@@ -79,7 +95,9 @@ const HesbahGame = forwardRef(function HesbahGame(
   { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd, onHesbahHeaderMeta },
   ref
 ) {
-  void setTab;
+  void onGameEnd;
+  const [joinPin, setJoinPin] = useState('');
+  const [authUid, setAuthUid] = useState(auth.currentUser?.uid || null);
   const [savedSession, setSavedSession] = useState(() => readSavedHesbah());
   const [sessionGate, setSessionGate] = useState(() => (readSavedHesbah().roomCode ? 'checking' : 'ready'));
   const [gameScreen, setGameScreen] = useState('home');
@@ -137,6 +155,22 @@ const HesbahGame = forwardRef(function HesbahGame(
       return false;
     },
   }));
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => setAuthUid(u?.uid || null));
+  }, []);
+
+  const persistHesbahPlayerSeat = (code, pid, name, sessionToken) => {
+    persistHesbahSession({
+      roomCode: code,
+      role: 'player',
+      myId: pid,
+      myName: name,
+      sessionToken,
+    });
+    writeGuestDeviceLock('hesbah', code, pid);
+    setSavedSession(readSavedHesbah());
+  };
 
   const me = myId ? players[myId] : null;
   const phase = game?.phase || 'lobby';
@@ -471,51 +505,130 @@ const HesbahGame = forwardRef(function HesbahGame(
       setJoinErr('رمز الغرفة 4 أرقام');
       return;
     }
-    if (!name) {
-      setJoinErr('أدخل اسمك');
-      return;
-    }
     setJoinLoading(true);
     setJoinErr('');
     try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const uid = auth.currentUser?.uid;
+      const isLoggedIn = !!uid;
       const snap = await get(dbRef(db, `srooms/${code}`));
       if (!snap.exists()) {
         setJoinErr('الغرفة غير موجودة');
         return;
       }
       const data = snap.val();
-      const totalQ = data.game?.totalQ || 20;
-      const board = buildScoreBoard(totalQ);
-      const colorIdx = Math.floor(Math.random() * AV_COLORS.length);
-      let pid;
+      const phase = data.game?.phase || 'lobby';
+      const playerEntries = Object.entries(data.players || {});
+      const saved = readSavedHesbah();
+      let pid = null;
+      let isRejoin = false;
 
-      const activeMatch = findActivePlayerByName(data.players, name);
-      if (activeMatch) {
-        pid = activeMatch[0];
-      } else {
-        const leftMatch = findLeftPlayerByName(data.players, name);
-        if (leftMatch) {
-          const [leftId] = leftMatch;
-          await remove(dbRef(db, `srooms/${code}/players/${leftId}`));
-          await remove(dbRef(db, `srooms/${code}/answers/${leftId}`));
-          await remove(dbRef(db, `srooms/${code}/votes/${leftId}`));
+      const byUid = findSeatByOwnerUid(playerEntries, uid);
+      if (byUid) {
+        pid = byUid[0];
+        isRejoin = true;
+        if (byUid[1]?.left) {
+          await update(dbRef(db, `srooms/${code}/players/${pid}`), { left: false, leftAt: null });
         }
-        const newRef = push(dbRef(db, `srooms/${code}/players`));
-        pid = newRef.key;
-        const arenaFields = await fetchArenaFieldsForJoin();
-        await set(newRef, { ...hesbahPlayerPayload(name, colorIdx), ...arenaFields, board });
+      } else if (saved.roomCode === code && saved.myId && saved.sessionToken) {
+        const byToken = findSeatById(playerEntries, saved.myId);
+        if (byToken && byToken[1]?.sessionToken === saved.sessionToken) {
+          pid = byToken[0];
+          isRejoin = true;
+          if (byToken[1]?.left) {
+            await update(dbRef(db, `srooms/${code}/players/${pid}`), { left: false, leftAt: null });
+          }
+        }
       }
 
+      if (!pid && !name) {
+        setJoinErr('أدخل اسمك');
+        return;
+      }
+
+      if (!pid) {
+        const byName = findSeatByName(playerEntries, name);
+        if (byName) {
+          const [seatId, seat] = byName;
+          if (seat.ownerUid && seat.ownerUid !== uid) {
+            setJoinErr('هذا المقعد مربوط بحساب آخر — سجّل بنفس البريد');
+            return;
+          }
+          if (isLoggedIn && !seat.ownerUid) {
+            try {
+              await update(dbRef(db, `srooms/${code}/players/${seatId}`), { ownerUid: uid });
+              seat.ownerUid = uid;
+            } catch {
+              /* optional */
+            }
+          }
+          if (!isLoggedIn || !seat.ownerUid) {
+            const access = await verifyGuestSeatAccess(seat, seatId, code, {
+              pin: joinPin,
+              sessionToken: saved.sessionToken,
+            });
+            if (!access.ok) {
+              setJoinErr(access.reason || SEAT_ERRORS.pinWrong);
+              return;
+            }
+          }
+          pid = seatId;
+          isRejoin = true;
+          if (seat.left) {
+            await update(dbRef(db, `srooms/${code}/players/${pid}`), { left: false, leftAt: null });
+          }
+        }
+      }
+
+      if (!pid) {
+        if (isRegistrationLocked(phase)) {
+          setJoinErr(SEAT_ERRORS.registrationClosed);
+          return;
+        }
+        if (!isLoggedIn) {
+          if (!isValidPin(joinPin)) {
+            setJoinErr(SEAT_ERRORS.pinRequired);
+            return;
+          }
+          const guestLock = readGuestDeviceLock('hesbah', code);
+          if (guestLock?.seatId) {
+            setJoinErr(SEAT_ERRORS.guestLocked);
+            return;
+          }
+        }
+        const totalQ = data.game?.totalQ || 20;
+        const board = buildScoreBoard(totalQ);
+        const colorIdx = Math.floor(Math.random() * AV_COLORS.length);
+        const newRef = push(dbRef(db, `srooms/${code}/players`));
+        pid = newRef.key;
+        let security = { sessionToken: '' };
+        try {
+          security = await buildNewSeatSecurity(code, pid, {
+            isGuest: !isLoggedIn,
+            pin: joinPin,
+          });
+        } catch (e) {
+          setJoinErr(e.message || SEAT_ERRORS.pinRequired);
+          return;
+        }
+        const arenaFields = await fetchArenaFieldsForJoin();
+        await set(newRef, {
+          ...hesbahPlayerPayload(name, colorIdx),
+          ...arenaFields,
+          board,
+          sessionToken: security.sessionToken,
+          ...(security.pinHash ? { pinHash: security.pinHash } : {}),
+          ...(uid ? { ownerUid: uid } : {}),
+        });
+      }
+
+      const refreshed = (await get(dbRef(db, `srooms/${code}/players/${pid}`))).val() || {};
       setRoomCode(code);
       setRole('player');
       setMyId(pid);
-      persistHesbahSession({ roomCode: code, role: 'player', myId: pid, myName: name });
-      setSavedSession(readSavedHesbah());
+      persistHesbahPlayerSeat(code, pid, name, refreshed.sessionToken);
       setGameScreen('lobby');
-      notify(
-        activeMatch ? '✅ عدت للغرفة — تُتابع من حيث نقاطك' : '✅ انضممت للغرفة — بداية جديدة',
-        'success'
-      );
+      notify(isRejoin ? '✅ عدت للغرفة — تُتابع من حيث نقاطك' : '✅ انضممت للغرفة', 'success');
     } catch {
       setJoinErr('خطأ في الاتصال');
     } finally {
@@ -540,10 +653,22 @@ const HesbahGame = forwardRef(function HesbahGame(
       }
       const data = snap.val();
       const player = data.players?.[pid];
-      if (!isActiveHesbahPlayer(player)) {
+      const uid = auth.currentUser?.uid;
+      const tokenOk =
+        saved.sessionToken &&
+        player?.sessionToken &&
+        saved.sessionToken === player.sessionToken;
+      const uidOk = uid && player?.ownerUid === uid;
+      if (!player || (!isActiveHesbahPlayer(player) && !player.left)) {
         clearHesbahSession();
         setSavedSession({});
         notify('انتهت جلستك السابقة — انضم من جديد برمز الغرفة', 'info');
+        return;
+      }
+      if (savedRole === 'player' && player?.sessionToken && saved.sessionToken && !tokenOk && !uidOk) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify('أدخل رقمك السري للعودة', 'info');
         return;
       }
       if (savedRole === 'admin' && data.adminId !== pid) {
@@ -571,13 +696,6 @@ const HesbahGame = forwardRef(function HesbahGame(
       });
     } catch {
       /* ignore */
-    }
-    try {
-      await remove(dbRef(db, `srooms/${code}/players/${pid}`));
-      await remove(dbRef(db, `srooms/${code}/answers/${pid}`));
-      await remove(dbRef(db, `srooms/${code}/votes/${pid}`));
-    } catch {
-      /* left flag يبقى — joinRoom يتجاهل left */
     }
   };
 
@@ -1168,7 +1286,7 @@ const HesbahGame = forwardRef(function HesbahGame(
     clearHesbahSession();
     setSavedSession({});
     resetHesbahRoomState();
-    notify('انسحبت من المسابقة — يمكنك العودة برمز الغرفة ونفس اسمك', 'info');
+    notify('انسحبت — للعودة: نفس الرمز والاسم ورقمك السري', 'info');
 
     if (pid && code) {
       purgePlayerFromRoom(code, pid).catch(() => {});
@@ -1294,19 +1412,7 @@ const HesbahGame = forwardRef(function HesbahGame(
             <button type="button" className="btn bgh mt2" onClick={() => setShowGuide(true)}>
               📖 كيف تلعب؟ — دليل المشرف والمتسابق
             </button>
-            <div className="div">قوانين سريعة</div>
-            {[
-              '🎯 كل درجة على لوحتك تُستخدم مرة واحدة — اخترها بذكاء',
-              '🔒 لا ترى إجابات أحد حتى ترسل — ضد التكرار',
-              '✍️ الإجابة الكتابية — التكرار أو الجهل أكثر أسباب الخطأ',
-              '⚡ كروت إثارة للمشرف + درع وتعديل وثقة للمتسابق (مرة للمسابقة)',
-              '🗳️ بعد آخر جولة: تصويت على قيمة السؤال الحاسم',
-              '🏆 أعلى مجموع نقاط يفوز',
-            ].map((r, i) => (
-              <div key={i} className="game-rule-row">
-                {r}
-              </div>
-            ))}
+            <GameQuickRules rules={HESBAH_QUICK_RULES} />
           </div>
         </div>
       );
@@ -1345,6 +1451,15 @@ const HesbahGame = forwardRef(function HesbahGame(
             />
             <label className="lbl">اسمك</label>
             <input className="inp" placeholder={PLAYER_DISPLAY_NAME_PLACEHOLDER} value={joinName} onChange={(e) => setJoinName(e.target.value)} />
+            {authUid ? (
+              <div className="game-seat-login-hint">
+                ✅ مسجّل دخول — مقعدك مربوط بحسابك وترجع بدون رقم سري
+              </div>
+            ) : (
+              <div className="game-seat-guest-pin-card">
+                <GameSeatPinField value={joinPin} onChange={setJoinPin} />
+              </div>
+            )}
             {joinErr && <div className="err-msg">{joinErr}</div>}
             <button type="button" className="btn bg mt2" disabled={joinLoading} onClick={() => void joinRoom()}>
               {joinLoading ? '⏳' : '🚀 انضمام'}
@@ -1359,7 +1474,16 @@ const HesbahGame = forwardRef(function HesbahGame(
 
     if (gameScreen === 'lobby') {
       return (
-        <HesbahLobby
+        <>
+          {role === 'player' && myId && (
+            <GameSeatWelcomeOverlay
+              gameId="hesbah"
+              seatId={myId}
+              isLoggedIn={!!authUid}
+              onSignup={() => setTab?.('account')}
+            />
+          )}
+          <HesbahLobby
           roomCode={roomCode}
           role={role}
           players={players}
@@ -1375,6 +1499,7 @@ const HesbahGame = forwardRef(function HesbahGame(
           onExitRequest={openExitSheet}
           onOpenGuide={() => setShowGuide(true)}
         />
+        </>
       );
     }
 
@@ -1406,7 +1531,6 @@ const HesbahGame = forwardRef(function HesbahGame(
           onVote={(v) => void onVote(v)}
           voteCountdown={voteCountdown}
           onExitRequest={openExitSheet}
-          onOpenGuide={() => setShowGuide(true)}
         />
       );
     }
@@ -1441,7 +1565,6 @@ const HesbahGame = forwardRef(function HesbahGame(
           canEarlyEnd={canEarlyEnd}
           onExitRequest={openExitSheet}
           notify={notify}
-          onOpenGuide={() => setShowGuide(true)}
         />
       );
     }

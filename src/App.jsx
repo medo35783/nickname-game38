@@ -379,7 +379,7 @@ export default function App() {
   const user = auth.currentUser;
   const isGuest = arena.isGuest;
   const accountDisplayName = isGuest
-    ? 'افتح شارتك'
+    ? 'سجّل دخول'
     : `${arena.avatarIcon} ${arena.displayName}`;
   const accountBtnClass = isGuest
     ? 'hdr-account-btn hdr-account-btn--guest'

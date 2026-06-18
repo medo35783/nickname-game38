@@ -196,6 +196,8 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
         playerCount,
         completed,
         roomCode,
+        totalRounds: Number(game.totalRounds) || 0,
+        durationMinutes,
       });
       if (hostResult && (hostResult.tierUpgraded || hostResult.newAchievements?.length)) {
         emitArenaCelebration(hostResult);

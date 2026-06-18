@@ -33,11 +33,11 @@ export default function ArenaHallOfFame({ onGoAccount, isGuest = true }) {
         <div className="arena-hof__empty">جاري التحميل…</div>
       ) : rows.length === 0 ? (
         <div className="arena-hof__empty">
-          لا متصدرين بعد — العب وسجّل شارتك لتظهر هنا!
+          لا متصدرين بعد — سجّل دخولك وتنافس لتظهر هنا!
           {isGuest && typeof onGoAccount === 'function' ? (
             <div style={{ marginTop: 10 }}>
               <button type="button" className="btn bg bsm" style={{ width: 'auto' }} onClick={onGoAccount}>
-                👤 افتح شارتك
+                👤 سجّل دخول
               </button>
             </div>
           ) : null}
