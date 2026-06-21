@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
+import { isArenaRegisteredUser } from '../core/arenaProfile';
+import { refreshKnowledgeContributionStats } from '../core/arenaKnowledge';
 import {
   submitCommunityQuestion,
   fetchBankStats,
@@ -103,6 +105,9 @@ export default function QuestionContribute({ notify, onBack, backLabel }) {
         uid: auth.currentUser?.uid || null,
         name: contributorName,
       });
+      if (isArenaRegisteredUser(auth.currentUser)) {
+        await refreshKnowledgeContributionStats(auth.currentUser.uid).catch(() => {});
+      }
       setSuccess(true);
       notify('تم إرسال سؤالك للمراجعة', 'success');
     } catch (submitError) {

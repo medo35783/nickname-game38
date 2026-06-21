@@ -1,6 +1,6 @@
 import { ARENA_TIER_THRESHOLDS } from './arena.constants';
 
-/** @typedef {'general'|'player'|'host'|'points'|'loyalty'} ArenaAchievementCategory */
+/** @typedef {'general'|'player'|'host'|'points'|'loyalty'|'knowledge'} ArenaAchievementCategory */
 
 /** @typedef {{ id: string, icon: string, label: string, desc: string, category: ArenaAchievementCategory, rarity?: string }} ArenaAchievementDef */
 
@@ -10,6 +10,7 @@ export const ARENA_ACHIEVEMENT_CATEGORIES = [
   { id: 'host', label: 'مشرف', icon: '🎛️' },
   { id: 'points', label: 'نقاط', icon: '⭐' },
   { id: 'loyalty', label: 'وفاء', icon: '💎' },
+  { id: 'knowledge', label: 'معرفة', icon: '📚' },
   { id: 'general', label: 'عام', icon: '🏟️' },
 ];
 
@@ -113,6 +114,21 @@ function buildAchievementCatalog() {
     login_365: milestone('login_365', '🏆', 'سنة في الساحة', '365 زيارة للساحة', 'loyalty', 'legendary'),
 
     weekly_star: milestone('weekly_star', '⭐', 'نجم الأسبوع', 'دخلت أفضل 3 هذا الأسبوع', 'loyalty', 'epic'),
+
+    kb_first: milestone('kb_first', '📚', 'بذرة المعرفة', 'أرسلت أول مقترح لبنك المعرفة', 'knowledge', 'common'),
+    kb_submit_5: milestone('kb_submit_5', '✍️', 'مساهم نشيط', '5 مقترحات مرسلة', 'knowledge', 'common'),
+    kb_submit_10: milestone('kb_submit_10', '📝', 'كاتب الأسئلة', '10 مقترحات مرسلة', 'knowledge', 'rare'),
+    kb_submit_25: milestone('kb_submit_25', '📖', 'مؤلف الساحة', '25 مقترحاً مرسلاً', 'knowledge', 'epic'),
+
+    kb_approved_first: milestone('kb_approved_first', '✅', 'سؤال معتمد', 'اعتُمد أول سؤال لك في البنك', 'knowledge', 'common'),
+    kb_approved_3: milestone('kb_approved_3', '🌱', 'باني البنك', '3 أسئلة معتمدة', 'knowledge', 'rare'),
+    kb_approved_5: milestone('kb_approved_5', '🏛️', 'عميد المعرفة', '5 أسئلة معتمدة', 'knowledge', 'rare'),
+    kb_approved_10: milestone('kb_approved_10', '📚', 'خزانة الأسئلة', '10 أسئلة معتمدة', 'knowledge', 'epic'),
+    kb_approved_25: milestone('kb_approved_25', '🎓', 'عالم الساحة', '25 سؤالاً معتمداً', 'knowledge', 'epic'),
+    kb_approved_50: milestone('kb_approved_50', '👑', 'أسطورة المعرفة', '50 سؤالاً معتمداً', 'knowledge', 'legendary'),
+
+    kb_patience: milestone('kb_patience', '⏳', 'صبور المراجعة', '3 مقترحات قيد المراجعة', 'knowledge', 'common'),
+    kb_top_voice: milestone('kb_top_voice', '🎙️', 'صوت المجتمع', '15 سؤالاً معتمداً — مساهمة بارزة', 'knowledge', 'legendary'),
   };
 
   return map;
@@ -173,6 +189,9 @@ export function getArenaStatsFromProfile(profile = {}) {
     },
     arenaPoints: Number(profile.arenaPoints) || 0,
     totalLogins: Number(profile.totalLogins) || 0,
+    kbSubmitted: Number(profile.kbSubmitted) || 0,
+    kbApproved: Number(profile.kbApproved) || 0,
+    kbPending: Number(profile.kbPending) || 0,
   };
 }
 
@@ -284,6 +303,21 @@ export function computeEligibleAchievements(profile = {}) {
   reach('login_30', s.totalLogins >= 30);
   reach('login_100', s.totalLogins >= 100);
   reach('login_365', s.totalLogins >= 365);
+
+  reach('kb_first', s.kbSubmitted >= 1);
+  reach('kb_submit_5', s.kbSubmitted >= 5);
+  reach('kb_submit_10', s.kbSubmitted >= 10);
+  reach('kb_submit_25', s.kbSubmitted >= 25);
+
+  reach('kb_approved_first', s.kbApproved >= 1);
+  reach('kb_approved_3', s.kbApproved >= 3);
+  reach('kb_approved_5', s.kbApproved >= 5);
+  reach('kb_approved_10', s.kbApproved >= 10);
+  reach('kb_approved_25', s.kbApproved >= 25);
+  reach('kb_approved_50', s.kbApproved >= 50);
+  reach('kb_top_voice', s.kbApproved >= 15);
+
+  reach('kb_patience', s.kbPending >= 3);
 
   return ids;
 }

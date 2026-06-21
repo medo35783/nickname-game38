@@ -381,6 +381,384 @@
   border-color: rgba(240, 192, 64, 0.3);
 }
 
+.arena-account-card--profile {
+  padding: 22px 16px 16px;
+  background: linear-gradient(160deg, rgba(240, 192, 64, 0.12) 0%, rgba(155, 89, 182, 0.08) 50%, rgba(15, 15, 34, 0.02) 100%);
+  border-color: rgba(240, 192, 64, 0.35);
+  box-shadow: 0 8px 28px rgba(240, 192, 64, 0.08);
+}
+
+.arena-account-card--profile .arena-badge {
+  margin-bottom: 4px;
+}
+
+.arena-account-card--profile .arena-badge__name {
+  font-size: 20px;
+  margin-top: 4px;
+}
+
+.arena-account-card--profile .arena-badge__stats {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* ── بطاقة الهوية الموحّدة ── */
+
+.arena-hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding: 24px 16px 18px;
+  margin-bottom: 14px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(240, 192, 64, 0.35);
+  background: linear-gradient(165deg, rgba(240, 192, 64, 0.14) 0%, rgba(155, 89, 182, 0.08) 42%, var(--card) 88%);
+  box-shadow: 0 12px 36px rgba(240, 192, 64, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.arena-hero--bronze {
+  border-color: rgba(205, 127, 50, 0.45);
+  background: linear-gradient(165deg, rgba(205, 127, 50, 0.16) 0%, rgba(139, 90, 43, 0.06) 50%, var(--card) 90%);
+  box-shadow: 0 12px 36px rgba(205, 127, 50, 0.12);
+}
+
+.arena-hero--silver {
+  border-color: rgba(192, 192, 210, 0.55);
+  background: linear-gradient(165deg, rgba(192, 192, 210, 0.22) 0%, rgba(240, 192, 64, 0.08) 38%, var(--card) 90%);
+  box-shadow: 0 14px 40px rgba(192, 192, 210, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+.arena-hero--gold {
+  border-color: rgba(240, 192, 64, 0.55);
+  background: linear-gradient(165deg, rgba(240, 192, 64, 0.2) 0%, rgba(230, 126, 34, 0.08) 45%, var(--card) 90%);
+  box-shadow: 0 14px 42px rgba(240, 192, 64, 0.2);
+}
+
+.arena-hero--legend {
+  border-color: rgba(155, 89, 182, 0.55);
+  background: linear-gradient(165deg, rgba(155, 89, 182, 0.2) 0%, rgba(240, 192, 64, 0.1) 45%, var(--card) 90%);
+  box-shadow: 0 16px 44px rgba(155, 89, 182, 0.2);
+}
+
+.arena-hero__glow {
+  pointer-events: none;
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.28), transparent 68%);
+}
+
+.arena-hero--silver .arena-hero__glow {
+  background: radial-gradient(ellipse, rgba(220, 220, 235, 0.45), transparent 68%);
+}
+
+.arena-hero--gold .arena-hero__glow {
+  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.38), transparent 68%);
+}
+
+.arena-hero__shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.06) 50%, transparent 60%);
+}
+
+.arena-hero__badge-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.arena-hero__name {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1.2;
+}
+
+.arena-hero__tier-pill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+}
+
+.arena-hero__tier-pill--bronze {
+  color: #cd7f32;
+  background: rgba(205, 127, 50, 0.14);
+  border-color: rgba(205, 127, 50, 0.35);
+}
+
+.arena-hero__tier-pill--silver {
+  color: #8e9aaf;
+  background: linear-gradient(90deg, rgba(192, 192, 210, 0.2), rgba(255, 255, 255, 0.12));
+  border-color: rgba(192, 192, 210, 0.5);
+  box-shadow: 0 0 14px rgba(192, 192, 210, 0.2);
+}
+
+.arena-hero__tier-pill--gold {
+  color: var(--gold);
+  background: rgba(240, 192, 64, 0.14);
+  border-color: rgba(240, 192, 64, 0.4);
+}
+
+.arena-hero__tier-pill--legend {
+  color: #b57edc;
+  background: rgba(155, 89, 182, 0.14);
+  border-color: rgba(155, 89, 182, 0.4);
+}
+
+.arena-hero__tier-pill-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.arena-hero__pts {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 16px;
+}
+
+.arena-hero__pts-num {
+  display: block;
+  font-family: 'Cairo', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 12px rgba(240, 192, 64, 0.25);
+}
+
+.arena-hero__pts-lbl {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.arena-hero__quest {
+  position: relative;
+  z-index: 1;
+  padding: 14px 12px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .arena-hero__quest {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(184, 134, 11, 0.12);
+}
+
+.arena-hero__quest-ends {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 1.4fr) 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.arena-hero__quest-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  opacity: 0.65;
+}
+
+.arena-hero__quest-node--now {
+  opacity: 1;
+}
+
+.arena-hero__quest-node--next {
+  opacity: 0.85;
+}
+
+.arena-hero__quest-node-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border: 2px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.arena-hero__quest-node--now.arena-hero__quest-node--silver .arena-hero__quest-node-icon {
+  border-color: rgba(192, 192, 210, 0.7);
+  box-shadow: 0 0 16px rgba(192, 192, 210, 0.35);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(192, 192, 210, 0.12));
+}
+
+.arena-hero__quest-node--now.arena-hero__quest-node--gold .arena-hero__quest-node-icon {
+  border-color: rgba(240, 192, 64, 0.7);
+  box-shadow: 0 0 16px rgba(240, 192, 64, 0.35);
+}
+
+.arena-hero__quest-node--next.arena-hero__quest-node--gold .arena-hero__quest-node-icon {
+  border-color: rgba(240, 192, 64, 0.45);
+  background: rgba(240, 192, 64, 0.08);
+}
+
+.arena-hero__quest-node--next.arena-hero__quest-node--legend .arena-hero__quest-node-icon {
+  border-color: rgba(155, 89, 182, 0.45);
+  background: rgba(155, 89, 182, 0.08);
+}
+
+.arena-hero__quest-node-tag {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: rgba(240, 192, 64, 0.15);
+  color: var(--gold);
+}
+
+.arena-hero__quest-node-tag--goal {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.arena-hero__quest-node--now .arena-hero__quest-node-tag {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--green);
+}
+
+.arena-hero__quest-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.arena-hero__quest-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--surface);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arena-hero__quest-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #c0c0d8, var(--gold));
+  box-shadow: 0 0 10px rgba(240, 192, 64, 0.35);
+  transition: width 0.4s ease;
+}
+
+.arena-hero--silver .arena-hero__quest-fill {
+  background: linear-gradient(90deg, #aeb4c8, #f0c040, #e67e22);
+}
+
+.arena-hero__quest-pct {
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-hero__quest-msg {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.arena-hero__quest-msg strong {
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.arena-hero__max {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--gold);
+  background: rgba(240, 192, 64, 0.1);
+  border: 1px solid rgba(240, 192, 64, 0.25);
+}
+
+.arena-hero__max-icon {
+  font-size: 20px;
+}
+
+.arena-hero__edit-name {
+  position: relative;
+  z-index: 1;
+  margin-top: 12px;
+  border: none;
+  background: none;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.arena-hero__edit-name:hover {
+  color: var(--text);
+}
+
+.arena-hero__name-edit {
+  position: relative;
+  z-index: 1;
+  max-width: 280px;
+  margin: 0 auto 12px;
+}
+
+.arena-hero__name-edit .account-name-edit__actions {
+  margin-top: 8px;
+}
+
+.arena-points-guide-card {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(240, 192, 64, 0.2);
+  background: rgba(240, 192, 64, 0.03);
+}
+
+.arena-points-guide-card .arena-rewards-guide {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .arena-account-card--guest {
   background: linear-gradient(145deg, rgba(79, 163, 224, 0.08), rgba(15, 15, 34, 0.95));
   border-color: rgba(79, 163, 224, 0.25);
@@ -872,7 +1250,194 @@
   margin-bottom: 10px;
 }
 
-/* ── بطاقات فتح الشارة والإنجازات ── */
+/* ── عرض الشارة والإنجازات — فاخر ── */
+
+.arena-showcase {
+  margin-bottom: 14px;
+}
+
+.arena-showcase__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.arena-showcase__spark {
+  font-size: 12px;
+  color: var(--gold);
+  opacity: 0.85;
+}
+
+.arena-showcase__title {
+  margin: 0;
+  font-family: 'Cairo', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+.arena-showcase__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.arena-showcase-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 10px 14px;
+  border-radius: 18px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  overflow: hidden;
+  min-height: 168px;
+  transition: transform 0.18s, box-shadow 0.2s;
+}
+
+.arena-showcase-card:active {
+  transform: scale(0.97);
+}
+
+.arena-showcase-card--badge {
+  background: linear-gradient(160deg, rgba(240, 192, 64, 0.16) 0%, rgba(240, 192, 64, 0.04) 55%, var(--card) 100%);
+  border-color: rgba(240, 192, 64, 0.45);
+  box-shadow: 0 8px 28px rgba(240, 192, 64, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.arena-showcase-card--ach {
+  background: linear-gradient(160deg, rgba(155, 89, 182, 0.16) 0%, rgba(155, 89, 182, 0.04) 55%, var(--card) 100%);
+  border-color: rgba(155, 89, 182, 0.42);
+  box-shadow: 0 8px 28px rgba(155, 89, 182, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.arena-showcase-card__glow {
+  pointer-events: none;
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 80px;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.arena-showcase-card__glow--gold {
+  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.35), transparent 70%);
+}
+
+.arena-showcase-card__glow--purple {
+  background: radial-gradient(ellipse, rgba(155, 89, 182, 0.32), transparent 70%);
+}
+
+.arena-showcase-card__visual {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+
+.arena-showcase-card__visual--ach {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.arena-showcase-card__visual .arena-badge {
+  gap: 0;
+}
+
+.arena-showcase-ach-ring {
+  --pct: 0%;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(var(--gold) var(--pct), rgba(255, 255, 255, 0.08) 0);
+  padding: 3px;
+  box-shadow: 0 0 16px rgba(240, 192, 64, 0.2);
+}
+
+.arena-showcase-ach-ring__icon {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  background: var(--card);
+  border: 1px solid rgba(155, 89, 182, 0.25);
+}
+
+.arena-showcase-ach-ring__count {
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-showcase-ach-ring__count small {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.arena-showcase-card__title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.arena-showcase-card__sub {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-showcase-card__cta {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--gold);
+  opacity: 0.85;
+}
+
+.arena-showcase-card--ach .arena-showcase-card__cta {
+  color: #b57edc;
+}
+
+[data-theme="light"] .arena-showcase-card--badge {
+  box-shadow: 0 6px 20px rgba(184, 134, 11, 0.12);
+}
+
+[data-theme="light"] .arena-showcase-card--ach {
+  box-shadow: 0 6px 20px rgba(142, 68, 173, 0.1);
+}
+
+/* ── بطاقات فتح الشارة والإنجازات (قديم) ── */
 
 .arena-badge-actions {
   display: flex;
@@ -1012,6 +1577,35 @@ body.arena-sheet-open .site-footer {
 @keyframes arena-sheet-slide {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+.arena-sheet-overlay--center {
+  align-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+.arena-sheet--center {
+  border-radius: 22px;
+  border-bottom: 1px solid rgba(240, 192, 64, 0.28);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5);
+  height: auto;
+  max-height: min(78dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 32px));
+  animation: arena-sheet-pop 0.28s ease;
+}
+
+[data-theme="light"] .arena-sheet--center {
+  border-bottom-color: rgba(184, 134, 11, 0.28);
+}
+
+@keyframes arena-sheet-pop {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 .arena-sheet__glow {
@@ -1381,15 +1975,346 @@ body.arena-sheet-open .site-footer {
   box-shadow: 0 0 12px rgba(240, 192, 64, 0.15);
 }
 
-/* ── مقابل النقاط ── */
+/* ── مقابل النقاط — عرض فاخر مختصر ── */
 
 .arena-rewards-card {
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid var(--border-subtle);
   background: linear-gradient(145deg, rgba(240, 192, 64, 0.06), rgba(155, 89, 182, 0.04));
   padding: 14px;
   margin-bottom: 12px;
 }
+
+.arena-rewards-card--lux {
+  padding: 16px 14px 12px;
+  border-color: rgba(240, 192, 64, 0.28);
+  background: linear-gradient(155deg, rgba(155, 89, 182, 0.08) 0%, rgba(240, 192, 64, 0.06) 45%, rgba(12, 12, 32, 0.02) 100%);
+  box-shadow: 0 6px 24px rgba(155, 89, 182, 0.06);
+}
+
+[data-theme="light"] .arena-rewards-card--lux {
+  background: linear-gradient(155deg, rgba(155, 89, 182, 0.06) 0%, rgba(240, 192, 64, 0.08) 50%, #fff 100%);
+}
+
+.arena-rewards-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.arena-rewards-hero__badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(145deg, rgba(240, 192, 64, 0.18), rgba(155, 89, 182, 0.1));
+  border: 2px solid rgba(240, 192, 64, 0.4);
+  box-shadow: 0 0 20px rgba(240, 192, 64, 0.15);
+}
+
+.arena-rewards-hero__tier-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.arena-rewards-hero__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.arena-rewards-hero__pts {
+  font-family: 'Cairo', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-rewards-hero__pts span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.arena-rewards-hero__tier {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.arena-rewards-hero__next {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.arena-rewards-hero__next--max {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.arena-rewards-card__bar {
+  margin: 12px 0 14px;
+}
+
+.arena-tier-track {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.arena-tier-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border-faint);
+  background: var(--surface);
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  opacity: 0.55;
+  transition: opacity 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.arena-tier-chip:active {
+  transform: scale(0.96);
+}
+
+.arena-tier-chip--on {
+  opacity: 1;
+  border-color: rgba(240, 192, 64, 0.35);
+  background: rgba(240, 192, 64, 0.06);
+}
+
+.arena-tier-chip--current {
+  border-color: rgba(240, 192, 64, 0.55);
+  box-shadow: 0 0 12px rgba(240, 192, 64, 0.15);
+}
+
+.arena-tier-chip__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.arena-tier-chip__label {
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.arena-tier-chip--on .arena-tier-chip__label {
+  color: var(--text);
+}
+
+.arena-rewards-guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+}
+
+.arena-rewards-guide__tag {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px dashed var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.arena-rewards-guide__label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.arena-rewards-guide__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.arena-rewards-guide__link {
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.arena-rewards-guide__link:hover {
+  color: var(--gold);
+}
+
+.arena-rewards-guide__sep {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+/* ── محتوى نوافذ النقاط ── */
+
+.arena-rewards-sheet-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.arena-rewards-sheet-tier {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-faint);
+  background: var(--surface);
+  opacity: 0.75;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.arena-rewards-sheet-tier--on {
+  opacity: 1;
+  border-color: rgba(240, 192, 64, 0.35);
+  background: rgba(240, 192, 64, 0.06);
+}
+
+.arena-rewards-sheet-tier--focus {
+  border-color: rgba(240, 192, 64, 0.55);
+  box-shadow: 0 0 16px rgba(240, 192, 64, 0.12);
+}
+
+.arena-rewards-sheet-tier__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arena-rewards-sheet-tier__icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.arena-rewards-sheet-tier__head strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.arena-rewards-sheet-tier__head span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.arena-rewards-sheet-tier__badge {
+  margin-right: auto;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--green);
+  background: rgba(46, 204, 113, 0.12);
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+
+.arena-rewards-sheet-tier__frame {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
+.arena-rewards-sheet-tier__perks {
+  margin: 8px 0 0;
+  padding-right: 16px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.arena-rewards-sheet-earn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arena-rewards-sheet-earn__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-faint);
+  background: var(--surface);
+}
+
+.arena-rewards-sheet-earn__icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.arena-rewards-sheet-earn__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.arena-rewards-sheet-earn__body strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.arena-rewards-sheet-earn__body span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.arena-rewards-sheet-earn__pts {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--gold);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.arena-rewards-sheet-earn__note {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.55;
+  background: rgba(240, 192, 64, 0.06);
+  border: 1px solid rgba(240, 192, 64, 0.15);
+}
+
+/* ── مقابل النقاط (قديم — للتوافق) ── */
 
 .arena-rewards-card__head {
   display: flex;
@@ -1413,10 +2338,6 @@ body.arena-sheet-open .site-footer {
   font-size: 11px;
   color: var(--muted);
   margin-top: 2px;
-}
-
-.arena-rewards-card__bar {
-  margin-bottom: 12px;
 }
 
 .arena-rewards-section {

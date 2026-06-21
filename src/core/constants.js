@@ -32,8 +32,13 @@ export const SUPPORT_EMAIL = 'nicknameGame.support@gmail.com';
 export const SUPPORT_WHATSAPP = '0539999010';
 export const SUPPORT_WHATSAPP_URL = 'https://wa.me/966539999010';
 
-/** اسم المنصة المؤقت حتى اعتماد براند نهائي */
-export const PLATFORM_NAME = 'ساحة الألعاب';
+/** هوية المنصة — لعيبز / LA3IBZ */
+export const PLATFORM_NAME = 'لعيبز';
+export const PLATFORM_NAME_EN = 'LA3IBZ';
+export const PLATFORM_TAGLINE = 'لعيبز | جَوّك، جمعتك، وتحديك';
+export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=4';
+export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=4';
+export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=4';
 
 /** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
 export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';

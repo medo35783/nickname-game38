@@ -2,6 +2,7 @@
 import { ref, update } from 'firebase/database';
 import { db } from '../firebase';
 import { COLORS } from '../core/constants';
+import { refreshKnowledgeContributionStats } from '../core/arenaKnowledge';
 import '../styles/base.css';
 import {
   suggestQuestion,
@@ -623,10 +624,18 @@ export default function QBankManager({ notify }) {
 
     try {
       if (editingId) {
+        const original = allQuestions.find((item) => item.id === editingId);
         await update(ref(db, `question-bank/${editingId}`), {
           ...payload,
           updatedAt: Date.now(),
         });
+        if (
+          original?.contributor_uid &&
+          original.status === 'pending' &&
+          payload.status === 'approved'
+        ) {
+          await refreshKnowledgeContributionStats(original.contributor_uid).catch(() => {});
+        }
         showNotice('تم تعديل السؤال بنجاح', 'success');
       } else {
         const created = await suggestQuestion(payload);
@@ -711,6 +720,9 @@ export default function QBankManager({ notify }) {
 
     try {
       await approveQuestion(questionId);
+      if (question?.contributor_uid) {
+        await refreshKnowledgeContributionStats(question.contributor_uid).catch(() => {});
+      }
       showNotice('تم اعتماد السؤال', 'success');
       await reloadQuestions();
     } catch (approveError) {

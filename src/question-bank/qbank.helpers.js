@@ -136,6 +136,20 @@ function matchesContributor(question, { uid, sessionId }) {
   return false;
 }
 
+export function summarizeContributions(questions = []) {
+  const rows = Array.isArray(questions) ? questions : [];
+  const approved = rows.filter((q) => q.status === 'approved').length;
+  const pending = rows.filter((q) => q.status === 'pending').length;
+  const rejected = rows.filter((q) => q.status === 'rejected').length;
+
+  return {
+    kbSubmitted: rows.length,
+    kbApproved: approved,
+    kbPending: pending,
+    kbRejected: rejected,
+  };
+}
+
 export function calcContributionPoints(questions) {
   let points = 0;
   (questions || []).forEach((q) => {

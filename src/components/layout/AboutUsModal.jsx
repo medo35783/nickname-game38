@@ -10,9 +10,9 @@ const AUDIENCES = [
     desc: 'لتكسر الجليد وتصنع جوّاً حماسياً استثنائياً.',
   },
   {
-    icon: '🏫',
-    title: 'المدارس والحلق والدور التعليمية',
-    desc: 'لكسر الروتين ودمج التعليم بالمتعة والمرح.',
+    icons: ['🏫', '🤝'],
+    title: 'المدارس والحلق والدور التعليمية والجمعيات',
+    desc: 'لكسر الروتين ودمج التعليم بالمتعة، وتفعيل الأنشطة المجتمعية بروح تنافسية.',
   },
   {
     icon: '🏢',
@@ -34,8 +34,11 @@ export default function AboutUsModal({ onClose }) {
     >
       <div className="about-modal" onClick={(e) => e.stopPropagation()}>
         <div className="about-modal-head">
-          <div id="about-us-title" className="about-modal-title">
-            🏟️ من نحن؟
+          <div className="about-modal-head-text">
+            <div id="about-us-title" className="about-modal-title">
+              منصة لعيبز
+            </div>
+            <p className="about-modal-slogan">لعيبز | من فيكم اللعيب؟</p>
           </div>
           <button type="button" className="btn bgh bxs" onClick={onClose} aria-label="إغلاق">
             ✕
@@ -44,8 +47,8 @@ export default function AboutUsModal({ onClose }) {
 
         <div className="about-modal-body">
           <p className="about-lead">
-            نحن منصة ألعاب تفاعلية، سعودية الفكرة والصنع، انطلقت بشغف لإعادة تعريف المتعة والترابط في
-            التجمعات والفعاليات.
+            نحن منصة لعيبز، ألعاب جماعية بنكهة تنافسية، سعودية الفكرة والصنع، انطلقت بشغف لإعادة
+            تعريف المتعة والترابط في التجمعات والفعاليات.
           </p>
 
           <div className="about-highlight" dir="rtl">
@@ -70,16 +73,28 @@ export default function AboutUsModal({ onClose }) {
           </p>
 
           <p className="about-text about-text--muted">
-            باختصار.. لعبة جماعية صُممت تجربتها الممتعة والسلسة لتصنع ذكريات لا تُنسى — تناسب كافة
+            باختصار.. لعبة جماعية صُممت تجربتها الممتعة والسلسة لتصنع ذكريات لا تُنسى — تناسب جميع
             تجمعاتكم:
           </p>
 
           <p className="about-tagline">برمز واحد.. تشتعل اللمة ومرحها يزود</p>
 
-          <div className="about-grid">
+          <h3 className="about-section-title">تناسب جميع تجمعاتكم</h3>
+
+          <div className="about-grid about-grid--audiences">
             {AUDIENCES.map((item) => (
               <div key={item.title} className="about-card">
-                <div className="about-card-icon">{item.icon}</div>
+                <div className="about-card-icon">
+                  {item.icons ? (
+                    <span className="about-card-icons" aria-hidden="true">
+                      {item.icons.map((emoji) => (
+                        <span key={emoji}>{emoji}</span>
+                      ))}
+                    </span>
+                  ) : (
+                    item.icon
+                  )}
+                </div>
                 <div className="about-card-title">{item.title}</div>
                 <div className="about-card-desc">{item.desc}</div>
               </div>

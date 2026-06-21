@@ -8,6 +8,7 @@ import {
   iconsUnlockedForPoints,
 } from './arena.constants';
 import { detectNewAchievements, didTierUpgrade, computeArenaStatDelta, computeEligibleAchievements } from './arenaAchievements';
+import { refreshKnowledgeContributionStats } from './arenaKnowledge';
 import { saveUsedQuestionIds } from '../games/fameeri/fameeriBankProgress';
 import { saveUsedHesbahQuestionIds } from '../games/hesbah/hesbahBankProgress';
 
@@ -227,6 +228,8 @@ function readTypeCount(obj, type) {
 
 export async function syncProfileAchievements(userId, profileLike = null) {
   if (!userId) return [];
+
+  await refreshKnowledgeContributionStats(userId).catch(() => {});
 
   const profileRef = ref(db, `users/${userId}/profile`);
   let profile = profileLike;

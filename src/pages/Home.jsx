@@ -1,6 +1,7 @@
 ﻿import '../styles/hesbah.css';
 import { formatOtherSessionsHint, getAllActiveSessions } from '../shared/gameSessionRegistry';
 import { setLastPlayedGame } from '../question-bank/qbank.helpers';
+import La3ibzBrandMark from '../shared/La3ibzBrandMark';
 
 const GAME_BANK_TYPE = {
   nicknames: 'titles',
@@ -8,7 +9,7 @@ const GAME_BANK_TYPE = {
   hesbah: 'hesbah',
 };
 
-/** ساحة الألعاب — الألعاب + بوابة صوتك */
+/** لعيبز — الألعاب + بوابة صوتك */
 export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
   const activeSessions = getAllActiveSessions();
 
@@ -20,9 +21,7 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
         </div>
       )}
       <div style={{ textAlign: 'center', padding: '18px 0 14px' }}>
-        <div style={{ fontSize: 42, marginBottom: 6 }}>🏟️</div>
-        <div className="ptitle" style={{ fontSize: 24 }}>ساحة الألعاب</div>
-        <div className="psub">ألعاب جماعية تفاعلية للرحلات والاجتماعات والمناسبات</div>
+        <La3ibzBrandMark variant="hero" />
       </div>
 
       <div

@@ -5,7 +5,17 @@ import '../styles/arena-badge.css';
 /**
  * نافذة منبثقة موحّدة — أيقونة الشارة والإنجازات
  */
-export default function ArenaBadgeSheet({ open, onClose, title, subtitle, icon, children, footer, bodyClassName = '' }) {
+export default function ArenaBadgeSheet({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  children,
+  footer,
+  bodyClassName = '',
+  placement = 'bottom',
+}) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -25,16 +35,20 @@ export default function ArenaBadgeSheet({ open, onClose, title, subtitle, icon, 
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="arena-sheet-overlay" role="presentation" onClick={onClose}>
+    <div
+      className={`arena-sheet-overlay${placement === 'center' ? ' arena-sheet-overlay--center' : ''}`}
+      role="presentation"
+      onClick={onClose}
+    >
       <div
-        className="arena-sheet"
+        className={`arena-sheet${placement === 'center' ? ' arena-sheet--center' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="arena-sheet-title"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="arena-sheet__glow" aria-hidden />
-        <div className="arena-sheet__handle" aria-hidden />
+        {placement === 'bottom' ? <div className="arena-sheet__handle" aria-hidden /> : null}
         <header className="arena-sheet__head">
           <div className="arena-sheet__head-text">
             {icon ? <span className="arena-sheet__head-icon">{icon}</span> : null}

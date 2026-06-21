@@ -36,7 +36,7 @@ export default function ArenaBadge({
               {points > 0 ? (
                 <>
                   <span className="arena-badge__sep">·</span>
-                  <span className="arena-badge__pts">{points.toLocaleString('ar-SA')} نقطة</span>
+                  <span className="arena-badge__pts">{Number(points || 0).toLocaleString('en-US')} نقاط</span>
                 </>
               ) : null}
             </div>

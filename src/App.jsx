@@ -31,6 +31,8 @@ import { rewardCurrentPlayerIfRegistered } from './core/arenaRewards';
 import { onArenaCelebration } from './core/arenaEvents';
 import useArenaProfile from './hooks/useArenaProfile';
 import ArenaLevelUpModal from './shared/ArenaLevelUpModal';
+import La3ibzBrandMark from './shared/La3ibzBrandMark';
+import La3ibzBrandIcon from './shared/La3ibzBrandIcon';
 import './styles/arena-badge.css';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
@@ -369,7 +371,7 @@ export default function App() {
   };
 
   const navItems = [
-    { id: 'game', icon: '🏟️', label: 'الألعاب' },
+    { id: 'game', icon: 'brand', label: 'الألعاب' },
     { id: 'voice', icon: '💬', label: 'صوّتك', dot: false },
     ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
     { id: 'pricing', icon: '💎', label: 'الباقات' },
@@ -483,26 +485,11 @@ export default function App() {
         </div>
 
         <div className="hdr-center">
-          <div
-            className="logo"
-            role="presentation"
-            style={{ userSelect: 'none' }}
+          <La3ibzBrandMark
+            variant="header"
             onClick={handleLogoSecretTap}
-          >
-            {contributeOpen
-              ? '📚 بنك المعرفة'
-              : tab === 'voice'
-              ? '💬 صوّتك'
-              : tab === 'game'
-                ? '🏟️ ساحة الألعاب'
-                : tab === 'pricing'
-                    ? '💎 الباقات'
-                    : tab === 'codes'
-                      ? '🎫 الأكواد'
-                      : tab === 'account'
-                        ? '👤 حسابي'
-                        : '🏟️ ساحة الألعاب'}
-          </div>
+            role="presentation"
+          />
         </div>
 
         <div className="hdr-left">
@@ -649,7 +636,13 @@ export default function App() {
       <nav className="bnav">
         {navItems.map(item=>(
           <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} onClick={()=>goToTab(item.id)}>
-            <div className="bnav-icon">{item.icon}</div>
+            <div className="bnav-icon">
+              {item.icon === 'brand' ? (
+                <La3ibzBrandIcon size="nav" alt="لعيبز" />
+              ) : (
+                item.icon
+              )}
+            </div>
             <div className="bnav-label">{item.label}</div>
             {item.dot&&<div className="bnav-dot"/>}
           </button>
