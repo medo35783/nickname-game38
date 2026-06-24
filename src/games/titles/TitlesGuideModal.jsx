@@ -6,7 +6,13 @@ export default function TitlesGuideModal({ onClose }) {
   const [guideRole, setGuideRole] = useState('player');
 
   return (
-    <GameGuideModalShell title="📖 دليل لعبة الألقاب" titleId="titles-guide-title" onClose={onClose}>
+    <GameGuideModalShell
+      title="📖 دليل لعبة الألقاب"
+      titleId="titles-guide-title"
+      game="titles"
+      accentVar="--titles-primary"
+      onClose={onClose}
+    >
       <div className="role-toggle" style={{ marginBottom: 16 }}>
         <button type="button" className={`role-btn ${guideRole === 'player' ? 'active' : ''}`} onClick={() => setGuideRole('player')}>
           🎮 متسابق

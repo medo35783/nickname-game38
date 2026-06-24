@@ -68,7 +68,13 @@ export default function QuickOnboarding({ game, role, onDismiss }) {
   if (!pack) return null;
 
   const themeClass =
-    game === 'hesbah' ? ' hesbah-theme' : game === 'fameeri' || game === 'qumairi' ? ' fameeri-theme' : '';
+    game === 'hesbah'
+      ? ' hesbah-theme'
+      : game === 'fameeri' || game === 'qumairi'
+        ? ' fameeri-theme'
+        : game === 'titles'
+          ? ' titles-theme'
+          : '';
 
   return (
     <div className={`onb-bg${themeClass}`}>

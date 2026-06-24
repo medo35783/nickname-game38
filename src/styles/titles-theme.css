@@ -1,0 +1,206 @@
+/* ═══ الألقاب — هوية من BRAND_PALETTE (عنابي + كحلي) ═══ */
+
+:root,
+[data-theme='light'] {
+  --titles-primary: var(--brand-burgundy-hi);
+  --titles-primary-light: #c04058;
+  --titles-secondary: var(--brand-navy);
+  --titles-accent: var(--brand-blue);
+  --titles-bg-deep: #faf0f2;
+  --titles-bg-mid: #eef3f9;
+  --titles-glow: rgba(150, 36, 56, 0.28);
+  --titles-border: rgba(150, 36, 56, 0.28);
+  --titles-card-bg: rgba(255, 255, 255, 0.92);
+  --titles-muted: #5a7494;
+  --titles-inp-bg: #ffffff;
+  --titles-focus-ring: rgba(150, 36, 56, 0.16);
+  --titles-nav-bg: rgba(250, 240, 242, 0.97);
+  --titles-tag-bg: rgba(150, 36, 56, 0.1);
+  --titles-grid: rgba(150, 36, 56, 0.06);
+}
+
+[data-theme='dark'] {
+  --titles-primary: #e87888;
+  --titles-primary-light: #f08898;
+  --titles-secondary: var(--brand-blue-light);
+  --titles-accent: var(--brand-blue-light);
+  --titles-bg-deep: #0a1628;
+  --titles-bg-mid: #1a1020;
+  --titles-glow: rgba(232, 120, 136, 0.32);
+  --titles-border: rgba(232, 120, 136, 0.3);
+  --titles-card-bg: rgba(18, 42, 74, 0.88);
+  --titles-muted: #8eb4d8;
+  --titles-inp-bg: rgba(12, 24, 40, 0.85);
+  --titles-focus-ring: rgba(232, 120, 136, 0.2);
+  --titles-nav-bg: rgba(10, 22, 40, 0.97);
+  --titles-tag-bg: rgba(232, 120, 136, 0.12);
+  --titles-grid: rgba(232, 120, 136, 0.05);
+}
+
+.titles-theme {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+[data-theme='light'] .titles-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 90% 65% at 50% 0%, rgba(150, 36, 56, 0.12), transparent 55%),
+    radial-gradient(ellipse 75% 50% at 100% 100%, rgba(37, 111, 168, 0.1), transparent 50%),
+    linear-gradient(175deg, var(--titles-bg-deep) 0%, #f4eef0 40%, var(--titles-bg-mid) 100%);
+  pointer-events: none;
+}
+
+[data-theme='light'] .titles-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.45;
+  background-image: radial-gradient(circle at 20% 30%, var(--titles-grid) 0 1px, transparent 2px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+[data-theme='dark'] .titles-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 85% 55% at 50% -10%, rgba(150, 36, 56, 0.18), transparent 50%),
+    radial-gradient(ellipse 65% 45% at 100% 80%, rgba(37, 111, 168, 0.12), transparent 45%),
+    linear-gradient(165deg, var(--titles-bg-deep) 0%, var(--titles-bg-mid) 55%, #0e1f38 100%);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .titles-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(var(--titles-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--titles-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.app--in-titles .stars {
+  display: none;
+}
+
+.app--in-titles .hdr {
+  background: var(--titles-nav-bg);
+  border-bottom-color: var(--titles-border);
+}
+
+.app--in-titles .bnav {
+  background: var(--titles-nav-bg);
+  border-top-color: var(--titles-border);
+}
+
+.app--in-titles .bnav-item.active {
+  color: var(--titles-primary);
+}
+
+.app--in-titles .bnav-item.active .bnav-icon {
+  filter: drop-shadow(0 0 6px var(--titles-glow));
+}
+
+.titles-theme .ptitle {
+  background: linear-gradient(135deg, var(--titles-primary), var(--titles-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='dark'] .titles-theme .ptitle {
+  filter: drop-shadow(0 0 12px var(--titles-glow));
+}
+
+.titles-theme .ctitle {
+  color: var(--titles-primary);
+}
+
+.titles-theme .psub {
+  color: var(--titles-muted);
+}
+
+.titles-theme .room-code-big {
+  color: var(--titles-primary);
+  border: 2px dashed var(--titles-border);
+  background: var(--titles-tag-bg);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.titles-theme .card,
+.titles-theme .card2 {
+  background: var(--titles-card-bg);
+  border-color: var(--titles-border);
+}
+
+.titles-theme .btn.bg {
+  background: linear-gradient(135deg, var(--titles-primary-light), var(--titles-primary));
+  color: #fff;
+}
+
+.titles-theme .btn.bg:hover:not(:disabled) {
+  box-shadow: 0 4px 18px var(--titles-glow);
+}
+
+.titles-theme .btn.bo {
+  color: var(--titles-primary);
+  border-color: var(--titles-primary);
+}
+
+.titles-theme .btn.bo:hover:not(:disabled) {
+  background: var(--titles-tag-bg);
+}
+
+.titles-theme .btn.bgh {
+  color: var(--titles-primary);
+  border-color: var(--titles-border);
+}
+
+.titles-theme .lbl {
+  color: var(--titles-muted);
+}
+
+.titles-theme .inp,
+.titles-theme textarea.inp {
+  background: var(--titles-inp-bg);
+  border-color: var(--titles-border);
+}
+
+.titles-theme .inp:focus,
+.titles-theme textarea.inp:focus {
+  border-color: var(--titles-primary);
+  box-shadow: 0 0 0 3px var(--titles-focus-ring);
+}
+
+.titles-theme .onb-title {
+  color: var(--titles-primary);
+}
+
+.titles-theme .onb-sub {
+  color: var(--titles-muted);
+}
+
+.titles-theme .role-btn.active {
+  border-color: var(--titles-primary);
+  background: var(--titles-tag-bg);
+  color: var(--titles-primary);
+}
+
+.titles-theme .step-num {
+  background: linear-gradient(135deg, var(--titles-primary-light), var(--titles-primary));
+  color: #fff;
+}

@@ -10,7 +10,7 @@ export default function FameeriGuideModal({ onClose }) {
       title="📖 دليل لعبة القميري"
       titleId="fameeri-guide-title"
       onClose={onClose}
-      themeClass="fameeri-theme"
+      game="fameeri"
       accentVar="--fameeri-primary"
     >
       <div className="role-toggle" style={{ marginBottom: 16 }}>

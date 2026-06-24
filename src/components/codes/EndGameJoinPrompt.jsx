@@ -3,14 +3,10 @@ import { shareArenaVictoryImage, downloadArenaVictoryImage } from '../../core/ar
 import {
   SUBSCRIPTION_PACKAGES,
   SUBSCRIPTION_FEATURES,
-  getEffectivePrice,
-  hasActivePromo,
-  promoDiscountPercent,
-  savingsPercent
 } from '../../core/subscriptionPackages';
 import { arenaPointsForRank } from '../../core/arena.constants';
 import ArenaSignupPrompt from '../../shared/ArenaSignupPrompt';
-import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
+import PackagePlanCard from './PackagePlanCard';
 
 /**
  * شاشة بعد انتهاء اللعبة للمتسابقين غير المشتركين — دعوة للاشتراك والباقات.
@@ -34,7 +30,6 @@ import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
  */
 
 const SUB_FEATURES = SUBSCRIPTION_FEATURES;
-const PACKAGES = SUBSCRIPTION_PACKAGES;
 
 function formatTimeDisplay(time) {
   if (time == null || time === '') return '—';
@@ -269,86 +264,24 @@ export default function EndGameJoinPrompt({
           💳 اختر باقتك
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
-          {PACKAGES.map((pkg) => {
-            const promo = hasActivePromo(pkg);
-            const effective = getEffectivePrice(pkg);
-            const save = savingsPercent(pkg.days, effective);
-            const promoPct = promoDiscountPercent(pkg);
-            return (
-              <div
-                key={pkg.id}
-                className={`plan-card ${pkg.planClass}`}
-                style={{
-                  ...pkg.cardStyle,
-                  marginBottom: 0,
-                  transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                }}
-              >
-                <PackagePlanBadges badges={badgesForPackage(pkg)} />
-                <div style={{ textAlign: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 40, lineHeight: 1, display: 'block' }}>{pkg.icon}</span>
-                  <div className="plan-name" style={{ marginTop: 6 }}>
-                    {pkg.durationLabel}
-                  </div>
-                  <div className="pkg-price-row" style={{ marginTop: 4 }}>
-                    {promo && (
-                      <>
-                        <span className="pkg-price-original">{pkg.price}</span>
-                        {promoPct != null && (
-                          <span className="pkg-promo-badge">-{promoPct}%</span>
-                        )}
-                      </>
-                    )}
-                    <span className="pkg-price-num" style={{ fontSize: 28 }}>{effective}</span>
-                    <span className="pkg-price-currency">ريال</span>
-                  </div>
-                  {promo && <div className="pkg-promo-note">عرض مؤقت</div>}
-                  {save != null && save > 0 ? (
-                    <div className="tag tv" style={{ marginTop: 8 }}>
-                      وفر {save}% مقارنة باليومي
-                    </div>
-                  ) : (
-                    <div className="tag tm" style={{ marginTop: 8 }}>
-                      نقطة انطلاق ممتازة
-                    </div>
-                  )}
-                </div>
-                <ul
-                  style={{
-                    margin: '0 0 12px 0',
-                    padding: '0 20px 0 0',
-                    fontSize: 12,
-                    color: 'var(--muted)',
-                    lineHeight: 1.85,
-                    textAlign: 'right'
-                  }}
-                >
-                  {pkg.feats.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
-                <button type="button" className="btn bg" onClick={() => onSubscribe(pkg)}>
-                  🛒 اشترك الآن
-                </button>
-              </div>
-            );
-          })}
+        <div className="pkg-tiers" style={{ marginBottom: 14 }}>
+          {SUBSCRIPTION_PACKAGES.map((pkg) => (
+            <PackagePlanCard
+              key={pkg.id}
+              pkg={pkg}
+              onSubscribe={onSubscribe}
+              ctaLabel="🛒 اشترك الآن"
+            />
+          ))}
         </div>
 
-        <div
-          className="card2"
-          style={{
-            textAlign: 'center',
-            marginBottom: 14,
-            border: '1px solid rgba(46, 204, 113, 0.22)',
-            background: 'rgba(46, 204, 113, 0.06)'
-          }}
-        >
-          <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>دفع آمن ومشفّر</div>
-          <div className="psub" style={{ marginBottom: 0, fontSize: 12 }}>
-            لا نخزّن بيانات بطاقتك على خوادمنا. المعاملة تتم عبر بوابة دفع معتمدة — تفعيل فوري بعد الإتمام.
+        <div className="pkg-trust" style={{ marginBottom: 14 }}>
+          <span className="pkg-trust__icon" aria-hidden="true">🔒</span>
+          <div>
+            <div className="pkg-trust__title">دفع آمن ومشفّر</div>
+            <p className="pkg-trust__sub">
+              لا نخزّن بيانات بطاقتك. المعاملة عبر بوابة دفع معتمدة — تفعيل فوري بعد الإتمام.
+            </p>
           </div>
         </div>
 

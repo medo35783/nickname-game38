@@ -59,6 +59,7 @@ import {
   readGuestDeviceLock,
   SEAT_ERRORS,
 } from '../../core/gameSeat';
+import '../../styles/titles-theme.css';
 
 const TitlesGameInner = forwardRef(function TitlesGameInner(
   { notify, setTab, setSelectedGame, onHeaderMeta, canCreateRoom, onRequestActivation, onGameEnd },
@@ -2563,10 +2564,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
               🎮 انضمام برمز الغرفة
             </button>
           </div>
-          <button type="button" className="btn bgh" style={{ marginTop: 4 }} onClick={() => setModal({ type: 'guide' })}>
+          <button type="button" className="btn bgh game-guide-open-btn" style={{ marginTop: 4 }} onClick={() => setModal({ type: 'guide' })}>
             📖 كيف تلعب؟ — دليل للمشرف والمتسابق
           </button>
-          <GameQuickRules rules={TITLES_QUICK_RULES} />
+          <GameQuickRules rules={TITLES_QUICK_RULES} game="titles" />
         </div>
       );
     }
@@ -2805,7 +2806,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   })();
 
   return (
-    <>
+    <div className="titles-theme">
       <GameExitSheet
         open={exitSheetOpen}
         game="titles"
@@ -2820,7 +2821,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       />
       {renderOverlays()}
       {mainEl}
-    </>
+    </div>
   );});
 
 const TitlesGame = forwardRef(function TitlesGame(

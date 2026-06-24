@@ -11,7 +11,7 @@ export default function HesbahGuideModal({ onClose }) {
       title="📖 دليل لعبة حَسْبة"
       titleId="hesbah-guide-title"
       onClose={onClose}
-      themeClass="hesbah-theme"
+      game="hesbah"
       accentVar="--hesbah-accent"
     >
       <div className="role-toggle" style={{ marginBottom: 16 }}>

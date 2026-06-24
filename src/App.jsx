@@ -1,7 +1,8 @@
 ﻿import { useState, useRef, useEffect, useCallback } from "react";
 import { onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { ARENA_BACK_LABEL, VOICE_BACK_LABEL, ACCOUNT_BACK_LABEL } from './core/constants';
+import { ARENA_BACK_LABEL, VOICE_BACK_LABEL, ACCOUNT_BACK_LABEL, PLATFORM_NAME } from './core/constants';
+import { GAME_ROUTE_THEMES } from './core/brandTheme';
 import Packages from './pages/Packages';
 import Home from './pages/Home';
 import VoicePage from './pages/VoicePage';
@@ -14,6 +15,7 @@ import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
 import AccountPage from './components/account/AccountPage';
 import { renderPlatformGame, handlePlatformGameBack } from './games/platformGameRouter';
 import './styles/base.css';
+import './styles/packages.css';
 import './styles/game-ui.css';
 import Stars from './shared/Stars';
 import Notif from './shared/Notif';
@@ -33,6 +35,7 @@ import useArenaProfile from './hooks/useArenaProfile';
 import ArenaLevelUpModal from './shared/ArenaLevelUpModal';
 import La3ibzBrandMark from './shared/La3ibzBrandMark';
 import La3ibzBrandIcon from './shared/La3ibzBrandIcon';
+import GameTopNav from './shared/GameTopNav';
 import './styles/arena-badge.css';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
@@ -330,18 +333,17 @@ export default function App() {
   /** التذييل أثناء التصفح فقط — يختفي داخل غرف الألعاب */
   const showSiteFooter = !selectedGame;
 
-  /** زر «رجوع» في الهيدر — الألقاب والقميري يديران الخروج داخلياً فقط */
+  /** زر «رجوع» في الهيدر — الألقاب والقميري وحَسْبة يديران الخروج داخلياً فقط */
   const hidePlatformBack =
     selectedGame === 'nicknames' ||
     selectedGame === 'qumairi' ||
-    (selectedGame === 'hesbah' && hesbahMeta.inRoom);
+    selectedGame === 'hesbah';
 
+  /** زر الرجوع في الهيدر — داخل تبويب الألعاب فقط؛ التبويبات الرئيسية (صوتك، الأكواد، الباقات، حسابي) بدون رجوع بالهيدر */
   const showHeaderBack =
-    contributeOpen
-    || (
-      (tab !== 'game' || selectedGame || (gameScreen !== 'home' && tab === 'game'))
-      && !hidePlatformBack
-    );
+    tab === 'game' &&
+    (selectedGame || gameScreen !== 'home') &&
+    !hidePlatformBack;
 
   const renderGame = () => {
     const mounted = renderPlatformGame(selectedGame, {
@@ -435,8 +437,21 @@ export default function App() {
     );
   }
 
+  const activeGameTheme = selectedGame ? GAME_ROUTE_THEMES[selectedGame]?.id : null;
+  const appGameClass =
+    selectedGame === 'hesbah'
+      ? ' app--in-hesbah'
+      : selectedGame === 'qumairi'
+        ? ' app--in-fameeri'
+        : selectedGame === 'nicknames'
+          ? ' app--in-titles'
+          : '';
+
   return(
-    <div className={`app${showSiteFooter ? ' app--with-footer' : ''}${selectedGame === 'hesbah' ? ' app--in-hesbah' : ''}`}>
+    <div
+      className={`app${showSiteFooter ? ' app--with-footer' : ''}${appGameClass}`}
+      data-game={activeGameTheme || undefined}
+    >
       <Stars/>
       {notifs.map(n=><Notif key={n.id} msg={n}/>)}
 
@@ -498,23 +513,11 @@ export default function App() {
               className="btn bgh bsm"
               style={{ width: 'auto', padding: '6px 12px', fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border-subtle)' }}
               onClick={() => {
-                if (contributeOpen) {
-                  closeContribute();
-                  return;
-                }
-                if (tab !== 'game') {
-                  goToTab('game');
-                  return;
-                }
-                if (
-                  handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, hesbahRef }, {
-                    setSelectedGame,
-                    setGameScreen,
-                    gameScreen,
-                  })
-                ) {
-                  return;
-                }
+                handlePlatformGameBack(selectedGame, { fameeriRef, titlesRef, hesbahRef }, {
+                  setSelectedGame,
+                  setGameScreen,
+                  gameScreen,
+                });
               }}
             >
               ← رجوع
@@ -570,6 +573,7 @@ export default function App() {
         {!showCodeActivation && !contributeOpen && tab === 'voice' && (
           <VoicePage
             notify={notify}
+            onBack={() => goToTab('game')}
             onOpenContribute={() => openContribute('voice')}
             onGoAccount={() => openAccountTab('register')}
             isGuest={isGuest}
@@ -581,6 +585,7 @@ export default function App() {
         {!showCodeActivation && !contributeOpen && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
         {!showCodeActivation && !contributeOpen && tab === 'codes' && isAdmin && (
           <div className="scr">
+            <GameTopNav onBack={() => goToTab('game')} variant="arena" />
             <div className="tabs">
               <button
                 type="button"
@@ -609,6 +614,7 @@ export default function App() {
         {!showCodeActivation && !contributeOpen && tab === 'account' && (
           <AccountPage
             notify={notify}
+            onBack={() => goToTab('game')}
             activeCode={activeCode}
             isCodeValid={isCodeValid}
             isAdmin={isAdmin}
@@ -624,6 +630,7 @@ export default function App() {
         )}
         {!showCodeActivation && !contributeOpen && tab==='pricing'&&(
           <Packages
+            onBack={() => goToTab('game')}
             onSubscribe={(pkg) => {
               notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${getEffectivePrice(pkg)} ريال)`, 'info');
             }}
@@ -638,7 +645,7 @@ export default function App() {
           <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} onClick={()=>goToTab(item.id)}>
             <div className="bnav-icon">
               {item.icon === 'brand' ? (
-                <La3ibzBrandIcon size="nav" alt="لعيبز" />
+                <La3ibzBrandIcon size="nav" alt={PLATFORM_NAME} />
               ) : (
                 item.icon
               )}

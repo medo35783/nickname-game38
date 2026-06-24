@@ -3,61 +3,61 @@
 /* ── متغيرات الهوية: نهاري vs ليلي ── */
 :root,
 [data-theme='light'] {
-  --hesbah-accent: #e65100;
-  --hesbah-accent-light: #ff8f00;
-  --hesbah-secondary: #1565c0;
-  --hesbah-secondary-light: #42a5f5;
-  --hesbah-gold: #f9a825;
-  --hesbah-bg-deep: #fff8f0;
-  --hesbah-bg-mid: #e8f4fc;
-  --hesbah-glow: rgba(230, 81, 0, 0.35);
-  --hesbah-border: rgba(21, 101, 192, 0.28);
+  --hesbah-accent: var(--brand-blue);
+  --hesbah-accent-light: var(--brand-blue-hi);
+  --hesbah-secondary: var(--brand-orange);
+  --hesbah-secondary-light: #e09220;
+  --hesbah-gold: var(--brand-orange);
+  --hesbah-bg-deep: #eef3f9;
+  --hesbah-bg-mid: rgba(37, 111, 168, 0.08);
+  --hesbah-glow: rgba(37, 111, 168, 0.28);
+  --hesbah-border: rgba(37, 111, 168, 0.28);
   --hesbah-card-bg: rgba(255, 255, 255, 0.92);
-  --hesbah-muted: #5d4037;
+  --hesbah-muted: #5a7494;
   --hesbah-inp-bg: #ffffff;
-  --hesbah-focus-ring: rgba(230, 81, 0, 0.18);
-  --hesbah-nav-bg: rgba(255, 248, 240, 0.97);
-  --hesbah-score-bg: rgba(21, 101, 192, 0.06);
-  --hesbah-score-text: #1a237e;
-  --hesbah-grid: rgba(230, 81, 0, 0.07);
+  --hesbah-focus-ring: rgba(37, 111, 168, 0.18);
+  --hesbah-nav-bg: rgba(238, 243, 249, 0.97);
+  --hesbah-score-bg: rgba(37, 111, 168, 0.06);
+  --hesbah-score-text: var(--brand-navy);
+  --hesbah-grid: rgba(37, 111, 168, 0.07);
   --hesbah-hud-bg: rgba(255, 255, 255, 0.95);
 }
 
 [data-theme='dark'] {
-  --hesbah-accent: #ffab00;
-  --hesbah-accent-light: #ffd54f;
-  --hesbah-secondary: #00e5ff;
-  --hesbah-secondary-light: #84ffff;
-  --hesbah-gold: #ffe082;
-  --hesbah-bg-deep: #030810;
-  --hesbah-bg-mid: #0c1a32;
-  --hesbah-glow: rgba(255, 171, 0, 0.4);
-  --hesbah-border: rgba(0, 229, 255, 0.32);
-  --hesbah-card-bg: rgba(8, 20, 42, 0.9);
-  --hesbah-muted: #90caf9;
-  --hesbah-inp-bg: rgba(6, 14, 30, 0.85);
-  --hesbah-focus-ring: rgba(0, 229, 255, 0.2);
-  --hesbah-nav-bg: rgba(3, 8, 16, 0.97);
-  --hesbah-score-bg: rgba(0, 229, 255, 0.08);
-  --hesbah-score-text: #e3f2fd;
-  --hesbah-grid: rgba(0, 229, 255, 0.06);
-  --hesbah-hud-bg: rgba(8, 20, 42, 0.94);
+  --hesbah-accent: var(--brand-blue-light);
+  --hesbah-accent-light: #9ec8f0;
+  --hesbah-secondary: var(--brand-orange-light);
+  --hesbah-secondary-light: #ffc860;
+  --hesbah-gold: var(--brand-orange-light);
+  --hesbah-bg-deep: #0a1628;
+  --hesbah-bg-mid: #122a4a;
+  --hesbah-glow: rgba(110, 184, 240, 0.35);
+  --hesbah-border: rgba(110, 184, 240, 0.32);
+  --hesbah-card-bg: rgba(18, 42, 74, 0.9);
+  --hesbah-muted: #8eb4d8;
+  --hesbah-inp-bg: rgba(12, 24, 40, 0.85);
+  --hesbah-focus-ring: rgba(110, 184, 240, 0.2);
+  --hesbah-nav-bg: rgba(10, 22, 40, 0.97);
+  --hesbah-score-bg: rgba(37, 111, 168, 0.1);
+  --hesbah-score-text: #e8f0f8;
+  --hesbah-grid: rgba(110, 184, 240, 0.06);
+  --hesbah-hud-bg: rgba(18, 42, 74, 0.94);
 }
 
-/* بطاقة الساحة */
+/* بطاقة الساحة — ألوان من BRAND_PALETTE (أزرق + برتقالي) */
 .home-game-card--hesbah {
-  background: linear-gradient(135deg, var(--hesbah-bg-deep), var(--hesbah-bg-mid));
-  border: 2px solid var(--hesbah-accent);
+  background: linear-gradient(135deg, rgba(18, 42, 74, 0.1), rgba(37, 111, 168, 0.12));
+  border: 2px solid rgba(37, 111, 168, 0.35);
   border-radius: 16px;
   padding: 18px 16px;
   margin-bottom: 12px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.25s;
-  box-shadow: 0 6px 20px var(--hesbah-glow);
+  box-shadow: 0 6px 20px rgba(37, 111, 168, 0.18);
 }
 
 [data-theme='light'] .home-game-card--hesbah {
-  box-shadow: 0 6px 18px rgba(230, 81, 0, 0.2);
+  box-shadow: 0 6px 18px rgba(37, 111, 168, 0.16);
 }
 
 .home-game-card--hesbah:active {
@@ -70,7 +70,14 @@
   font-weight: 900;
   letter-spacing: 0.5px;
   line-height: 1.2;
-  background: linear-gradient(135deg, var(--hesbah-accent), var(--hesbah-secondary));
+  background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-hi) 70%, var(--brand-orange) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme='dark'] .home-game-card--hesbah .home-game-card__title {
+  background: linear-gradient(135deg, var(--brand-blue-light) 0%, #9ec8f0 55%, var(--brand-orange-light) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -78,20 +85,36 @@
 
 .home-game-card--hesbah .home-game-card__sub {
   font-size: 12px;
-  color: var(--hesbah-muted);
+  color: var(--muted);
   margin-top: 4px;
   line-height: 1.6;
 }
 
 .home-game-card--hesbah .home-game-card__arrow {
   font-size: 20px;
-  color: var(--hesbah-accent);
+  color: var(--brand-blue);
+}
+
+[data-theme='dark'] .home-game-card--hesbah .home-game-card__arrow {
+  color: var(--brand-blue-light);
 }
 
 .home-game-card--hesbah .tag {
-  background: var(--hesbah-score-bg);
-  color: var(--hesbah-secondary);
-  border: 1px solid var(--hesbah-border);
+  background: rgba(37, 111, 168, 0.1);
+  color: var(--brand-blue);
+  border: 1px solid rgba(37, 111, 168, 0.22);
+}
+
+[data-theme='dark'] .home-game-card--hesbah {
+  background: linear-gradient(135deg, rgba(18, 42, 74, 0.35), rgba(37, 111, 168, 0.2));
+  border-color: rgba(110, 184, 240, 0.35);
+  box-shadow: 0 6px 20px rgba(37, 111, 168, 0.22);
+}
+
+[data-theme='dark'] .home-game-card--hesbah .tag {
+  background: rgba(110, 184, 240, 0.12);
+  color: var(--brand-blue-light);
+  border: 1px solid rgba(110, 184, 240, 0.28);
 }
 
 .app--in-hesbah .stars {
@@ -131,9 +154,9 @@
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(ellipse 100% 70% at 50% 0%, rgba(255, 183, 77, 0.45), transparent 55%),
-    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(66, 165, 245, 0.25), transparent 50%),
-    linear-gradient(175deg, #fff8f0 0%, #ffe0b2 35%, #e3f2fd 100%);
+    radial-gradient(ellipse 100% 70% at 50% 0%, rgba(37, 111, 168, 0.2), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(201, 127, 26, 0.12), transparent 50%),
+    linear-gradient(175deg, var(--hesbah-bg-deep) 0%, rgba(37, 111, 168, 0.06) 40%, #f4f8fc 100%);
   pointer-events: none;
 }
 
@@ -157,10 +180,10 @@
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(0, 229, 255, 0.2), transparent 50%),
-    radial-gradient(ellipse 70% 50% at 0% 100%, rgba(255, 171, 0, 0.15), transparent 45%),
-    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(0, 100, 180, 0.2), transparent 40%),
-    linear-gradient(165deg, #030810 0%, #0c1a32 50%, #061018 100%);
+    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(37, 111, 168, 0.22), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 0% 100%, rgba(201, 127, 26, 0.1), transparent 45%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(18, 42, 74, 0.35), transparent 40%),
+    linear-gradient(165deg, var(--hesbah-bg-deep) 0%, var(--hesbah-bg-mid) 50%, #0e1f38 100%);
   pointer-events: none;
 }
 
@@ -1127,7 +1150,7 @@
   font-size: 11px;
   font-weight: 800;
   color: var(--hesbah-accent-light);
-  background: rgba(230, 81, 0, 0.14);
+  background: rgba(201, 127, 26, 0.14);
   border: 1px solid var(--hesbah-border);
 }
 
@@ -1575,7 +1598,7 @@
 }
 
 .hesbah-exit-trigger--nav:hover {
-  border-color: rgba(230, 81, 0, 0.45);
+  border-color: rgba(201, 127, 26, 0.45);
   color: var(--hesbah-accent);
   background: #fff9f2;
 }
@@ -1608,8 +1631,8 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: linear-gradient(145deg, rgba(230, 81, 0, 0.18), rgba(249, 168, 37, 0.12));
-  border: 1px solid rgba(230, 81, 0, 0.35);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.18), rgba(249, 168, 37, 0.12));
+  border: 1px solid rgba(201, 127, 26, 0.35);
   color: var(--hesbah-accent);
   font-size: 20px;
   font-weight: 900;
@@ -1633,7 +1656,7 @@
 .hesbah-exit-trigger:hover {
   color: var(--text);
   border-color: var(--hesbah-accent);
-  background: rgba(230, 81, 0, 0.06);
+  background: rgba(201, 127, 26, 0.06);
 }
 
 .hesbah-exit-trigger--bar:hover {
@@ -2486,7 +2509,7 @@
   padding: 14px 12px;
   letter-spacing: 0.02em;
   border: 2px solid var(--hesbah-gold);
-  box-shadow: 0 0 20px var(--hesbah-glow), 0 4px 0 rgba(230, 81, 0, 0.35);
+  box-shadow: 0 0 20px var(--hesbah-glow), 0 4px 0 rgba(201, 127, 26, 0.35);
   animation: hesbahStartBtnShake 2.2s ease-in-out infinite;
 }
 

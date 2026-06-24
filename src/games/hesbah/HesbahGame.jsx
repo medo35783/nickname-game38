@@ -1362,9 +1362,6 @@ const HesbahGame = forwardRef(function HesbahGame(
     if (sessionGate === 'checking') {
       return <GameSessionChecking emoji="🎯" />;
     }
-    if (showGuide) {
-      return <HesbahGuideModal onClose={() => setShowGuide(false)} />;
-    }
     if (showOnboarding) {
       return (
         <QuickOnboarding
@@ -1409,10 +1406,10 @@ const HesbahGame = forwardRef(function HesbahGame(
             <button type="button" className="btn bo mt2" onClick={() => setShowOnboarding('player')}>
               🎮 انضمام برمز الغرفة
             </button>
-            <button type="button" className="btn bgh mt2" onClick={() => setShowGuide(true)}>
+            <button type="button" className="btn bgh mt2 game-guide-open-btn" onClick={() => setShowGuide(true)}>
               📖 كيف تلعب؟ — دليل المشرف والمتسابق
             </button>
-            <GameQuickRules rules={HESBAH_QUICK_RULES} />
+            <GameQuickRules rules={HESBAH_QUICK_RULES} game="hesbah" />
           </div>
         </div>
       );
@@ -1722,6 +1719,7 @@ const HesbahGame = forwardRef(function HesbahGame(
         onArena={() => void withdrawToArena()}
         onClose={() => setExitSheetOpen(false)}
       />
+      {showGuide && <HesbahGuideModal onClose={() => setShowGuide(false)} />}
     </>
   );
 });

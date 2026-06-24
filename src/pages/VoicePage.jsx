@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SUPPORT_EMAIL, PLATFORM_NAME } from '../core/constants';
 import ArenaHallOfFame from '../shared/ArenaHallOfFame';
 import KnowledgeBankSpotlight from '../shared/KnowledgeBankSpotlight';
+import GameTopNav from '../shared/GameTopNav';
 import '../styles/voice-hub.css';
 import '../styles/knowledge-chest.css';
 import '../styles/arena-badge.css';
@@ -78,6 +79,7 @@ export default function VoicePage({
   notify,
   onOpenContribute,
   onGoAccount,
+  onBack,
   isGuest = true,
   bankTotal = null,
   initialPortal = null,
@@ -113,6 +115,7 @@ export default function VoicePage({
 
   return (
     <div className="scr voice-hub">
+      {onBack ? <GameTopNav onBack={onBack} variant="arena" /> : null}
       <header className="voice-hub__hero">
         <div className="voice-hub__orbs" aria-hidden>
           <span className="voice-hub__orb voice-hub__orb--1" />

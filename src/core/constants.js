@@ -1,19 +1,21 @@
+export { BRAND_PALETTE, GAME_THEMES, GAME_ROUTE_THEMES } from './brandTheme';
+
 export const COLORS = {
-  gold: '#f0c040', red: '#e63950', green: '#2ecc71',
-  blue: '#4fa3e0', purple: '#9b59b6', card: '#0f0f22',
-  card2: '#151530', border: 'rgba(240,192,64,.18)',
-  text: '#e8e0ff', muted: '#7a74a0', bg: '#07071a',
+  gold: '#c97f1a', red: '#b82538', green: '#248f55',
+  blue: '#256fa8', purple: '#962438', card: '#122a4a',
+  card2: '#1a3860', border: 'rgba(37,111,168,.22)',
+  text: '#c8d8ea', muted: '#7a94b0', bg: '#0a1628',
 };
 
 export const AV_COLORS = [
-  'linear-gradient(135deg,#f0c040,#d4920a)',
-  'linear-gradient(135deg,#e63950,#a02020)',
-  'linear-gradient(135deg,#2ecc71,#1a8a50)',
-  'linear-gradient(135deg,#4fa3e0,#1e6fb0)',
-  'linear-gradient(135deg,#9b59b6,#6c3480)',
-  'linear-gradient(135deg,#e67e22,#b85a00)',
-  'linear-gradient(135deg,#1abc9c,#0e8c6e)',
-  'linear-gradient(135deg,#e91e8c,#a0105a)',
+  'linear-gradient(135deg,#962438,#7a1e30)',
+  'linear-gradient(135deg,#248f55,#1a6b40)',
+  'linear-gradient(135deg,#256fa8,#1a3860)',
+  'linear-gradient(135deg,#c97f1a,#9a6010)',
+  'linear-gradient(135deg,#b82538,#7a1e30)',
+  'linear-gradient(135deg,#1a3860,#122a4a)',
+  'linear-gradient(135deg,#2faa68,#248f55)',
+  'linear-gradient(135deg,#4a9fd4,#256fa8)',
 ];
 
 export const Q_TREES = ['العرعر','سدرة','برسوبس','طلحة','كينة','أثلة','سمر','العوسج','غضاة','رمثة','الغاف'];
@@ -32,13 +34,20 @@ export const SUPPORT_EMAIL = 'nicknameGame.support@gmail.com';
 export const SUPPORT_WHATSAPP = '0539999010';
 export const SUPPORT_WHATSAPP_URL = 'https://wa.me/966539999010';
 
-/** هوية المنصة — لعيبز / LA3IBZ */
-export const PLATFORM_NAME = 'لعيبز';
-export const PLATFORM_NAME_EN = 'LA3IBZ';
-export const PLATFORM_TAGLINE = 'لعيبز | جَوّك، جمعتك، وتحديك';
-export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=4';
-export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=4';
-export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=4';
+/** هوية المنصة — لعيب زون / La3ib Zone */
+export const PLATFORM_NAME = 'لعيب زون';
+export const PLATFORM_NAME_EN = 'La3ib Zone';
+export const PLATFORM_TAGLINE = 'لعيب زون | جَوّك، جمعتك، وتحديك';
+export const PLATFORM_SLOGAN = 'جَوّك، جمعتك، وتحديك';
+
+export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=15';
+export const BRAND_ICON_FOOTER_SRC = '/brand/la3ibz-icon-footer.png?v=15';
+export const BRAND_THREE_SRC = '/brand/la3ibz-three-mark.png?v=14';
+export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=14';
+export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=14';
+export const BRAND_LOGO_VERTICAL_SRC = '/brand/la3ibz-logo-vertical.png?v=14';
+export const BRAND_LOGO_HEADER_SRC = '/brand/la3ibz-logo-header.png?v=14';
+export const BRAND_WORDMARK_EN_SRC = '/brand/la3ibz-wordmark-en.png?v=14';
 
 /** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
 export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';

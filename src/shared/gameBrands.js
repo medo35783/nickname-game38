@@ -1,8 +1,19 @@
+import { GAME_THEMES } from '../core/brandTheme';
+
 /** هوية كل لعبة — للخروج والتنقل الموحّد */
 export const GAME_BRANDS = {
-  titles: { id: 'titles', emoji: '🎭', name: 'الألقاب', storageKeys: ['ng_session', 'ng_admin_session'] },
-  fameeri: { id: 'fameeri', emoji: '🦅', name: 'القميري', storageKeys: ['ng_qumairi'] },
-  hesbah: { id: 'hesbah', emoji: '🎯', name: 'حَسْبة', storageKeys: ['ng_hesbah'] },
+  titles: {
+    ...GAME_THEMES.titles,
+    storageKeys: ['ng_session', 'ng_admin_session'],
+  },
+  fameeri: {
+    ...GAME_THEMES.fameeri,
+    storageKeys: ['ng_qumairi'],
+  },
+  hesbah: {
+    ...GAME_THEMES.hesbah,
+    storageKeys: ['ng_hesbah'],
+  },
 };
 
 export function getGameBrand(game) {

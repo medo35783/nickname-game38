@@ -1480,10 +1480,6 @@ const FameeriGame = forwardRef(function FameeriGame(
       );
     }
 
-    if (showGuide) {
-      return <FameeriGuideModal onClose={() => setShowGuide(false)} />;
-    }
-
     if (sessionGate === 'checking') {
       return <GameSessionChecking emoji="🦅" />;
     }
@@ -1519,10 +1515,10 @@ const FameeriGame = forwardRef(function FameeriGame(
             <button type="button" className="btn bo" onClick={handlePlayerEntry}>🎮 انضمام كمجموعة برمز الغرفة</button>
             <button type="button" className="btn bgh" onClick={() => { setQJoinInput(''); setQJoinErr(''); setGameScreen('qumairi_spectator_join'); }}>📺 شاشة عرض (بروجكتر)</button>
           </div>
-          <button type="button" className="btn bgh" style={{ marginTop: 4 }} onClick={() => setShowGuide(true)}>
+          <button type="button" className="btn bgh game-guide-open-btn" style={{ marginTop: 4 }} onClick={() => setShowGuide(true)}>
             📖 كيف تلعب؟ — دليل المشرف والمجموعة
           </button>
-          <GameQuickRules rules={FAMEERI_QUICK_RULES} />
+          <GameQuickRules rules={FAMEERI_QUICK_RULES} game="fameeri" />
         </div>
       );
     }
@@ -1776,6 +1772,7 @@ const FameeriGame = forwardRef(function FameeriGame(
         onArena={withdrawToArena}
         onClose={() => setExitSheetOpen(false)}
       />
+      {showGuide && <FameeriGuideModal onClose={() => setShowGuide(false)} />}
       {renderMain()}
     </div>
   );

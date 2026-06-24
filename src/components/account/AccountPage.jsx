@@ -20,6 +20,7 @@ import AccountSubscriptionPanel from '../../shared/AccountSubscriptionPanel';
 import AccountStatsPanel from '../../shared/AccountStatsPanel';
 import ArenaBadgeSheet from '../../shared/ArenaBadgeSheet';
 import ArenaHallOfFame from '../../shared/ArenaHallOfFame';
+import GameTopNav from '../../shared/GameTopNav';
 import useArenaProfile from '../../hooks/useArenaProfile';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
 import { ARENA_ACHIEVEMENT_LIST } from '../../core/arenaAchievements';
@@ -58,6 +59,7 @@ export default function AccountPage({
   onActivateCode,
   onGoPricing,
   onOpenContribute,
+  onBack,
   theme = 'dark',
   followSystem = true,
   onSetTheme,
@@ -222,6 +224,7 @@ export default function AccountPage({
 
   return (
     <div className="scr account-page" style={{ paddingBottom: 28 }}>
+      {onBack ? <GameTopNav onBack={onBack} variant="arena" /> : null}
       <div className="account-page__head">
         <div className="ptitle" style={{ fontSize: 20, marginBottom: 4 }}>
           👤 حسابي

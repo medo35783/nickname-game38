@@ -1,28 +1,23 @@
-import { SUPPORT_EMAIL } from '../core/constants';
-import {
-  SUBSCRIPTION_PACKAGES,
-  SUBSCRIPTION_FEATURES,
-  getEffectivePrice,
-  hasActivePromo,
-  promoDiscountPercent,
-  savingsPercent
-} from '../core/subscriptionPackages';
-import PackagePlanBadges, { badgesForPackage } from '../components/codes/PackagePlanBadges';
+import { SUPPORT_EMAIL, PLATFORM_NAME } from '../core/constants';
+import GameTopNav from '../shared/GameTopNav';
+import { SUBSCRIPTION_PACKAGES, SUBSCRIPTION_FEATURES, getEffectivePrice } from '../core/subscriptionPackages';
+import PackagePlanCard from '../components/codes/PackagePlanCard';
 
 /**
  * @param {object} props
  * @param {(pkg: import('../core/subscriptionPackages').SubscriptionPackage) => void} [props.onSubscribe]
+ * @param {() => void} [props.onBack]
  */
-export default function Packages({ onSubscribe }) {
+export default function Packages({ onSubscribe, onBack }) {
   const handleSubscribe = (pkg) => {
     if (onSubscribe) {
       onSubscribe(pkg);
       return;
     }
-    const subject = encodeURIComponent(`اشتراك ${pkg.durationLabel} — لعبة الألقاب`);
+    const subject = encodeURIComponent(`اشتراك ${pkg.name} — ${PLATFORM_NAME}`);
     const price = getEffectivePrice(pkg);
     const body = encodeURIComponent(
-      `أرغب بالاشتراك في باقة ${pkg.durationLabel} (${price} ريال).\n\nالاسم:\nرقم الجوال:`
+      `أرغب بالاشتراك في باقة ${pkg.name} (${pkg.durationSub}) (${price} ريال).\n\nالاسم:\nرقم الجوال:`
     );
     window.open(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`, '_blank');
   };
@@ -33,103 +28,66 @@ export default function Packages({ onSubscribe }) {
 
   return (
     <div className="scr packages-scr">
-      <div className="ptitle">💎 باقات الاشتراك</div>
-      <p className="psub" style={{ marginBottom: 14 }}>
-        اشترِ بالأيام — بدون التزام شهري. كل الباقات تشمل نفس المميزات.
-      </p>
+      {onBack ? <GameTopNav onBack={onBack} variant="arena" /> : null}
 
-      <div className="pkg-launch-banner card ann ag">
-        <div className="pkg-launch-icon">🎉</div>
-        <div className="pkg-launch-title">أسعار إطلاق ترحيبية</div>
-        <p className="pkg-launch-sub">
-          تسعير تجريبي للمستخدمين الأوائل — لفترة محدودة وقد يُحدَّث لاحقاً دون إشعار مسبق.
+      <header className="pkg-hero">
+        <p className="pkg-hero__eyebrow">وصول كامل للمنصة</p>
+        <h1 className="pkg-hero__title">باقات الاشتراك</h1>
+        <p className="pkg-hero__sub">
+          اشترِ بالأيام — بدون التزام. المزايا واحدة؛ اختر المدة التي تناسبك.
         </p>
-        <span className="tag tv pkg-launch-tag">عرض المؤسسين</span>
-      </div>
+      </header>
 
-      <div className="card2 pkg-features-block">
+      <div className="pkg-includes">
         {SUBSCRIPTION_FEATURES.map((line) => (
-          <div key={line} className="pkg-feature-line">
-            {line}
-          </div>
+          <span key={line} className="pkg-include-chip">
+            {line.replace(/^✅\s*/, '')}
+          </span>
         ))}
       </div>
 
-      <div className="ctitle" style={{ marginBottom: 10, justifyContent: 'center' }}>
-        اختر مدة الاشتراك
-      </div>
-
-      <div className="pkg-cards-col">
-        {SUBSCRIPTION_PACKAGES.map((pkg) => {
-          const promo = hasActivePromo(pkg);
-          const effective = getEffectivePrice(pkg);
-          const save = savingsPercent(pkg.days, effective);
-          const perDay = (effective / pkg.days).toFixed(1);
-          const promoPct = promoDiscountPercent(pkg);
-
-          return (
-            <div
-              key={pkg.id}
-              className={`plan-card ${pkg.planClass} pkg-plan-card`}
-              style={pkg.cardStyle}
-            >
-              <PackagePlanBadges badges={badgesForPackage(pkg)} />
-
-              <div className="pkg-plan-head">
-                <span className="pkg-plan-icon">{pkg.icon}</span>
-                <div className="plan-name">{pkg.durationLabel}</div>
-                <div className="pkg-days-pill">{pkg.days} {pkg.days === 1 ? 'يوم' : 'أيام'}</div>
-                <div className="pkg-price-row">
-                  {promo && (
-                    <>
-                      <span className="pkg-price-original">{pkg.price}</span>
-                      {promoPct != null && (
-                        <span className="pkg-promo-badge">-{promoPct}%</span>
-                      )}
-                    </>
-                  )}
-                  <span className="pkg-price-num">{effective}</span>
-                  <span className="pkg-price-currency">ريال</span>
-                </div>
-                {promo && <div className="pkg-promo-note">عرض مؤقت — لفترة محدودة</div>}
-                <div className="pkg-per-day">≈ {perDay} ريال / يوم</div>
-                {save != null && save > 0 ? (
-                  <div className="tag tv pkg-save-tag">وفر {save}% مقارنة باليومي</div>
-                ) : (
-                  <div className="tag tm pkg-save-tag">بداية ممتازة للتجربة</div>
-                )}
-              </div>
-
-              <ul className="pkg-feat-list">
-                {pkg.feats.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-
-              <button type="button" className="btn bg" onClick={() => handleSubscribe(pkg)}>
-                🛒 اشترك — {effective} ريال
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="card pkg-trust-card">
-        <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
-        <div className="pkg-trust-title">دفع آمن وتفعيل فوري</div>
-        <p className="psub" style={{ marginBottom: 0, fontSize: 12 }}>
-          لا نخزّن بيانات بطاقتك. التفعيل يتم عبر كود اشتراك بعد إتمام الدفع.
-        </p>
-      </div>
-
-      <div className="card2 pkg-code-hint" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>
-          لديك كود اشتراك؟
+      <div className="pkg-offer-banner" role="note">
+        <div className="pkg-offer-banner__glow" aria-hidden="true" />
+        <div className="pkg-offer-banner__main">
+          <span className="pkg-offer-banner__badge">عرض محدود</span>
+          <h2 className="pkg-offer-banner__title">عروض إطلاق ترحيبية</h2>
+          <p className="pkg-offer-banner__sub">
+            أسعار خاصة للمستخدمين الأوائل — قد تتغيّر أو تنتهي في أي وقت دون إشعار مسبق.
+          </p>
         </div>
-        <button type="button" className="btn bo bsm" onClick={openCodes}>
-          🔑 تفعيل الكود
-        </button>
+        <span className="pkg-offer-banner__pct" aria-hidden="true">
+          -40%
+        </span>
       </div>
+
+      <p className="pkg-tiers-label">اختر مدة الاشتراك</p>
+
+      <div className="pkg-tiers">
+        {SUBSCRIPTION_PACKAGES.map((pkg) => (
+          <PackagePlanCard key={pkg.id} pkg={pkg} onSubscribe={handleSubscribe} />
+        ))}
+      </div>
+
+      <footer className="pkg-footer">
+        <div className="pkg-trust">
+          <span className="pkg-trust__icon" aria-hidden="true">
+            🔒
+          </span>
+          <div>
+            <div className="pkg-trust__title">دفع آمن وتفعيل فوري</div>
+            <p className="pkg-trust__sub">
+              لا نخزّن بيانات بطاقتك. التفعيل فوري بكود الاشتراك بعد إتمام الدفع.
+            </p>
+          </div>
+        </div>
+
+        <div className="pkg-code-row">
+          <span className="pkg-code-row__text">لديك كود اشتراك؟</span>
+          <button type="button" className="btn bo bsm" onClick={openCodes}>
+            🔑 تفعيل الكود
+          </button>
+        </div>
+      </footer>
     </div>
   );
 }

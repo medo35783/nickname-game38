@@ -1,13 +1,23 @@
-/** عرض القوانين السريعة — موحّد لكل الألعاب */
-export default function GameQuickRules({ rules, title = 'قوانين سريعة' }) {
+/** عرض القوانين السريعة — موحّد لكل الألعاب (ألوان حسب اللعبة) */
+export default function GameQuickRules({
+  rules,
+  title = 'مراحل سريعة',
+  game = null,
+  className = '',
+}) {
   if (!rules?.length) return null;
 
+  const themeMod = game ? ` game-quick-rules-wrap--${game}` : '';
+
   return (
-    <section className="game-quick-rules" aria-label={title}>
-      <div className="div">{title}</div>
+    <section
+      className={`game-quick-rules-wrap${themeMod}${className ? ` ${className}` : ''}`}
+      aria-label={title}
+    >
+      <div className="game-quick-rules__head">{title}</div>
       <ol className="game-quick-rules__list">
         {rules.map((rule, index) => (
-          <li key={index} className="game-quick-rules__item">
+          <li key={rule.text || index} className="game-quick-rules__item">
             <span className="game-quick-rules__num" aria-hidden="true">
               {index + 1}
             </span>

@@ -9,7 +9,7 @@ const GAME_BANK_TYPE = {
   hesbah: 'hesbah',
 };
 
-/** لعيبز — الألعاب + بوابة صوتك */
+/** لعيب زون — الألعاب + بوابة صوتك */
 export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
   const activeSessions = getAllActiveSessions();
 
@@ -20,7 +20,7 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
           جلسات نشطة: {formatOtherSessionsHint(activeSessions)} — افتح اللعبة واضغط «العودة للغرفة»
         </div>
       )}
-      <div style={{ textAlign: 'center', padding: '18px 0 14px' }}>
+      <div className="home-brand-wrap">
         <La3ibzBrandMark variant="hero" />
       </div>
 
@@ -44,7 +44,7 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
             <div className="home-game-card__sub">أخفِ هويتك واكشف الآخرين قبل أن يكشفوك</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
               {['6-50 لاعب', 'متعدد الجولات', 'إثارة وتشويق'].map((t) => (
-                <span key={t} className="tag tg" style={{ fontSize: 10 }}>
+                <span key={t} className="tag" style={{ fontSize: 10 }}>
                   {t}
                 </span>
               ))}

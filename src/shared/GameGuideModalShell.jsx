@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-/** غلاف موحّد لدليل اللعب — هيدر واضح بدون تغطية زر الإغلاق */
+/** غلاف موحّد لدليل اللعب — يُعرض فوق الشاشة (portal) */
 export default function GameGuideModalShell({
   title,
   titleId = 'game-guide-title',
   onClose,
-  themeClass = '',
+  game = null,
   accentVar = '--gold',
   children,
 }) {
@@ -18,9 +18,11 @@ export default function GameGuideModalShell({
     };
   }, []);
 
+  const portalGameClass = game ? ` game-guide-portal--${game}` : '';
+
   const content = (
     <div
-      className={`game-guide-portal ${themeClass}`.trim()}
+      className={`game-guide-portal${portalGameClass}`.trim()}
       style={{ '--guide-accent': `var(${accentVar})` }}
       role="dialog"
       aria-modal="true"

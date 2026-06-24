@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { activateCode, normalizeSubscriptionCode, formatCodeForDisplay } from '../../firebaseHelpers';
 import { auth } from '../../firebase';
-import { PLATFORM_NAME } from '../../core/constants';
+import { PLATFORM_NAME, ARENA_BACK_LABEL } from '../../core/constants';
+import GameTopNav from '../../shared/GameTopNav';
 
 /** بصمة جهاز بسيطة: userAgent + أبعاد الشاشة → base64 (آمن لمسار RTDB) */
 function buildDeviceInfo() {
@@ -45,7 +46,7 @@ function mapActivationError(message) {
 }
 
 /** شاشة تفعيل كود الاشتراك للمستخدمين العاديين. */
-export default function CodeActivation({ onActivationSuccess, notify, onBack }) {
+export default function CodeActivation({ onActivationSuccess, notify, onBack, backLabel = ARENA_BACK_LABEL }) {
   const [codeInput, setCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,13 +95,7 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack }) 
 
   return (
     <div className="scr">
-      {onBack ? (
-        <div style={{ marginBottom: '16px' }}>
-          <button type="button" className="btn bgh bsm" onClick={onBack} style={{ width: 'auto' }}>
-            ← رجوع
-          </button>
-        </div>
-      ) : null}
+      {onBack ? <GameTopNav onBack={onBack} variant="arena" label={backLabel} /> : null}
       <div style={{ textAlign: 'center', padding: '12px 0 14px' }}>
         <div className="ptitle" style={{ fontSize: 22 }}>
           🎮 مرحباً بك في {PLATFORM_NAME}!

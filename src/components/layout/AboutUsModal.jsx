@@ -1,3 +1,5 @@
+import { PLATFORM_NAME } from '../../core/constants';
+
 const AUDIENCES = [
   {
     icon: '👨‍👩‍👧‍👦',
@@ -36,9 +38,9 @@ export default function AboutUsModal({ onClose }) {
         <div className="about-modal-head">
           <div className="about-modal-head-text">
             <div id="about-us-title" className="about-modal-title">
-              منصة لعيبز
+              منصة {PLATFORM_NAME}
             </div>
-            <p className="about-modal-slogan">لعيبز | من فيكم اللعيب؟</p>
+            <p className="about-modal-slogan">{PLATFORM_NAME} | من فيكم اللعيب؟</p>
           </div>
           <button type="button" className="btn bgh bxs" onClick={onClose} aria-label="إغلاق">
             ✕
@@ -47,7 +49,7 @@ export default function AboutUsModal({ onClose }) {
 
         <div className="about-modal-body">
           <p className="about-lead">
-            نحن منصة لعيبز، ألعاب جماعية بنكهة تنافسية، سعودية الفكرة والصنع، انطلقت بشغف لإعادة
+            نحن منصة {PLATFORM_NAME}، ألعاب جماعية بنكهة تنافسية، سعودية الفكرة والصنع، انطلقت بشغف لإعادة
             تعريف المتعة والترابط في التجمعات والفعاليات.
           </p>
 
