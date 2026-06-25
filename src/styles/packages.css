@@ -419,6 +419,58 @@
   box-shadow: 0 4px 16px rgba(var(--pkg-tone-rgb), 0.28);
 }
 
+.pkg-tier__consent {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 7px 6px 2px;
+  border-top: 1px solid rgba(var(--pkg-tone-rgb), 0.12);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pkg-tier__consent-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-top: 1px;
+  border-radius: 50%;
+  font-size: 7px;
+  font-weight: 900;
+  color: var(--pkg-tone);
+  background: rgba(var(--pkg-tone-rgb), 0.12);
+  border: 1px solid rgba(var(--pkg-tone-rgb), 0.22);
+}
+
+.pkg-tier__consent-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: var(--pkg-tone);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+[data-theme='dark'] .pkg-tier__consent-link {
+  color: var(--pkg-tone-light, var(--pkg-tone));
+}
+
+.pkg-tier__consent-link:hover {
+  color: var(--text);
+}
+
 /* شارات الباقة */
 .pkg-badges-wrap {
   position: absolute;

@@ -5,6 +5,7 @@ import {
   SUPPORT_WHATSAPP_URL,
 } from '../../core/constants';
 import AboutUsModal from './AboutUsModal';
+import LegalFooterLinks from './LegalFooterLinks';
 
 function IconWhatsApp() {
   return (
@@ -56,6 +57,8 @@ export default function SiteFooter() {
               من نحن
             </button>
           </div>
+
+          <LegalFooterLinks />
 
           <div className="site-footer-links">
             <a

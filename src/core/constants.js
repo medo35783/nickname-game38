@@ -28,7 +28,7 @@ export const Q_WEAPONS = [
 
 export const Q_TOTAL = 100;
 
-export const SUPPORT_EMAIL = 'nicknameGame.support@gmail.com';
+export const SUPPORT_EMAIL = 'la3ib.zone@gmail.com';
 
 /** واتساب الدعم — الرابط wa.me يستخدم 966 بدون الصفر الأول */
 export const SUPPORT_WHATSAPP = '0539999010';
@@ -40,14 +40,17 @@ export const PLATFORM_NAME_EN = 'La3ib Zone';
 export const PLATFORM_TAGLINE = 'لعيب زون | جَوّك، جمعتك، وتحديك';
 export const PLATFORM_SLOGAN = 'جَوّك، جمعتك، وتحديك';
 
-export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=15';
-export const BRAND_ICON_FOOTER_SRC = '/brand/la3ibz-icon-footer.png?v=15';
-export const BRAND_THREE_SRC = '/brand/la3ibz-three-mark.png?v=14';
-export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=14';
-export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=14';
-export const BRAND_LOGO_VERTICAL_SRC = '/brand/la3ibz-logo-vertical.png?v=14';
-export const BRAND_LOGO_HEADER_SRC = '/brand/la3ibz-logo-header.png?v=14';
-export const BRAND_WORDMARK_EN_SRC = '/brand/la3ibz-wordmark-en.png?v=14';
+export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=16';
+export const BRAND_ICON_DARK_SRC = '/brand/la3ibz-icon-mark-dark.png?v=16';
+export const BRAND_ICON_FOOTER_SRC = '/brand/la3ibz-icon-footer.png?v=16';
+export const BRAND_THREE_SRC = '/brand/la3ibz-three-mark.png?v=16';
+export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=16';
+export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=16';
+export const BRAND_LOGO_VERTICAL_SRC = '/brand/la3ibz-logo-vertical.png?v=16';
+export const BRAND_LOGO_VERTICAL_DARK_SRC = '/brand/la3ibz-logo-vertical-dark.png?v=16';
+export const BRAND_LOGO_HEADER_SRC = '/brand/la3ibz-logo-header.png?v=16';
+export const BRAND_LOGO_HEADER_DARK_SRC = '/brand/la3ibz-logo-header-dark.png?v=16';
+export const BRAND_WORDMARK_EN_SRC = '/brand/la3ibz-wordmark-en.png?v=16';
 
 /** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
 export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';

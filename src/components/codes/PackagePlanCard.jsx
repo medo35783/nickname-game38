@@ -5,6 +5,7 @@ import {
   savingsPercent,
 } from '../../core/subscriptionPackages';
 import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
+import PackageLegalConsent from './PackageLegalConsent';
 
 /**
  * @param {object} props
@@ -72,6 +73,8 @@ export default function PackagePlanCard({ pkg, onSubscribe, ctaLabel }) {
       <button type="button" className="btn bg pkg-tier__cta" onClick={() => onSubscribe(pkg)}>
         {ctaLabel ?? `اشترك — ${effective} ر.س`}
       </button>
+
+      <PackageLegalConsent />
     </article>
   );
 }
