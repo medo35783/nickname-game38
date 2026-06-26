@@ -90,11 +90,11 @@ export default function AccountSubscriptionPanel({
         </div>
 
         <div className="acct-sub__actions">
-          <button type="button" className="btn bo" onClick={onActivateCode}>
+          <button type="button" className="btn bo-bbrand" onClick={onActivateCode}>
             🔄 تفعيل كود جديد
           </button>
           {urgent ? (
-            <button type="button" className="btn bg" onClick={onGoPricing}>
+            <button type="button" className="btn btn-bbrand" onClick={onGoPricing}>
               جدّد الاشتراك
             </button>
           ) : null}
@@ -121,10 +121,10 @@ export default function AccountSubscriptionPanel({
       ) : null}
 
       <div className="acct-sub__actions">
-        <button type="button" className="btn bg" onClick={onGoPricing}>
+        <button type="button" className="btn btn-bbrand" onClick={onGoPricing}>
           اشترك الآن
         </button>
-        <button type="button" className="btn bo" onClick={onActivateCode}>
+        <button type="button" className="btn bo-bbrand" onClick={onActivateCode}>
           تفعيل كود
         </button>
       </div>

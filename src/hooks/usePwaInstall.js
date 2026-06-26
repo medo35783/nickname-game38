@@ -10,9 +10,9 @@ export function usePwaInstall() {
   const deferredRef = useRef(null);
   const [canInstall, setCanInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(() => isPwaStandalone());
-  const [isIos, setIsIos] = useState(false);
-  const [isAndroid, setIsAndroid] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isIos, setIsIos] = useState(() => isIosDevice());
+  const [isAndroid, setIsAndroid] = useState(() => isAndroidDevice());
+  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function usePwaInstall() {
 
   const install = useCallback(async () => {
     const prompt = deferredRef.current;
-    if (!prompt) return false;
+    if (!prompt) return { ok: false, reason: 'no-prompt' };
 
     setInstalling(true);
     try {
@@ -61,13 +61,15 @@ export function usePwaInstall() {
       deferredRef.current = null;
       setCanInstall(false);
       if (outcome === 'accepted') setIsInstalled(true);
-      return outcome === 'accepted';
+      return { ok: outcome === 'accepted', reason: outcome };
+    } catch {
+      return { ok: false, reason: 'error' };
     } finally {
       setInstalling(false);
     }
   }, []);
 
-  const showCard = !isInstalled && isMobile && (canInstall || isIos || isAndroid);
+  const showCard = !isInstalled && isMobile;
 
   return {
     canInstall,

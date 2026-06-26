@@ -12,19 +12,19 @@
 
 .acct-sub--active {
   border-color: rgba(36, 143, 85, 0.4);
-  background: linear-gradient(160deg, rgba(36, 143, 85, 0.1) 0%, rgba(201, 127, 26, 0.06) 45%, var(--card) 92%);
+  background: linear-gradient(160deg, rgba(36, 143, 85, 0.1) 0%, rgba(37, 111, 168, 0.06) 45%, var(--card) 92%);
   box-shadow: 0 10px 32px rgba(36, 143, 85, 0.1);
 }
 
 .acct-sub--urgent {
   border-color: rgba(230, 57, 80, 0.45);
-  background: linear-gradient(160deg, rgba(230, 57, 80, 0.1) 0%, rgba(201, 127, 26, 0.05) 50%, var(--card) 92%);
+  background: linear-gradient(160deg, rgba(230, 57, 80, 0.1) 0%, rgba(37, 111, 168, 0.05) 50%, var(--card) 92%);
 }
 
 .acct-sub--empty {
   text-align: center;
-  border-color: rgba(201, 127, 26, 0.3);
-  background: linear-gradient(165deg, rgba(201, 127, 26, 0.08) 0%, var(--card) 70%);
+  border-color: rgba(37, 111, 168, 0.28);
+  background: linear-gradient(165deg, rgba(37, 111, 168, 0.08) 0%, var(--card) 70%);
 }
 
 .acct-sub__glow {
@@ -39,7 +39,7 @@
 }
 
 .acct-sub__glow--muted {
-  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.2), transparent 70%);
+  background: radial-gradient(ellipse, rgba(37, 111, 168, 0.18), transparent 70%);
 }
 
 .acct-sub__head {
@@ -93,7 +93,7 @@
   margin-bottom: 14px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.08);
-  border: 1px dashed rgba(201, 127, 26, 0.35);
+  border: 1px dashed rgba(37, 111, 168, 0.35);
 }
 
 [data-theme="light"] .acct-sub__code-block {
@@ -113,7 +113,7 @@
   font-size: 26px;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--gold);
+  color: var(--brand-blue);
   font-variant-numeric: tabular-nums;
 }
 
@@ -129,7 +129,7 @@
   font-family: 'Cairo', sans-serif;
   font-size: 36px;
   font-weight: 900;
-  color: var(--gold);
+  color: var(--brand-blue);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -176,12 +176,12 @@
 .acct-sub__progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--green), var(--gold));
+  background: linear-gradient(90deg, var(--green), var(--brand-blue));
   transition: width 0.35s ease;
 }
 
 .acct-sub--urgent .acct-sub__progress-fill {
-  background: linear-gradient(90deg, var(--red), var(--gold));
+  background: linear-gradient(90deg, var(--red), var(--brand-blue));
 }
 
 .acct-sub__details {
@@ -259,7 +259,7 @@
   gap: 8px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--brand-blue);
   margin-bottom: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -321,7 +321,7 @@
   font-family: 'Cairo', sans-serif;
   font-size: 17px;
   font-weight: 900;
-  color: var(--gold);
+  color: var(--brand-blue);
   letter-spacing: 0.06em;
 }
 
@@ -600,7 +600,7 @@
 }
 
 .acct-stat-tile--gold .acct-stat-tile__val {
-  color: var(--gold);
+  color: var(--brand-blue);
 }
 
 .acct-stats__time {
@@ -683,7 +683,7 @@
   font-family: 'Cairo', sans-serif;
   font-size: 14px;
   font-weight: 900;
-  color: var(--gold);
+  color: var(--brand-blue);
 }
 
 .acct-stats__games-grid {
@@ -1161,7 +1161,7 @@
   font-family: 'Cairo', sans-serif;
   font-size: 18px;
   font-weight: 900;
-  color: var(--gold);
+  color: var(--brand-blue);
   letter-spacing: 0.08em;
 }
 

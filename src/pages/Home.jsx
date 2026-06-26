@@ -4,6 +4,7 @@ import { formatOtherSessionsHint, getAllActiveSessions } from '../shared/gameSes
 import { setLastPlayedGame } from '../question-bank/qbank.helpers';
 import La3ibzBrandMark from '../shared/La3ibzBrandMark';
 import HomeGameIcon from '../shared/HomeGameIcons';
+import PwaInstallCard from '../components/layout/PwaInstallCard';
 
 const GAME_BANK_TYPE = {
   nicknames: 'titles',
@@ -12,7 +13,7 @@ const GAME_BANK_TYPE = {
 };
 
 /** لعيب زون — الألعاب + بوابة صوتك */
-export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
+export default function Home({ setSelectedGame, onOpenVoiceSuggest, notify }) {
   const activeSessions = getAllActiveSessions();
 
   return (
@@ -25,6 +26,8 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
       <div className="home-brand-wrap">
         <La3ibzBrandMark variant="hero" />
       </div>
+
+      <PwaInstallCard notify={notify} compact />
 
       <div
         className="home-game-card home-game-card--nicknames"
@@ -119,35 +122,41 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
       </div>
 
       <section className="home-teaser-zone" aria-label="قادم وصوتك">
-        <div className="home-coming-teaser">
-          <span className="home-coming-teaser__glow" aria-hidden />
-          <span className="home-coming-teaser__badge">قريباً</span>
-          <div className="home-coming-teaser__icon" aria-hidden>
-            🎲
-          </div>
-          <div className="home-coming-teaser__title">المزيد قادم!</div>
-          <div className="home-coming-teaser__sub">ألعاب جماعية جديدة على الساحة — استعدوا للمفاجآت</div>
-        </div>
+        <div className="home-teaser-card">
+          <span className="home-teaser-card__glow" aria-hidden />
 
-        <button
-          type="button"
-          className="home-suggest-entry"
-          onClick={() => onOpenVoiceSuggest?.()}
-        >
-          <span className="home-suggest-entry__shine" aria-hidden />
-          <span className="home-suggest-entry__icon" aria-hidden>
-            💡
-          </span>
-          <span className="home-suggest-entry__body">
-            <span className="home-suggest-entry__title">اقترح لعبة جديدة</span>
-            <span className="home-suggest-entry__sub">
-              صوتك يهمنا — شاركنا فكرتك ونوصلها للفريق
+          <div className="home-teaser-card__soon">
+            <span className="home-teaser-card__badge">قريباً</span>
+            <div className="home-teaser-card__icon" aria-hidden>
+              🎲
+            </div>
+            <div className="home-teaser-card__title">المزيد قادم!</div>
+            <div className="home-teaser-card__sub">ألعاب جماعية جديدة على الساحة — استعدوا للمفاجآت</div>
+          </div>
+
+          <div className="home-teaser-card__spectrum" aria-hidden />
+
+          <button
+            type="button"
+            className="home-teaser-card__suggest"
+            onClick={() => onOpenVoiceSuggest?.()}
+          >
+            <span className="home-teaser-card__suggest-shine" aria-hidden />
+            <span className="home-teaser-card__suggest-icon" aria-hidden>
+              💡
             </span>
-          </span>
-          <span className="home-suggest-entry__chevron" aria-hidden>
-            ←
-          </span>
-        </button>
+            <span className="home-teaser-card__suggest-body">
+              <span className="home-teaser-card__suggest-title">اقترح لعبة جديدة</span>
+              <span className="home-teaser-card__suggest-sep" aria-hidden>·</span>
+              <span className="home-teaser-card__suggest-sub">
+                صوتك يهمنا — شاركنا فكرتك ونوصلها للفريق
+              </span>
+            </span>
+            <span className="home-teaser-card__suggest-chevron" aria-hidden>
+              ←
+            </span>
+          </button>
+        </div>
       </section>
     </div>
   );

@@ -21,12 +21,17 @@ function computeNextStats(prev = {}, sessionData) {
   const avgPlayers =
     totalRealSessions > 0 ? totalPlayerCount / totalRealSessions : prev.avgPlayers || 0;
 
+  const engagementMinutes = playerCount * durationMinutes;
+  const roundReach = totalRounds * playerCount;
+
   const recentEntry = {
     gameType,
     totalRounds,
     completed,
     playerCount,
     durationMinutes,
+    engagementMinutes,
+    roundReach,
     roomCode,
     ts: timestamp,
   };
@@ -43,6 +48,12 @@ function computeNextStats(prev = {}, sessionData) {
     lastActiveAt: Date.now(),
     avgPlayers,
     totalPlayerCount,
+    peakPlayers: Math.max(Number(prev.peakPlayers) || 0, playerCount),
+    totalEngagementMinutes: (Number(prev.totalEngagementMinutes) || 0) + engagementMinutes,
+    roundReach: (Number(prev.roundReach) || 0) + roundReach,
+    firstSessionAt: prev.firstSessionAt
+      ? Math.min(Number(prev.firstSessionAt), timestamp)
+      : timestamp,
     totalDurationMinutes: (prev.totalDurationMinutes || 0) + durationMinutes,
     gamesPlayed: {
       titles: (prev.gamesPlayed?.titles || 0) + (gameType === 'titles' ? 1 : 0),
@@ -82,6 +93,9 @@ assert(s1.completedGames === 1, 'completedGames = 1');
 assert(s1.abandonedGames === 0, 'abandonedGames = 0');
 assert(s1.avgPlayers === 5, 'avgPlayers = 5');
 assert(s1.gamesPlayed.titles === 1, 'gamesPlayed.titles = 1');
+assert(s1.peakPlayers === 5, 'peakPlayers = 5');
+assert(s1.totalEngagementMinutes === 60, 'totalEngagementMinutes = 5*12');
+assert(s1.roundReach === 15, 'roundReach = 3*5');
 
 // جلسة بدون جولات — لا تُحسب جلسة حقيقية
 const s2 = computeNextStats(s1, {

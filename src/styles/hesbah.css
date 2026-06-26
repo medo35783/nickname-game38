@@ -1006,8 +1006,11 @@
 }
 
 .hesbah-final {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 24px;
 }
 
 .hesbah-podium {

@@ -4,31 +4,46 @@ import {
   PLATFORM_SITE_URL,
   PLATFORM_SLOGAN,
 } from '../core/constants';
+import { getPwaInstallShareLines } from '../core/pwaInstall';
 
 export function getPlatformSiteUrl() {
   return PLATFORM_SITE_URL;
 }
 
-export function buildRoomInviteText({ gameName, roomCode } = {}) {
-  const roomLink = getPlatformSiteUrl();
-  const gameLine = gameName ? `🎯 *انضم للعبة: ${gameName}*` : null;
-  const codeLine = roomCode ? `🔑 رمز الغرفة: *${roomCode}*` : null;
+export function buildRoomInviteText({ gameName, roomCode, includePwaHint = true } = {}) {
+  const roomLink = getPlatformSiteUrl().replace(/\/$/, '');
+  const code = roomCode ? String(roomCode).trim() : '';
+  const codeBold = code ? `*${code}*` : '';
 
-  return [
+  const lines = [
     `🎮 *${PLATFORM_NAME}* — ${PLATFORM_NAME_EN}`,
-    PLATFORM_SLOGAN,
+    `${PLATFORM_SLOGAN}! 🎯`,
     '',
-    gameLine,
-    codeLine,
-    gameLine || codeLine ? '' : null,
-    '1️⃣ افتح الرابط',
-    '2️⃣ اختر اللعبة',
-    '3️⃣ أدخل الرمز',
-    '',
-    roomLink,
-  ]
-    .filter((line) => line !== null && line !== undefined)
-    .join('\n');
+  ];
+
+  if (gameName) {
+    lines.push(`👑 تحدي جديد في لعبة: ${gameName}`);
+  }
+  if (code) {
+    lines.push(`🔑 رمز الغرفة: ${codeBold}`);
+  }
+
+  if (gameName || code) {
+    lines.push('');
+    lines.push('🛑 طريقة الدخول السريع:');
+    lines.push(`1️⃣ افتح الرابط: ${roomLink}`);
+    lines.push(
+      code
+        ? `2️⃣ اختر اللعبة وأدخل الرمز: ${codeBold}`
+        : '2️⃣ اختر اللعبة من القائمة',
+    );
+  }
+
+  if (includePwaHint) {
+    lines.push(...getPwaInstallShareLines());
+  }
+
+  return lines.join('\n');
 }
 
 export function getRoomInviteShareTitle(gameName) {

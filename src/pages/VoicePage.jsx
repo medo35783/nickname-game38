@@ -1,49 +1,12 @@
 import { useEffect, useState } from 'react';
-import { SUPPORT_EMAIL, PLATFORM_NAME } from '../core/constants';
+import { PLATFORM_NAME, SUPPORT_EMAIL } from '../core/constants';
 import ArenaHallOfFame from '../shared/ArenaHallOfFame';
 import KnowledgeBankSpotlight from '../shared/KnowledgeBankSpotlight';
 import GameTopNav from '../shared/GameTopNav';
+import VoiceFeedStrip from '../components/voice/VoiceFeedStrip';
 import '../styles/voice-hub.css';
 import '../styles/knowledge-chest.css';
 import '../styles/arena-badge.css';
-
-const NEWS = [
-  {
-    id: 1,
-    date: '2026-06-01',
-    title: '🎯 إطلاق لعبة حَسْبة',
-    body: 'لعبة معرفية جماعية — درجات، تأمين، اشتعال، ورهان حاسم على التتويج.',
-    isNew: true,
-  },
-  {
-    id: 2,
-    date: '2026-05-15',
-    title: '🏟️ شارة الساحة وقاعة المجد',
-    body: 'نقاط، إنجازات، ولوحة متصدرين أسبوعية — سجّل شارتك وتنافس.',
-    isNew: false,
-  },
-  {
-    id: 3,
-    date: '2026-04-20',
-    title: '🦅 لعبة القميري',
-    body: 'حرب استراتيجية بين المجموعات — وزّع القميري واهجم خصومك.',
-    isNew: false,
-  },
-  {
-    id: 4,
-    date: '2026-03-29',
-    title: '🎭 لعبة الألقاب',
-    body: 'أخفِ هويتك واكشف الآخرين — غرف حقيقية مع أصدقائك.',
-    isNew: false,
-  },
-  {
-    id: 5,
-    date: '2026-03-10',
-    title: '📚 بنك المعرفة',
-    body: 'اقترح أسئلتك — تُراجع وتُضاف للألعاب من مساهمات المجتمع.',
-    isNew: false,
-  },
-];
 
 const CONTACT_TYPES = {
   suggest: {
@@ -108,9 +71,9 @@ export default function VoicePage({
     }
     const sub = encodeURIComponent(cfg.emailSubject);
     const bod = encodeURIComponent(`النوع: ${cfg.label}\nالتصنيف: ${form.cat}\n\n${form.text}`);
-    window.open(`mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`);
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`;
     setForm((f) => ({ ...f, text: '' }));
-    notify?.('✅ سيُفتح تطبيق البريد', 'success');
+    notify?.('✅ جاري فتح البريد…', 'success');
   };
 
   return (
@@ -140,11 +103,13 @@ export default function VoicePage({
         <div className="voice-spotlight">
           <button
             type="button"
-            className={`voice-spotlight__card voice-spotlight__card--gold${activePortal === 'hof' ? ' voice-spotlight__card--active' : ''}`}
+            className={`voice-spotlight__card voice-spotlight__card--hof${activePortal === 'hof' ? ' voice-spotlight__card--active' : ''}`}
             onClick={() => setActivePortal((p) => (p === 'hof' ? null : 'hof'))}
           >
-            <span className="voice-spotlight__glow" aria-hidden />
-            <span className="voice-spotlight__glyph">🏆</span>
+            <span className="voice-spotlight__glow voice-spotlight__glow--spin" aria-hidden />
+            <span className="voice-spotlight__glyph voice-spotlight__trophy" aria-hidden>
+              🏆
+            </span>
             <span className="voice-spotlight__title">قاعة المجد</span>
             <span className="voice-spotlight__sub">أبطال الأسبوع</span>
             <span className="voice-spotlight__cta">عرض المتصدرين</span>
@@ -177,7 +142,7 @@ export default function VoicePage({
 
       <section className="voice-section voice-section--community" aria-label="المجتمع">
         <div className="voice-section__label">المجتمع</div>
-        <p className="voice-section__hint">تواصل معنا أو اطّلع على ما يقترحه الآخرون</p>
+        <p className="voice-section__hint">تواصل معنا — اختر نوع رسالتك</p>
 
         <div className="voice-bento voice-bento--contact">
           {CONTACT.map((p) => (
@@ -243,46 +208,11 @@ export default function VoicePage({
             <button type="button" className="voice-form-submit" onClick={sendMail}>
               📤 إرسال عبر البريد
             </button>
-            <div className="voice-form-note">
-              إلى: <strong>{SUPPORT_EMAIL}</strong>
-            </div>
           </section>
         ) : null}
-
-        {communitySuggestions.length > 0 ? (
-          <div className="voice-community">
-            <div className="voice-community__head">اقتراحات من المجتمع</div>
-            {communitySuggestions.map((s) => (
-              <article key={s.id} className="voice-community__item">
-                <div className="voice-community__top">
-                  <span className="voice-community__cat">{s.cat}</span>
-                  <span className="voice-community__date">{s.date}</span>
-                </div>
-                <div className="voice-community__text">{s.text}</div>
-              </article>
-            ))}
-          </div>
-        ) : null}
       </section>
 
-      <section className="voice-section" aria-label="تحديثات">
-        <div className="voice-section__label">آخر الأخبار</div>
-        <div className="voice-news">
-          {NEWS.map((n) => (
-            <article
-              key={n.id}
-              className={`voice-news__item${n.isNew ? ' voice-news__item--new' : ''}`}
-            >
-              <div className="voice-news__meta">
-                <span className="voice-news__date">{n.date}</span>
-                {n.isNew ? <span className="voice-news__tag">جديد</span> : null}
-              </div>
-              <div className="voice-news__title">{n.title}</div>
-              <div className="voice-news__body">{n.body}</div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <VoiceFeedStrip communitySuggestions={communitySuggestions} />
     </div>
   );
 }

@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { deriveMarketingMetrics, buildMarketingPitch, formatEngagementMinutes } from '../../core/marketingStatsHelpers';
+
 function formatRelativeTime(ts) {
   if (!ts) return '—';
   const diff = Date.now() - Number(ts);
@@ -22,12 +25,14 @@ function formatLastActive(ts) {
 function gameTypeIcon(gameType) {
   if (gameType === 'fameeri') return '🦅';
   if (gameType === 'titles') return '🎭';
+  if (gameType === 'hesbah') return '🎯';
   return '❓';
 }
 
 function gameTypeLabel(gameType) {
   if (gameType === 'fameeri') return 'القميري';
   if (gameType === 'titles') return 'الألقاب';
+  if (gameType === 'hesbah') return 'الحسبة';
   return gameType || '—';
 }
 
@@ -80,7 +85,9 @@ function StatsSkeleton() {
 /**
  * لوحة إحصائيات جلسات كود واحد (تُحمّل عند الطلب).
  */
-export default function CodeStatsDetailPanel({ loading, stats }) {
+export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null, onOpenReport }) {
+  const [pitchCopied, setPitchCopied] = useState(false);
+
   if (loading) return <StatsSkeleton />;
 
   if (!stats || typeof stats !== 'object') {
@@ -91,28 +98,84 @@ export default function CodeStatsDetailPanel({ loading, stats }) {
     );
   }
 
-  const totalReal = Number(stats.totalRealSessions) || 0;
+  const m = deriveMarketingMetrics(stats);
+  const totalReal = m.totalRealSessions;
   const totalDuration = Number(stats.totalDurationMinutes) || 0;
-  const totalPlayers = Number(stats.totalPlayerCount) || 0;
-  const completed = Number(stats.completedGames) || 0;
+  const completed = m.completedGames;
   const avgDuration =
     totalReal > 0 ? Math.round((totalDuration / totalReal) * 10) / 10 : 0;
-  const avgPlayers =
-    totalReal > 0 ? Math.round((totalPlayers / totalReal) * 10) / 10 : Number(stats.avgPlayers) || 0;
-  const titlesPlayed = Number(stats.gamesPlayed?.titles) || 0;
-  const fameeriPlayed = Number(stats.gamesPlayed?.fameeri) || 0;
-  const completionRate = totalReal > 0 ? Math.round((completed / totalReal) * 100) : 0;
+  const avgPlayers = m.avgPlayers;
+  const titlesPlayed = m.gamesPlayed.titles;
+  const fameeriPlayed = m.gamesPlayed.fameeri;
+  const hesbahPlayed = m.gamesPlayed.hesbah;
+  const completionRate = m.completionRate;
   const barColor =
     completionRate > 70 ? 'var(--green)' : completionRate >= 40 ? 'var(--gold)' : 'var(--red)';
 
   const recent = Array.isArray(stats.recentSessions) ? stats.recentSessions.slice(-5).reverse() : [];
   const lastActiveFormatted = formatLastActive(stats.lastActiveAt);
 
+  const handleCopyPitch = async () => {
+    const text = buildMarketingPitch(stats, { codeLabel });
+    try {
+      await navigator.clipboard.writeText(text);
+      setPitchCopied(true);
+      setTimeout(() => setPitchCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <div style={{ padding: '8px 4px 4px' }}>
+      <div
+        style={{
+          marginBottom: 12,
+          padding: '12px 10px',
+          borderRadius: 12,
+          background: 'linear-gradient(135deg, rgba(201,127,26,.12), rgba(37,111,168,.08))',
+          border: '1px solid rgba(201,127,26,.22)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--gold)' }}>📣 أرقام تسويقية</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {onOpenReport && (
+              <button
+                type="button"
+                className="btn bgh bxs"
+                style={{ width: 'auto', fontSize: 10, padding: '4px 10px', borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                onClick={onOpenReport}
+              >
+                📄 تقرير رسمي PDF
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn bgh bxs"
+              style={{ width: 'auto', fontSize: 10, padding: '4px 10px' }}
+              onClick={handleCopyPitch}
+            >
+              {pitchCopied ? '✅ تم النسخ' : '📋 نسخ نص العرض'}
+            </button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {detailStatBox('مشاركات المتسابقين', m.totalParticipants, 'var(--gold)')}
+          {detailStatBox('ذروة الحضور', m.peakPlayers, 'var(--purple)')}
+          {detailStatBox('ظهور الرعاية', m.roundReach, 'var(--fameeri-primary)')}
+          {detailStatBox('دقائق التفاعل', formatEngagementMinutes(m.totalEngagementMinutes, { short: true }), 'var(--blue)')}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5, fontWeight: 600 }}>
+          B2B: {totalReal} جلسة · متوسط {avgPlayers} متسابق —
+          رعاية: {m.totalRounds} جولة ({m.roundReach} ظهور) —
+          جوائز: {m.couponReadySessions} جلسة مؤهلة
+        </div>
+      </div>
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
         {detailStatBox('جلسات حقيقية', totalReal, 'var(--gold)')}
-        {detailStatBox('جولات مكتملة', Number(stats.totalRounds) || 0, 'var(--fameeri-primary)')}
+        {detailStatBox('جولات مكتملة', m.totalRounds, 'var(--fameeri-primary)')}
         {detailStatBox('ألعاب مكتملة', completed, 'var(--green)')}
         {detailStatBox('تُركت مبكراً', Number(stats.abandonedGames) || 0, 'var(--red)')}
       </div>
@@ -122,7 +185,7 @@ export default function CodeStatsDetailPanel({ loading, stats }) {
         {detailStatBox('متوسط اللاعبين', totalReal > 0 ? avgPlayers : '—', 'var(--purple)')}
         {detailStatBox(
           'توزيع الألعاب',
-          `الألقاب: ${titlesPlayed} | القميري: ${fameeriPlayed}`,
+          `ألقاب ${titlesPlayed} · قميري ${fameeriPlayed} · حسبة ${hesbahPlayed}`,
           'var(--text)'
         )}
       </div>
@@ -183,7 +246,7 @@ export default function CodeStatsDetailPanel({ loading, stats }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ color: 'var(--muted)', textAlign: 'right' }}>
-                {['اللعبة', 'الجولات', 'مكتملة؟', 'اللاعبين', 'المدة', 'التاريخ'].map((h) => (
+                {['اللعبة', 'الجولات', 'متسابقين', 'ظهور رعاية', 'تفاعل', 'التاريخ'].map((h) => (
                   <th
                     key={h}
                     style={{ padding: '6px 5px', borderBottom: '1px solid rgba(255,255,255,.08)', fontWeight: 700 }}
@@ -200,9 +263,16 @@ export default function CodeStatsDetailPanel({ loading, stats }) {
                     {gameTypeIcon(s.gameType)} {gameTypeLabel(s.gameType)}
                   </td>
                   <td style={{ padding: '7px 5px', fontWeight: 800 }}>{s.totalRounds ?? 0}</td>
-                  <td style={{ padding: '7px 5px' }}>{s.completed ? '✅' : '🚪 غادر مبكراً'}</td>
                   <td style={{ padding: '7px 5px' }}>{s.playerCount ?? 0}</td>
-                  <td style={{ padding: '7px 5px' }}>{Math.round(Number(s.durationMinutes) || 0)} د</td>
+                  <td style={{ padding: '7px 5px' }}>
+                    {s.roundReach ?? (Number(s.totalRounds) || 0) * (Number(s.playerCount) || 0)}
+                  </td>
+                  <td style={{ padding: '7px 5px' }}>
+                    {formatEngagementMinutes(
+                      s.engagementMinutes ?? (Number(s.playerCount) || 0) * (Number(s.durationMinutes) || 0)
+                    )}
+                    {s.completed ? '' : ' · 🚪'}
+                  </td>
                   <td style={{ padding: '7px 5px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                     {formatRelativeTime(s.ts)}
                   </td>

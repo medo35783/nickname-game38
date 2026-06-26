@@ -18,6 +18,8 @@ import { ADMIN_PACKAGE_OPTIONS } from '../../core/subscriptionPackages';
 import CodeStatsDetailPanel from './CodeStatsDetailPanel';
 import CodeActivityBadge from './CodeActivityBadge';
 import { formatCodeMiniStats, getCodeActivityInfo } from './codeActivityHelpers';
+import { aggregateMarketingMetrics, formatEngagementMinutes } from '../../core/marketingStatsHelpers';
+import MarketingReportDialog from './MarketingReportDialog';
 
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
 const PACKAGES = ADMIN_PACKAGE_OPTIONS;
@@ -53,6 +55,27 @@ function formatDate(ts) {
   }
 }
 
+function mergeByGameStats(a = {}, b = {}) {
+  const keys = ['titles', 'fameeri', 'hesbah'];
+  const out = { ...a };
+  keys.forEach((k) => {
+    const x = a[k] || {};
+    const y = b[k] || {};
+    if (!x.sessions && !y.sessions) return;
+    out[k] = {
+      sessions: (x.sessions || 0) + (y.sessions || 0),
+      realSessions: (x.realSessions || 0) + (y.realSessions || 0),
+      rounds: (x.rounds || 0) + (y.rounds || 0),
+      participants: (x.participants || 0) + (y.participants || 0),
+      engagementMinutes: (x.engagementMinutes || 0) + (y.engagementMinutes || 0),
+      roundReach: (x.roundReach || 0) + (y.roundReach || 0),
+      completed: (x.completed || 0) + (y.completed || 0),
+      peakPlayers: Math.max(x.peakPlayers || 0, y.peakPlayers || 0),
+    };
+  });
+  return out;
+}
+
 /**
  * لوحة إدارة أكواد الاشتراك — إحصائيات، توليد، قائمة، تصدير CSV
  * @param {{ notify: (text: string, type?: string) => void }} props
@@ -84,6 +107,7 @@ export default function AdminCodesPanel({ notify }) {
   const [expandedStatsError, setExpandedStatsError] = useState(false);
   const expandedStatsRef = useRef(null);
   const expandedUnsubRef = useRef(null);
+  const [reportDialog, setReportDialog] = useState(null);
 
   // الاشتراك في codes بعد تأكيد جلسة مشرف (تجنّب قراءة أثناء auth مجهول)
   useEffect(() => {
@@ -265,6 +289,13 @@ export default function AdminCodesPanel({ notify }) {
     return { total, unused, active, expired };
   }, [rows, indexByCode]);
 
+  const platformMarketing = useMemo(() => {
+    const statsList = Object.values(codeStatsById)
+      .map((entry) => entry?.data)
+      .filter(Boolean);
+    return aggregateMarketingMetrics(statsList);
+  }, [codeStatsById]);
+
   const clampCount = useCallback((n) => {
     const x = Number.isFinite(n) ? Math.floor(n) : 1;
     return Math.min(100, Math.max(1, x));
@@ -310,6 +341,54 @@ export default function AdminCodesPanel({ notify }) {
     }
   };
 
+  /** تصدير تقرير تسويقي لكل الأكواد */
+  const handleExportMarketingCsv = () => {
+    if (!rows.length) {
+      notify('لا توجد بيانات للتصدير', 'info');
+      return;
+    }
+    const header = [
+      'code',
+      'status',
+      'sessions',
+      'participants',
+      'peak_players',
+      'rounds',
+      'sponsor_reach',
+      'engagement_minutes',
+      'completion_rate',
+      'coupon_ready_sessions',
+    ];
+    const lines = rows.map((row) => {
+      const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+      const eff = getEffectiveStatus(merged);
+      const rowStats = codeStatsById[row.id]?.data;
+      const m = aggregateMarketingMetrics(rowStats ? [rowStats] : []);
+      const code = String(formatCodeForDisplay(row.code) || '').replace(/"/g, '""');
+      return [
+        `"${code}"`,
+        `"${eff}"`,
+        m.totalRealSessions,
+        m.totalParticipants,
+        m.peakPlayers,
+        m.totalRounds,
+        m.roundReach,
+        Math.round(m.totalEngagementMinutes),
+        m.completionRate,
+        m.couponReadySessions,
+      ].join(',');
+    });
+    const csv = [header.join(','), ...lines].join('\r\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `marketing-report-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('تم تصدير التقرير التسويقي', 'success');
+  };
+
   /** تصدير كل الأكواد المعروضة كـ CSV */
   const handleExportCsv = () => {
     if (!rows.length) {
@@ -338,6 +417,61 @@ export default function AdminCodesPanel({ notify }) {
   const toggleCodeStats = useCallback((codeId) => {
     setExpandedCodeId((prev) => (prev === codeId ? null : codeId));
   }, []);
+
+  const openCodeReport = useCallback(
+    (row, rowStats) => {
+      const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+      const eff = getEffectiveStatus(merged);
+      setReportDialog({
+        reportScope: 'code',
+        stats: rowStats,
+        codeLabel: formatCodeForDisplay(row.code),
+        codeMeta: {
+          duration: row.duration,
+          statusLabel: statusLabel(eff),
+          activatedAt: merged.activatedAt || row.activatedAt || null,
+        },
+      });
+    },
+    [indexByCode]
+  );
+
+  const openPlatformReport = useCallback(() => {
+    const statsList = Object.values(codeStatsById)
+      .map((entry) => entry?.data)
+      .filter(Boolean);
+    const syntheticStats = statsList.length
+      ? {
+          ...statsList.reduce((acc, s) => ({
+            totalRealSessions: (acc.totalRealSessions || 0) + (Number(s.totalRealSessions) || 0),
+            totalPlayerCount: (acc.totalPlayerCount || 0) + (Number(s.totalPlayerCount) || 0),
+            totalRounds: (acc.totalRounds || 0) + (Number(s.totalRounds) || 0),
+            totalEngagementMinutes: (acc.totalEngagementMinutes || 0) + (Number(s.totalEngagementMinutes) || 0),
+            roundReach: (acc.roundReach || 0) + (Number(s.roundReach) || 0),
+            completedGames: (acc.completedGames || 0) + (Number(s.completedGames) || 0),
+            abandonedGames: (acc.abandonedGames || 0) + (Number(s.abandonedGames) || 0),
+            totalDurationMinutes: (acc.totalDurationMinutes || 0) + (Number(s.totalDurationMinutes) || 0),
+            peakPlayers: Math.max(acc.peakPlayers || 0, Number(s.peakPlayers) || 0),
+            lastActiveAt: Math.max(acc.lastActiveAt || 0, Number(s.lastActiveAt) || 0),
+            gamesPlayed: {
+              titles: (acc.gamesPlayed?.titles || 0) + (Number(s.gamesPlayed?.titles) || 0),
+              fameeri: (acc.gamesPlayed?.fameeri || 0) + (Number(s.gamesPlayed?.fameeri) || 0),
+              hesbah: (acc.gamesPlayed?.hesbah || 0) + (Number(s.gamesPlayed?.hesbah) || 0),
+            },
+            byGame: mergeByGameStats(acc.byGame, s.byGame),
+            recentSessions: [...(acc.recentSessions || []), ...(Array.isArray(s.recentSessions) ? s.recentSessions : [])]
+              .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+              .slice(-20),
+          }), {}),
+        }
+      : null;
+
+    setReportDialog({
+      reportScope: 'platform',
+      stats: syntheticStats,
+      platformAggregate: platformMarketing,
+    });
+  }, [codeStatsById, platformMarketing]);
 
   const statBox = (label, value, colorVar) => (
     <div
@@ -374,6 +508,29 @@ export default function AdminCodesPanel({ notify }) {
           {statBox('مُفعّل', stats.active, 'var(--green)')}
           {statBox('منتهي', stats.expired, 'var(--red)')}
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="ctitle">📣 ملخص تسويقي للمنصة</div>
+        <div className="psub" style={{ marginBottom: 10, fontSize: 11 }}>
+          أرقام مجمّعة من {platformMarketing.codesWithActivity || 0} كود نشط — لعروض B2B والرعاة والجوائز
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {statBox('مشاركات المتسابقين', platformMarketing.totalParticipants, 'var(--gold)')}
+          {statBox('ذروة حضور', platformMarketing.peakPlayers, 'var(--purple)')}
+          {statBox('جولات قابلة للرعاية', platformMarketing.totalRounds, 'var(--fameeri-primary)')}
+          {statBox('ظهور الرعاية', platformMarketing.roundReach, 'var(--green)')}
+          {statBox('دقائق التفاعل', formatEngagementMinutes(platformMarketing.totalEngagementMinutes, { short: true }), 'var(--blue)')}
+          {statBox('جلسات مؤهلة للجوائز', platformMarketing.couponReadySessions, 'var(--gold)')}
+        </div>
+        <button
+          type="button"
+          className="btn bg mt2"
+          style={{ width: '100%' }}
+          onClick={openPlatformReport}
+        >
+          📄 إنشاء تقرير B2B رسمي (PDF)
+        </button>
       </div>
 
       {/* توليد أكواد */}
@@ -478,6 +635,9 @@ export default function AdminCodesPanel({ notify }) {
             </button>
             <button type="button" className="btn bgh bsm" style={{ width: 'auto' }} onClick={handleExportCsv}>
               📤 تصدير CSV
+            </button>
+            <button type="button" className="btn bgh bsm" style={{ width: 'auto' }} onClick={handleExportMarketingCsv}>
+              📣 تقرير تسويقي
             </button>
           </div>
         </div>
@@ -592,6 +752,8 @@ export default function AdminCodesPanel({ notify }) {
                               <CodeStatsDetailPanel
                                 loading={expandedStatsLoading}
                                 stats={expandedStats}
+                                codeLabel={formatCodeForDisplay(row.code)}
+                                onOpenReport={() => openCodeReport(row, expandedStats)}
                               />
                             )}
                           </td>
@@ -605,6 +767,17 @@ export default function AdminCodesPanel({ notify }) {
           </table>
         </div>
       </div>
+
+      <MarketingReportDialog
+        open={Boolean(reportDialog)}
+        onClose={() => setReportDialog(null)}
+        stats={reportDialog?.stats}
+        codeLabel={reportDialog?.codeLabel}
+        codeMeta={reportDialog?.codeMeta}
+        reportScope={reportDialog?.reportScope || 'code'}
+        platformAggregate={reportDialog?.platformAggregate}
+        notify={notify}
+      />
     </div>
   );
 }

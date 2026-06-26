@@ -4,6 +4,7 @@ import { playSound } from '../../core/helpers';
 import { HESBAH_ACCENT_CSS, HESBAH_THEME, sortedHesbahPlayers } from './HesbahHelpers';
 import { downloadHesbahVictoryImage, shareHesbahVictoryImage } from './hesbahVictoryShare';
 import HesbahTopNav from './HesbahTopNav';
+import EndGameJoinSection from '../../components/codes/EndGameJoinSection';
 
 function ConfettiBurst() {
   const [bits] = useState(() =>
@@ -75,6 +76,7 @@ export default function HesbahFinal({
   onHome,
   onExitRequest,
   hideExitBar = false,
+  joinCta = null,
 }) {
   const list = sortedHesbahPlayers(players);
   const top3 = list.slice(0, 3);
@@ -203,6 +205,17 @@ export default function HesbahFinal({
           </button>
         </div>
       </div>
+
+      {joinCta && (
+        <EndGameJoinSection
+          playerStats={joinCta.playerStats}
+          isGuest={joinCta.isGuest}
+          arenaReward={joinCta.arenaReward}
+          onArenaSignup={joinCta.onArenaSignup}
+          onTryFree={joinCta.onTryFree}
+          onPackages={joinCta.onPackages}
+        />
+      )}
 
       <button type="button" className="btn bgh hesbah-final__home" onClick={onHome}>
         🏟️ العودة لساحة الألعاب

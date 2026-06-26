@@ -58,7 +58,7 @@ export default function ArenaSignupPrompt({
       )}
 
       {typeof onSignup === 'function' && (
-        <button type="button" className="btn bg arena-prompt__cta" onClick={onSignup}>
+        <button type="button" className="btn btn-bbrand arena-prompt__cta" onClick={onSignup}>
           {isMini ? '👤 سجّل دخول' : `سجّل الآن — +${ARENA_WELCOME_BONUS} 🎁`}
         </button>
       )}

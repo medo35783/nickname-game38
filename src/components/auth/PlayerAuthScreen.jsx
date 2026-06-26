@@ -87,22 +87,18 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
   );
 
   return (
-    <div>
+    <div className="auth-screen auth-screen--brand">
       {!compact ? (
         <p className="psub" style={{ textAlign: 'center', marginBottom: 12 }}>
           اختياري — افتح شارة الساحة (+300 نقطة ترحيب)
         </p>
       ) : null}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div className="auth-mode-tabs" style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button
           type="button"
-          className={`btn bgh ${mode === 'login' ? 'bo' : ''}`}
-          style={{
-            flex: 1,
-            borderColor: mode === 'login' ? 'var(--gold)' : undefined,
-            background: mode === 'login' ? 'rgba(201,127,26,.1)' : undefined,
-          }}
+          className={`btn bgh auth-mode-btn${mode === 'login' ? ' is-on' : ''}`}
+          style={{ flex: 1 }}
           onClick={() => {
             setMode('login');
             resetErr();
@@ -112,12 +108,8 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
         </button>
         <button
           type="button"
-          className={`btn bgh ${mode === 'register' ? 'bo' : ''}`}
-          style={{
-            flex: 1,
-            borderColor: mode === 'register' ? 'var(--gold)' : undefined,
-            background: mode === 'register' ? 'rgba(201,127,26,.1)' : undefined,
-          }}
+          className={`btn bgh auth-mode-btn${mode === 'register' ? ' is-on' : ''}`}
+          style={{ flex: 1 }}
           onClick={() => {
             setMode('register');
             resetErr();
@@ -193,7 +185,7 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
           </div>
         ) : null}
 
-        <button type="submit" className="btn bg mt2" disabled={loading}>
+        <button type="submit" className="btn btn-bbrand mt2" disabled={loading}>
           {loading ? '⏳…' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'}
         </button>
       </form>

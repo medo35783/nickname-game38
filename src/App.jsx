@@ -322,6 +322,8 @@ export default function App() {
           }
         : null,
     });
+    // حَسْبة: الترغيب بالتسجيل مضمّن أسفل شاشة التتويج — لا نغطيها بنافذة منبثقة
+    if (data?.game === 'hesbah') return;
     setTimeout(() => {
       setShowEndGamePrompt(true);
     }, 2000);
@@ -360,12 +362,25 @@ export default function App() {
       onRequestActivation: () => setShowCodeActivation(true),
       onGameEnd,
       onGoAccount: () => setTab('account'),
+      endGameJoin:
+        selectedGame === 'hesbah' && endGameData?.game === 'hesbah' ? endGameData : null,
+      isGuest,
+      onEndGameArenaSignup: () => {
+        setAccountAuthMode('register');
+        setTab('account');
+        notify('🏟️ افتح شارة الساحة — سجّل في 30 ثانية', 'gold');
+      },
+      onEndGameTryFree: () => {
+        setTab('account');
+        notify('📝 أنشئ حسابك لتصبح مشرف مسابقة', 'gold');
+      },
+      onEndGamePackages: () => setTab('pricing'),
     });
     if (mounted) return mounted;
 
     if (gameScreen === 'home') {
       return (
-        <Home setSelectedGame={setSelectedGame} onOpenVoiceSuggest={openVoiceSuggest} />
+        <Home setSelectedGame={setSelectedGame} onOpenVoiceSuggest={openVoiceSuggest} notify={notify} />
       );
     }
 
@@ -642,7 +657,7 @@ export default function App() {
 
       <nav className="bnav">
         {navItems.map(item=>(
-          <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} onClick={()=>goToTab(item.id)}>
+          <button key={item.id} className={`bnav-item${tab===item.id?' active':''}`} data-nav={item.id} onClick={()=>goToTab(item.id)}>
             <div className="bnav-icon">
               {item.icon === 'brand' ? (
                 <La3ibzBrandIcon size="nav" alt={PLATFORM_NAME} />

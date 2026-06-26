@@ -20,6 +20,11 @@ export function renderPlatformGame(selectedGame, props) {
     onRequestActivation,
     onGameEnd,
     onGoAccount,
+    endGameJoin,
+    isGuest,
+    onEndGameArenaSignup,
+    onEndGameTryFree,
+    onEndGamePackages,
   } = props;
 
   if (selectedGame === 'nicknames') {
@@ -64,6 +69,11 @@ export function renderPlatformGame(selectedGame, props) {
         canCreateRoom={canHostRoom}
         onRequestActivation={onRequestActivation}
         onGameEnd={onGameEnd}
+        endGameJoin={endGameJoin}
+        isGuest={isGuest}
+        onEndGameArenaSignup={onEndGameArenaSignup}
+        onEndGameTryFree={onEndGameTryFree}
+        onEndGamePackages={onEndGamePackages}
       />
     );
   }

@@ -761,3 +761,101 @@
 .game-cancelled-screen__home {
   min-width: 220px;
 }
+
+/* ── قسم الترغيب المضمّن أسفل شاشة النتائج (حَسْبة) ── */
+.egjs {
+  position: relative;
+  z-index: 2;
+  margin: 20px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.egjs__rank {
+  text-align: center;
+  padding: 14px 16px;
+  background: linear-gradient(145deg, rgba(37, 111, 168, 0.08), var(--card));
+  border-color: rgba(37, 111, 168, 0.25);
+}
+
+.egjs__rank-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.egjs__rank-num {
+  font-family: Cairo, sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.egjs__arena {
+  text-align: center;
+  padding: 14px 16px;
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.12), var(--card));
+  border-color: rgba(201, 127, 26, 0.35);
+}
+
+.egjs__arena-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+
+.egjs__arena-pts {
+  font-family: Cairo, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--gold);
+}
+
+.egjs__arena-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.egjs__pitch {
+  text-align: center;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(150, 36, 56, 0.1), rgba(201, 127, 26, 0.06));
+  border-color: rgba(150, 36, 56, 0.3);
+}
+
+.egjs__pitch-icon {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+
+.egjs__pitch-title {
+  font-family: Cairo, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.egjs__pitch-sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.egjs__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.egjs__actions .btn {
+  width: 100%;
+}
+
+.egjs .arena-prompt {
+  margin: 0;
+}

@@ -97,12 +97,33 @@ export function computeNextStats(prev = {}, sessionData) {
   const avgPlayers =
     totalRealSessions > 0 ? totalPlayerCount / totalRealSessions : prev.avgPlayers || 0;
 
+  const engagementMinutes = playerCount * durationMinutes;
+  const roundReach = totalRounds * playerCount;
+  const gk = normalizeGameType(gameType);
+  const prevByGame = prev.byGame && typeof prev.byGame === 'object' ? prev.byGame : {};
+  const prevGame = prevByGame[gk] || {};
+  const nextByGame = { ...prevByGame };
+  if (gk === 'titles' || gk === 'fameeri' || gk === 'hesbah') {
+    nextByGame[gk] = {
+      sessions: (prevGame.sessions || 0) + 1,
+      realSessions: (prevGame.realSessions || 0) + (isRealSession ? 1 : 0),
+      rounds: (prevGame.rounds || 0) + totalRounds,
+      participants: (prevGame.participants || 0) + playerCount,
+      engagementMinutes: (prevGame.engagementMinutes || 0) + engagementMinutes,
+      roundReach: (prevGame.roundReach || 0) + roundReach,
+      completed: (prevGame.completed || 0) + (completed ? 1 : 0),
+      peakPlayers: Math.max(prevGame.peakPlayers || 0, playerCount),
+    };
+  }
+
   const recentEntry = {
     gameType,
     totalRounds,
     completed,
     playerCount,
     durationMinutes,
+    engagementMinutes,
+    roundReach,
     roomCode,
     ts: timestamp,
   };
@@ -119,12 +140,19 @@ export function computeNextStats(prev = {}, sessionData) {
     lastActiveAt: Date.now(),
     avgPlayers,
     totalPlayerCount,
+    peakPlayers: Math.max(Number(prev.peakPlayers) || 0, playerCount),
+    totalEngagementMinutes: (Number(prev.totalEngagementMinutes) || 0) + engagementMinutes,
+    roundReach: (Number(prev.roundReach) || 0) + roundReach,
+    firstSessionAt: prev.firstSessionAt
+      ? Math.min(Number(prev.firstSessionAt), timestamp)
+      : timestamp,
     totalDurationMinutes: (prev.totalDurationMinutes || 0) + durationMinutes,
     gamesPlayed: {
       titles: (prev.gamesPlayed?.titles || 0) + (gameType === 'titles' ? 1 : 0),
       fameeri: (prev.gamesPlayed?.fameeri || 0) + (gameType === 'fameeri' ? 1 : 0),
       hesbah: (prev.gamesPlayed?.hesbah || 0) + (normalizeGameType(gameType) === 'hesbah' ? 1 : 0),
     },
+    byGame: nextByGame,
     recentSessions,
   };
 }

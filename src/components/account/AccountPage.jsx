@@ -288,7 +288,7 @@ export default function AccountPage({
               <PlayerAuthScreen notify={notify} compact initialMode={initialAuthMode} />
             </div>
           ) : (
-            <button type="button" className="btn bo" onClick={handleSignOut}>
+            <button type="button" className="btn bo-bbrand" onClick={handleSignOut}>
               تسجيل الخروج
             </button>
           )}
@@ -344,7 +344,7 @@ export default function AccountPage({
                   <div className="arena-sheet__actions">
                     <button
                       type="button"
-                      className="btn bg"
+                      className="btn btn-bbrand"
                       disabled={iconSaving || !iconDraft}
                       onClick={() => void handleSaveIcon()}
                     >
@@ -426,7 +426,7 @@ export default function AccountPage({
               <ArenaSignupPrompt variant="full" localQuestionCount={localQuestionCount} />
               <button
                 type="button"
-                className="btn bo mt2"
+                className="btn bo-bbrand mt2"
                 style={{ width: '100%' }}
                 onClick={() => setTab('sub')}
               >
@@ -527,7 +527,7 @@ export default function AccountPage({
                     ⚠️ {linkErr}
                   </div>
                 ) : null}
-                <button type="submit" className="btn bo mt2" disabled={linkLoading}>
+                <button type="submit" className="btn bo-bbrand mt2" disabled={linkLoading}>
                   {linkLoading ? '⏳…' : 'ربط البريد'}
                 </button>
               </form>

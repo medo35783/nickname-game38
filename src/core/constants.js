@@ -44,6 +44,7 @@ export const PLATFORM_SITE_URL = 'https://www.la3ibz.com/';
 export const PLATFORM_SITE_HOST = 'www.la3ibz.com';
 
 export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=16';
+export const BRAND_ICON_PATH = '/brand/la3ibz-icon-mark.png';
 export const BRAND_ICON_DARK_SRC = '/brand/la3ibz-icon-mark-dark.png?v=16';
 export const BRAND_ICON_FOOTER_SRC = '/brand/la3ibz-icon-footer.png?v=16';
 export const BRAND_THREE_SRC = '/brand/la3ibz-three-mark.png?v=16';

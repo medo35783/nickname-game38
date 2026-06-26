@@ -40,9 +40,10 @@ export default defineConfig({
         'brand/la3ibz-favicon.png',
         'brand/la3ibz-icon-mark.png',
         'brand/la3ibz-icon-mark-dark.png',
+        'brand/la3ibz-pwa-192.png',
       ],
       manifest: {
-        id: '/',
+        id: PWA_MANIFEST.scope,
         ...PWA_MANIFEST,
       },
       workbox: {

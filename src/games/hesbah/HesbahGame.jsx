@@ -93,7 +93,20 @@ function poolStorageKey(room) {
 }
 
 const HesbahGame = forwardRef(function HesbahGame(
-  { notify, setTab, setSelectedGame, canCreateRoom, onRequestActivation, onGameEnd, onHesbahHeaderMeta },
+  {
+    notify,
+    setTab,
+    setSelectedGame,
+    canCreateRoom,
+    onRequestActivation,
+    onGameEnd,
+    onHesbahHeaderMeta,
+    endGameJoin,
+    isGuest,
+    onEndGameArenaSignup,
+    onEndGameTryFree,
+    onEndGamePackages,
+  },
   ref
 ) {
   void onGameEnd;
@@ -1653,6 +1666,18 @@ const HesbahGame = forwardRef(function HesbahGame(
             notify={notify}
             hideExitBar
             onHome={leaveToArena}
+            joinCta={
+              endGameJoin
+                ? {
+                    playerStats: endGameJoin.playerStats,
+                    arenaReward: endGameJoin.arenaReward,
+                    isGuest,
+                    onArenaSignup: onEndGameArenaSignup,
+                    onTryFree: onEndGameTryFree,
+                    onPackages: onEndGamePackages,
+                  }
+                : null
+            }
           />
         </HesbahPlayerHud>
       );

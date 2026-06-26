@@ -1,35 +1,52 @@
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 import { PWA_MANIFEST } from '../../core/pwaManifest';
+import { PWA_ANDROID_INSTALL_STEPS, PWA_IOS_INSTALL_STEPS } from '../../core/pwaInstall';
+import PlatformOsIcon from '../../shared/PlatformOsIcon';
 
-const IOS_STEPS = [
-  'اضغط زر المشاركة ↑ في أسفل Safari',
-  'اختر «إضافة إلى الشاشة الرئيسية»',
-  'اضغط «إضافة» — يظهر التطبيق بأيقونة لعيب زون',
-];
-
-const ANDROID_MANUAL_STEPS = [
-  'من قائمة المتصفح ⋮ اختر «تثبيت التطبيق»',
-  'أو «إضافة إلى الشاشة الرئيسية»',
-  'يفتح كتطبيق بدون شريط المتصفح',
-];
-
-export default function PwaInstallCard({ notify }) {
+export default function PwaInstallCard({ notify, compact = false }) {
   const { canInstall, isIos, isAndroid, installing, install, showCard } = usePwaInstall();
 
   if (!showCard) return null;
 
   const handleInstall = async () => {
-    const ok = await install();
-    if (ok) {
-      notify?.('✅ تم التثبيت — افتح لعيب زون من شاشتك الرئيسية', 'success');
+    if (!canInstall) {
+      notify?.('من Chrome: ⋮ ⬅️ تثبيت التطبيق', 'info');
+      return;
     }
+
+    const result = await install();
+    if (result.ok) {
+      notify?.('✅ تم التثبيت — افتح لعيب زون من شاشتك الرئيسية', 'success');
+      return;
+    }
+    if (result.reason === 'dismissed') {
+      notify?.('ألغيت التثبيت — يمكنك المحاولة لاحقاً', 'info');
+      return;
+    }
+    notify?.('تعذّر التثبيت — جرّب ⋮ ⬅️ تثبيت التطبيق من Chrome', 'error');
   };
 
+  const renderSteps = (os, steps, label) => (
+    <>
+      <div className="pwa-install-platform__head">
+        <PlatformOsIcon os={os} size={18} />
+        <span>{label}</span>
+      </div>
+      <ol className="pwa-install-steps" aria-label={`خطوات التثبيت على ${label}`}>
+        {steps.map((step) => (
+          <li key={step} className="pwa-install-steps__item">
+            {step}
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+
   return (
-    <div className="card pwa-install-card" style={{ marginBottom: 12 }}>
+    <div className={`card pwa-install-card${compact ? ' pwa-install-card--compact' : ''}`} style={{ marginBottom: 12 }}>
       <div className="ctitle">📲 إضافة للشاشة الرئيسية</div>
       <p className="psub pwa-install-card__lead">
-        ثبّت {PWA_MANIFEST.short_name} على جوالك ليفتح كتطبيق — أسرع وأنسب للجلسات
+        لعبك أسرع؟ ثبّت {PWA_MANIFEST.short_name} على شاشتك (مرة واحدة)
       </p>
 
       {canInstall ? (
@@ -43,29 +60,26 @@ export default function PwaInstallCard({ notify }) {
         </button>
       ) : null}
 
-      {isIos ? (
-        <ol className="pwa-install-steps" aria-label="خطوات التثبيت على iPhone">
-          {IOS_STEPS.map((step) => (
-            <li key={step} className="pwa-install-steps__item">
-              {step}
-            </li>
-          ))}
-        </ol>
+      {isIos ? renderSteps('apple', PWA_IOS_INSTALL_STEPS, 'iPhone') : null}
+
+      {isAndroid ? (
+        <>
+          <p className="pwa-install-card__trust">
+            تحذير Play Protect يظهر أحياناً لتطبيقات الويب الجديدة — ليس فيروساً. التطبيق يعمل داخل Chrome ولا يصل لبياناتك خارج الموقع.
+          </p>
+          {renderSteps('android', PWA_ANDROID_INSTALL_STEPS, 'Android')}
+        </>
       ) : null}
 
-      {isAndroid && !canInstall ? (
-        <ol className="pwa-install-steps" aria-label="خطوات التثبيت على أندرويد">
-          {ANDROID_MANUAL_STEPS.map((step) => (
-            <li key={step} className="pwa-install-steps__item">
-              {step}
-            </li>
-          ))}
-        </ol>
-      ) : null}
-
-      <p className="pwa-install-card__hint">
-        بعد التثبيت يفتح بملء الشاشة بدون شريط المتصفح
-      </p>
+      {!isIos && !isAndroid ? (
+        <p className="pwa-install-card__hint">
+          من متصفح الجوال: ⋮ ⬅️ تثبيت التطبيق أو إضافة للشاشة الرئيسية
+        </p>
+      ) : (
+        <p className="pwa-install-card__hint">
+          بعد التثبيت يفتح بملء الشاشة بدون شريط المتصفح
+        </p>
+      )}
     </div>
   );
 }

@@ -16,11 +16,13 @@ export function getCodeActivityInfo(stats) {
   return { label: 'غير نشط', color: 'var(--dim)', pulse: false };
 }
 
-/** ملخص سطر الجدول: X جلسة · Y جولة */
+/** ملخص سطر الجدول: X جلسة · Y جولة · Z متسابق */
 export function formatCodeMiniStats(stats) {
   if (!stats) return '—';
   if (stats.totalRealSessions == null && stats.totalRounds == null) return '—';
   const sessions = Number(stats.totalRealSessions) || 0;
   const rounds = Number(stats.totalRounds) || 0;
+  const players = Number(stats.totalPlayerCount) || 0;
+  if (players > 0) return `${sessions} جلسة · ${rounds} جولة · ${players} مشاركة`;
   return `${sessions} جلسة · ${rounds} جولة`;
 }
