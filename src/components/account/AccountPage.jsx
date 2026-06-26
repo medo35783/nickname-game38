@@ -21,6 +21,7 @@ import AccountStatsPanel from '../../shared/AccountStatsPanel';
 import ArenaBadgeSheet from '../../shared/ArenaBadgeSheet';
 import ArenaHallOfFame from '../../shared/ArenaHallOfFame';
 import GameTopNav from '../../shared/GameTopNav';
+import PwaInstallCard from '../layout/PwaInstallCard';
 import useArenaProfile from '../../hooks/useArenaProfile';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
 import { ARENA_ACHIEVEMENT_LIST } from '../../core/arenaAchievements';
@@ -448,6 +449,8 @@ export default function AccountPage({
               onFollowSystem={onFollowSystem}
             />
           </div>
+
+          <PwaInstallCard notify={notify} />
 
           <AccountKnowledgeBank onOpenContribute={onOpenContribute} />
 

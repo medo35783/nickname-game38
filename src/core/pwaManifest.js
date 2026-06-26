@@ -15,6 +15,12 @@ export const PWA_MANIFEST = {
   icons: [
     {
       src: '/brand/la3ibz-favicon.png',
+      sizes: '192x192',
+      type: 'image/png',
+      purpose: 'any',
+    },
+    {
+      src: '/brand/la3ibz-favicon.png',
       sizes: '512x512',
       type: 'image/png',
       purpose: 'any',

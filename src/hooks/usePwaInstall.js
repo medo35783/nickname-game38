@@ -1,0 +1,82 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  isAndroidDevice,
+  isIosDevice,
+  isMobileDevice,
+  isPwaStandalone,
+} from '../core/pwaInstall';
+
+export function usePwaInstall() {
+  const deferredRef = useRef(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => isPwaStandalone());
+  const [isIos, setIsIos] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [installing, setInstalling] = useState(false);
+
+  useEffect(() => {
+    setIsIos(isIosDevice());
+    setIsAndroid(isAndroidDevice());
+    setIsMobile(isMobileDevice());
+    setIsInstalled(isPwaStandalone());
+
+    const onBeforeInstall = (event) => {
+      event.preventDefault();
+      deferredRef.current = event;
+      setCanInstall(true);
+    };
+
+    const onInstalled = () => {
+      deferredRef.current = null;
+      setCanInstall(false);
+      setIsInstalled(true);
+    };
+
+    const onDisplayModeChange = () => {
+      setIsInstalled(isPwaStandalone());
+    };
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
+    window.addEventListener('appinstalled', onInstalled);
+
+    const mq = window.matchMedia('(display-mode: standalone)');
+    mq.addEventListener('change', onDisplayModeChange);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+      window.removeEventListener('appinstalled', onInstalled);
+      mq.removeEventListener('change', onDisplayModeChange);
+    };
+  }, []);
+
+  const install = useCallback(async () => {
+    const prompt = deferredRef.current;
+    if (!prompt) return false;
+
+    setInstalling(true);
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      deferredRef.current = null;
+      setCanInstall(false);
+      if (outcome === 'accepted') setIsInstalled(true);
+      return outcome === 'accepted';
+    } finally {
+      setInstalling(false);
+    }
+  }, []);
+
+  const showCard = !isInstalled && isMobile && (canInstall || isIos || isAndroid);
+
+  return {
+    canInstall,
+    isInstalled,
+    isIos,
+    isAndroid,
+    isMobile,
+    installing,
+    install,
+    showCard,
+  };
+}

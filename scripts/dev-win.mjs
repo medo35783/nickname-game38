@@ -9,6 +9,7 @@ function resolveDepsRoot() {
   if (process.env.NG_DEPS_ROOT) return process.env.NG_DEPS_ROOT
 
   const candidates = [
+    projectRoot,
     'D:/ng-deps/nickname-game55777',
     'C:/Users/Hp/ng-deps/nickname-game55777',
   ]
@@ -18,17 +19,21 @@ function resolveDepsRoot() {
   }
 
   console.error(
-    '\nلم يتم العثور على node_modules على قرص NTFS (D: أو C:).\n' +
-    'شغّل مرة واحدة:\n' +
-    '  npm run setup-deps\n',
+    '\nلم يتم العثور على node_modules.\n' +
+    'على Windows شغّل مرة واحدة:\n' +
+    '  npm run setup-deps\n' +
+    'على Vercel/Linux تأكد من تشغيل npm install قبل البناء.\n',
   )
   process.exit(1)
 }
 
 const depsRoot = resolveDepsRoot()
-const proxyConfig = path.join(depsRoot, 'vite.config.proxy.mjs')
+const useLocalDeps = path.resolve(depsRoot) === path.resolve(projectRoot)
+const viteConfig = useLocalDeps
+  ? path.join(projectRoot, 'vite.config.js')
+  : path.join(depsRoot, 'vite.config.proxy.mjs')
 const viteBin = path.join(depsRoot, 'node_modules/vite/bin/vite.js')
-const viteArgs = ['--config', proxyConfig, ...process.argv.slice(2)]
+const viteArgs = ['--config', viteConfig, ...process.argv.slice(2)]
 
 const child = spawn(
   process.execPath,
