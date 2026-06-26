@@ -1,7 +1,9 @@
 ﻿import '../styles/hesbah.css';
+import '../styles/home-game-icons.css';
 import { formatOtherSessionsHint, getAllActiveSessions } from '../shared/gameSessionRegistry';
 import { setLastPlayedGame } from '../question-bank/qbank.helpers';
 import La3ibzBrandMark from '../shared/La3ibzBrandMark';
+import HomeGameIcon from '../shared/HomeGameIcons';
 
 const GAME_BANK_TYPE = {
   nicknames: 'titles',
@@ -37,9 +39,9 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 44 }}>🎭</div>
-          <div style={{ flex: 1 }}>
+        <div className="home-game-card__row">
+          <HomeGameIcon game="nicknames" />
+          <div className="home-game-card__body">
             <div className="home-game-card__title">الألقاب</div>
             <div className="home-game-card__sub">أخفِ هويتك واكشف الآخرين قبل أن يكشفوك</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
@@ -67,9 +69,9 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 44 }}>🦅</div>
-          <div style={{ flex: 1 }}>
+        <div className="home-game-card__row">
+          <HomeGameIcon game="fameeri" />
+          <div className="home-game-card__body">
             <div className="home-game-card__title">القميري</div>
             <div className="home-game-card__sub">وزّع القميري على الأشجار واهجم مجموعات الخصوم</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
@@ -99,9 +101,9 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest }) {
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 44 }}>🎯</div>
-          <div style={{ flex: 1 }}>
+        <div className="home-game-card__row">
+          <HomeGameIcon game="hesbah" />
+          <div className="home-game-card__body">
             <div className="home-game-card__title">حَسْبة</div>
             <div className="home-game-card__sub">اختر درجتك، أجب بذكاء، ونافس على التتويج</div>
             <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>

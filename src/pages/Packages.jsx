@@ -2,6 +2,7 @@ import { SUPPORT_EMAIL, PLATFORM_NAME } from '../core/constants';
 import GameTopNav from '../shared/GameTopNav';
 import { SUBSCRIPTION_PACKAGES, SUBSCRIPTION_FEATURES, getEffectivePrice } from '../core/subscriptionPackages';
 import PackagePlanCard from '../components/codes/PackagePlanCard';
+import PackagesLegalNotice from '../components/codes/PackagesLegalNotice';
 
 /**
  * @param {object} props
@@ -67,6 +68,8 @@ export default function Packages({ onSubscribe, onBack }) {
           <PackagePlanCard key={pkg.id} pkg={pkg} onSubscribe={handleSubscribe} />
         ))}
       </div>
+
+      <PackagesLegalNotice />
 
       <footer className="pkg-footer">
         <div className="pkg-trust">

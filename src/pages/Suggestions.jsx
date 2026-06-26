@@ -32,7 +32,7 @@ export default function Suggestions({ notify }) {
           window.open(`mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`);
           setSuggForm(f => ({ ...f, text: '' })); notify('✅ سيُفتح تطبيق البريد', 'success');
         }}>📤 فتح البريد للإرسال</button>
-        <div style={{ marginTop: 10, padding: '9px 12px', background: 'rgba(79,163,224,.07)', border: '1px solid rgba(79,163,224,.2)', borderRadius: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
+        <div style={{ marginTop: 10, padding: '9px 12px', background: 'rgba(37,111,168,.08)', border: '1px solid rgba(37,111,168,.22)', borderRadius: 8, fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
           إلى: <strong style={{ color: 'var(--blue)' }}>{SUPPORT_EMAIL}</strong>
         </div>
       </div>

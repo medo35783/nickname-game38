@@ -2,6 +2,7 @@
  * تقرير HTML للطباعة / حفظ PDF — لعبة الألقاب (خلفية بيضاء، ألوان اللعبة).
  */
 import { AV_COLORS } from '../../core/constants';
+import { reportPlatformFooterLabel, reportPlatformLogoHtml } from '../../shared/reportBrandAssets';
 import {
   attackableNicksForPlayer,
   nickExitMeta,
@@ -35,6 +36,7 @@ const C = {
 function pgHead(roomCode, sectionTitle = '') {
   return `<header class="pg-head">
     <div class="pg-brand">
+      <div class="pg-platform">${reportPlatformLogoHtml({ theme: 'light', maxHeight: 34 })}</div>
       <span class="pg-ico" aria-hidden="true">🎭</span>
       <div>
         <div class="pg-title">لعبة الألقاب</div>
@@ -328,7 +330,8 @@ function reportStyles() {
     background:linear-gradient(135deg,${C.goldLight},#fff);
     border-bottom:2px solid ${C.gold};
   }
-  .pg-brand{display:flex;align-items:center;gap:10px}
+  .pg-brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pg-platform{flex-shrink:0}
   .pg-ico{font-size:28px;line-height:1}
   .pg-title{font-family:'Cairo',sans-serif;font-size:16px;font-weight:900;color:${C.gold}}
   .pg-tag{font-size:10px;color:${C.muted}}
@@ -339,6 +342,7 @@ function reportStyles() {
   .page-break{page-break-before:always;padding-top:8px}
   .sec-title{font-family:'Cairo',sans-serif;font-size:17px;font-weight:900;color:${C.gold};margin:0 0 10px}
   .cover{padding:16px 0 8px;text-align:center}
+  .cover-platform{display:flex;justify-content:center;margin-bottom:12px}
   .cover h1{margin:0 0 8px;font-family:'Cairo',sans-serif;font-size:22px;color:${C.gold}}
   .cover .date{font-size:12px;color:${C.muted}}
   .kpi{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0}
@@ -358,7 +362,7 @@ function reportStyles() {
   .wchip.dim{color:${C.muted}}
   .winner-sep{color:${C.muted}}
   .print-hint{font-size:11px;color:${C.muted};margin:12px 0 6px}
-  .print-btn{font-family:'Cairo',sans-serif;padding:11px 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#f0c040,#c9a030);color:#1a1020;font-weight:900;font-size:14px;cursor:pointer}
+  .print-btn{font-family:'Cairo',sans-serif;padding:11px 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#d4920a,#b86a10);color:#1a1020;font-weight:900;font-size:14px;cursor:pointer}
   .hud{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
   .hud-cell{padding:8px 12px;border-radius:10px;background:#fff;border:1px solid ${C.border};font-size:11px;color:${C.muted}}
   .hud-cell b{display:block;font-family:'Cairo',sans-serif;font-size:18px;color:${C.blue}}
@@ -492,6 +496,7 @@ function buildReportHtml({ roomCode, playersList, allRoundsList, allAttacksFlat,
 <div class="wrap">
 
   <section class="page cover">
+    <div class="cover-platform">${reportPlatformLogoHtml({ theme: 'light', maxHeight: 52 })}</div>
     ${pgHead(roomCode, 'ملخص المسابقة')}
     <h1>تقرير كامل</h1>
     <p class="date">${esc(dateStr)}</p>
@@ -550,7 +555,7 @@ function buildReportHtml({ roomCode, playersList, allRoundsList, allAttacksFlat,
     ${roundsPath || '<p class="empty-sm">لا جولات مسجّلة</p>'}
   </section>
 
-  <div class="foot">لعبة الألقاب — ساحة الألعاب</div>
+  <div class="foot">${reportPlatformFooterLabel('لعبة الألقاب')}</div>
 </div>
 <script>function doPrint(){window.focus();window.print();}</script>
 </body>

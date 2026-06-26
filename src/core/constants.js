@@ -39,6 +39,9 @@ export const PLATFORM_NAME = 'لعيب زون';
 export const PLATFORM_NAME_EN = 'La3ib Zone';
 export const PLATFORM_TAGLINE = 'لعيب زون | جَوّك، جمعتك، وتحديك';
 export const PLATFORM_SLOGAN = 'جَوّك، جمعتك، وتحديك';
+/** الموقع الرسمي للمنصة — يُستخدم في المشاركة والتقارير */
+export const PLATFORM_SITE_URL = 'https://www.la3ibz.com/';
+export const PLATFORM_SITE_HOST = 'www.la3ibz.com';
 
 export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=16';
 export const BRAND_ICON_DARK_SRC = '/brand/la3ibz-icon-mark-dark.png?v=16';

@@ -43,8 +43,8 @@ export default function CodeActivityBadge({ activity, loading }) {
     >
       <style>{`
         @keyframes codeActPulse {
-          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(46,204,113,.45); }
-          50% { opacity: 0.85; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(46,204,113,0); }
+          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(36,143,85,.45); }
+          50% { opacity: 0.85; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(36,143,85,0); }
         }
       `}</style>
       <span

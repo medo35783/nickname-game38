@@ -55,7 +55,7 @@ export default function FameeriSpectatorView({
               borderRadius: 999,
               fontSize: 15,
               fontWeight: 800,
-              background: underAttack ? 'rgba(230,57,80,.15)' : attacking ? 'rgba(240,192,64,.15)' : 'var(--surface)',
+              background: underAttack ? 'rgba(230,57,80,.15)' : attacking ? 'rgba(201,127,26,.15)' : 'var(--surface)',
               border: `1.5px solid ${underAttack ? 'var(--red)' : attacking ? accent : 'var(--border-faint)'}`,
               color: 'var(--text)',
             }}
@@ -110,7 +110,7 @@ export default function FameeriSpectatorView({
                 padding: '14px 18px',
                 marginBottom: 10,
                 borderRadius: 14,
-                background: isWinner ? 'linear-gradient(135deg,rgba(240,192,64,.2),rgba(255,140,0,.1))' : 'var(--surface)',
+                background: isWinner ? 'linear-gradient(135deg,rgba(36,143,85,.2),rgba(201,127,26,.1))' : 'var(--surface)',
                 border: isWinner ? `2px solid ${accent}` : '1px solid var(--border-faint)',
               }}
             >

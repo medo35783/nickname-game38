@@ -1,4 +1,5 @@
 import { PLATFORM_NAME } from './constants';
+import { drawReportBrandLogo, reportSiteHost } from '../shared/reportBrandAssets';
 
 const CARD_W = 1080;
 const CARD_H = 1350;
@@ -12,8 +13,8 @@ const GAME_LABELS = {
 const TIER_COLORS = {
   bronze: ['#5c3d1e', '#cd7f32'],
   silver: ['#4a4a5a', '#c0c0d8'],
-  gold: ['#5c4a10', '#f0c040'],
-  legend: ['#3d1a5c', '#9b59b6'],
+  gold: ['#5c4a10', '#d4920a'],
+  legend: ['#3d1a2a', '#962438'],
 };
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -74,8 +75,16 @@ export async function buildArenaVictoryCanvas({
   roundRect(ctx, 32, 32, CARD_W - 64, CARD_H - 64, 32);
   ctx.stroke();
 
+  await drawReportBrandLogo(ctx, {
+    centerX: CARD_W / 2,
+    y: 52,
+    maxWidth: 380,
+    maxHeight: 56,
+    theme: 'dark',
+  });
+
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#f0c040';
+  ctx.fillStyle = '#d4920a';
   ctx.font = '900 44px Cairo, Tajawal, sans-serif';
   ctx.fillText('🏟️ شارة الساحة', CARD_W / 2, 120);
 
@@ -93,7 +102,7 @@ export async function buildArenaVictoryCanvas({
   roundRect(ctx, 80, 520, CARD_W - 160, 340, 24);
   ctx.fillStyle = 'rgba(15,15,34,0.75)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(240,192,64,0.35)';
+  ctx.strokeStyle = 'rgba(201,127,26,0.35)';
   ctx.lineWidth = 2;
   ctx.stroke();
 
@@ -103,13 +112,13 @@ export async function buildArenaVictoryCanvas({
   ctx.fillText(gameLabel, CARD_W / 2, 590);
 
   if (rank != null) {
-    ctx.fillStyle = '#f0c040';
+    ctx.fillStyle = '#d4920a';
     ctx.font = '900 72px Cairo, Tajawal, sans-serif';
     ctx.fillText(`المركز ${rank}`, CARD_W / 2, 680);
   }
 
   if (arenaReward > 0) {
-    ctx.fillStyle = '#2ecc71';
+    ctx.fillStyle = '#248f55';
     ctx.font = '800 40px Cairo, Tajawal, sans-serif';
     ctx.fillText(`+${arenaReward} نقطة ساحة`, CARD_W / 2, 760);
   }
@@ -126,7 +135,7 @@ export async function buildArenaVictoryCanvas({
   ctx.fillText(meta, CARD_W / 2, CARD_H - 100);
 
   ctx.font = '600 16px Cairo, Tajawal, sans-serif';
-  ctx.fillText('nickname-game38.vercel.app', CARD_W / 2, CARD_H - 64);
+  ctx.fillText(reportSiteHost(), CARD_W / 2, CARD_H - 64);
 
   return canvas;
 }

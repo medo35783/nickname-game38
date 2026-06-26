@@ -8,6 +8,7 @@ import HostSetupPanel from './HostSetupPanel';
 import HostAttacksTable from './HostAttacksTable';
 import { PLAYER_DISPLAY_NAME_PLACEHOLDER, PLAYER_NICK_PLACEHOLDER } from '../../../core/formLabels';
 import WhatsAppLogoIcon from '../../../components/icons/WhatsAppLogoIcon';
+import { shareRoomInviteMessage } from '../../../shared/roomInviteShare';
 
 const HOST_TABS = [
   { id: 'players', icon: '👥', label: 'لاعبون' },
@@ -162,47 +163,12 @@ export default function TitlesHostCockpit(props) {
   };
 
   const shareRoomInvite = async (preferWhatsApp = false) => {
-    const roomLink = 'https://nickname-game38.vercel.app/';
-    const gameName = 'الألقاب';
-    const inviteText = [
-      '🎮 ساحة الألعاب',
-      'مسابقات جماعية سريعة وممتعة.',
-      'برمز واحد.. تشتعل اللمة ومرحها يزود',
-      '',
-      `اللعبة: ${gameName}`,
-      `رمز الغرفة: ${roomCode}`,
-      `رابط الدخول: ${roomLink}`,
-    ].join('\n');
-
-    if (!preferWhatsApp && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: 'ساحة الألعاب',
-          text: inviteText,
-          url: roomLink,
-        });
-        notify('تم فتح المشاركة ✓', 'success');
-        return;
-      } catch (err) {
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
-    if (typeof window !== 'undefined') {
-      const w = window.open(waUrl, '_blank', 'noopener,noreferrer');
-      if (w) {
-        notify('تم فتح واتساب ✓', 'success');
-        return;
-      }
-    }
-
-    try {
-      await navigator.clipboard?.writeText(inviteText);
-      notify('تم نسخ دعوة الغرفة ✓', 'success');
-    } catch {
-      notify('تعذر فتح المشاركة حالياً', 'error');
-    }
+    await shareRoomInviteMessage({
+      gameName: 'الألقاب',
+      roomCode,
+      preferWhatsApp,
+      notify,
+    });
   };
 
   const fab = (() => {
@@ -388,7 +354,7 @@ export default function TitlesHostCockpit(props) {
                           <div className="pi-name">{p.name}</div>
                           <div className="pi-nick">
                             &quot;{p.nick}&quot;
-                            {p.nick2 ? <span style={{ color: 'rgba(240,192,64,.6)' }}> · &quot;{p.nick2}&quot;</span> : ''}
+                            {p.nick2 ? <span style={{ color: 'var(--titles-primary-light)' }}> · &quot;{p.nick2}&quot;</span> : ''}
                           </div>
                           {phase === 'attacking' && (
                             <div

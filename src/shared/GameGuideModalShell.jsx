@@ -41,7 +41,7 @@ export default function GameGuideModalShell({
 
         <div className="game-guide-modal__body">{children}</div>
 
-        <button type="button" className="btn bg game-guide-modal__done" onClick={onClose}>
+        <button type="button" className="btn btn-arena game-guide-modal__done" onClick={onClose}>
           ✅ فهمت!
         </button>
       </div>

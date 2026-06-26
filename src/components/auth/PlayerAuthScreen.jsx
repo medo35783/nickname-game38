@@ -101,7 +101,7 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
           style={{
             flex: 1,
             borderColor: mode === 'login' ? 'var(--gold)' : undefined,
-            background: mode === 'login' ? 'rgba(240,192,64,.1)' : undefined,
+            background: mode === 'login' ? 'rgba(201,127,26,.1)' : undefined,
           }}
           onClick={() => {
             setMode('login');
@@ -116,7 +116,7 @@ export default function PlayerAuthScreen({ notify, compact = false, onSuccess, i
           style={{
             flex: 1,
             borderColor: mode === 'register' ? 'var(--gold)' : undefined,
-            background: mode === 'register' ? 'rgba(240,192,64,.1)' : undefined,
+            background: mode === 'register' ? 'rgba(201,127,26,.1)' : undefined,
           }}
           onClick={() => {
             setMode('register');

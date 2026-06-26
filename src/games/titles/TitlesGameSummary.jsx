@@ -49,7 +49,7 @@ export default function TitlesGameSummary({
             fontFamily: 'Cairo',
             fontSize: 24,
             fontWeight: 900,
-            background: 'linear-gradient(135deg,var(--gold),#ff8c00)',
+            background: 'linear-gradient(135deg,var(--gold),var(--brand-orange-light))',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}
@@ -75,7 +75,7 @@ export default function TitlesGameSummary({
           <div style={{ fontFamily: 'Cairo', fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>{w.name}</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>
             &quot;{w.nick}&quot;
-            {w.nick2 ? <span style={{ color: 'rgba(240,192,64,.6)' }}> · &quot;{w.nick2}&quot;</span> : ''}
+            {w.nick2 ? <span style={{ color: 'var(--titles-primary-light)' }}> · &quot;{w.nick2}&quot;</span> : ''}
           </div>
         </div>
       ))}

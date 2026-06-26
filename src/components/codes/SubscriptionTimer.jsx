@@ -91,8 +91,8 @@ export default function SubscriptionTimer({ activeCode, onExpired }) {
     borderRadius: 8,
     fontSize: 12,
     cursor: 'pointer',
-    border: `1px solid ${urgent ? 'rgba(230,57,80,.45)' : 'rgba(46,204,113,.35)'}`,
-    background: urgent ? 'rgba(230,57,80,.12)' : 'rgba(46,204,113,.1)',
+    border: `1px solid ${urgent ? 'rgba(230,57,80,.45)' : 'rgba(36,143,85,.35)'}`,
+    background: urgent ? 'rgba(230,57,80,.12)' : 'rgba(36,143,85,.1)',
     color: urgent ? 'var(--red)' : 'var(--green)',
     fontWeight: 700,
     whiteSpace: 'nowrap',
@@ -159,7 +159,7 @@ export default function SubscriptionTimer({ activeCode, onExpired }) {
               <div style={{ fontSize: 15, fontWeight: 800 }}>{formatDetailedRemaining(expiresAt)}</div>
             </div>
 
-            <button type="button" className="btn bg" onClick={() => setModalOpen(false)}>
+            <button type="button" className="btn btn-arena" onClick={() => setModalOpen(false)}>
               إغلاق
             </button>
 

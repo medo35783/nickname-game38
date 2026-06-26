@@ -11,20 +11,20 @@
 }
 
 .acct-sub--active {
-  border-color: rgba(46, 204, 113, 0.4);
-  background: linear-gradient(160deg, rgba(46, 204, 113, 0.1) 0%, rgba(240, 192, 64, 0.06) 45%, var(--card) 92%);
-  box-shadow: 0 10px 32px rgba(46, 204, 113, 0.1);
+  border-color: rgba(36, 143, 85, 0.4);
+  background: linear-gradient(160deg, rgba(36, 143, 85, 0.1) 0%, rgba(201, 127, 26, 0.06) 45%, var(--card) 92%);
+  box-shadow: 0 10px 32px rgba(36, 143, 85, 0.1);
 }
 
 .acct-sub--urgent {
   border-color: rgba(230, 57, 80, 0.45);
-  background: linear-gradient(160deg, rgba(230, 57, 80, 0.1) 0%, rgba(240, 192, 64, 0.05) 50%, var(--card) 92%);
+  background: linear-gradient(160deg, rgba(230, 57, 80, 0.1) 0%, rgba(201, 127, 26, 0.05) 50%, var(--card) 92%);
 }
 
 .acct-sub--empty {
   text-align: center;
-  border-color: rgba(240, 192, 64, 0.3);
-  background: linear-gradient(165deg, rgba(240, 192, 64, 0.08) 0%, var(--card) 70%);
+  border-color: rgba(201, 127, 26, 0.3);
+  background: linear-gradient(165deg, rgba(201, 127, 26, 0.08) 0%, var(--card) 70%);
 }
 
 .acct-sub__glow {
@@ -35,11 +35,11 @@
   width: 160px;
   height: 120px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(46, 204, 113, 0.25), transparent 70%);
+  background: radial-gradient(ellipse, rgba(36, 143, 85, 0.25), transparent 70%);
 }
 
 .acct-sub__glow--muted {
-  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.2), transparent 70%);
+  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.2), transparent 70%);
 }
 
 .acct-sub__head {
@@ -75,8 +75,8 @@
   font-size: 10px;
   font-weight: 900;
   color: var(--green);
-  background: rgba(46, 204, 113, 0.14);
-  border: 1px solid rgba(46, 204, 113, 0.3);
+  background: rgba(36, 143, 85, 0.14);
+  border: 1px solid rgba(36, 143, 85, 0.3);
 }
 
 .acct-sub__status--urgent {
@@ -93,7 +93,7 @@
   margin-bottom: 14px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.08);
-  border: 1px dashed rgba(240, 192, 64, 0.35);
+  border: 1px dashed rgba(201, 127, 26, 0.35);
 }
 
 [data-theme="light"] .acct-sub__code-block {
@@ -301,8 +301,8 @@
 }
 
 .acct-history__row--current {
-  border-color: rgba(46, 204, 113, 0.4);
-  background: linear-gradient(145deg, rgba(46, 204, 113, 0.08), var(--card));
+  border-color: rgba(36, 143, 85, 0.4);
+  background: linear-gradient(145deg, rgba(36, 143, 85, 0.08), var(--card));
 }
 
 .acct-history__row--expired {
@@ -337,8 +337,8 @@
 
 .acct-history__badge--on {
   color: var(--green);
-  background: rgba(46, 204, 113, 0.12);
-  border-color: rgba(46, 204, 113, 0.3);
+  background: rgba(36, 143, 85, 0.12);
+  border-color: rgba(36, 143, 85, 0.3);
 }
 
 .acct-history__row-meta {
@@ -368,9 +368,9 @@
   margin-bottom: 16px;
   padding: 18px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(155, 89, 182, 0.28);
-  background: linear-gradient(165deg, rgba(155, 89, 182, 0.08) 0%, rgba(79, 163, 224, 0.05) 40%, var(--card) 90%);
-  box-shadow: 0 8px 28px rgba(155, 89, 182, 0.08);
+  border: 1px solid rgba(150, 36, 56, 0.28);
+  background: linear-gradient(165deg, rgba(150, 36, 56, 0.08) 0%, rgba(37, 111, 168, 0.05) 40%, var(--card) 90%);
+  box-shadow: 0 8px 28px rgba(150, 36, 56, 0.08);
 }
 
 .acct-stats--compact-summary {
@@ -425,8 +425,8 @@
 }
 
 .acct-stats-explore__btn:hover {
-  border-color: rgba(79, 163, 224, 0.45);
-  background: rgba(79, 163, 224, 0.06);
+  border-color: rgba(37, 111, 168, 0.45);
+  background: rgba(37, 111, 168, 0.06);
 }
 
 .acct-stats-explore__icon {
@@ -528,8 +528,8 @@
   color: var(--green);
   padding: 5px 10px;
   border-radius: 99px;
-  background: rgba(46, 204, 113, 0.12);
-  border: 1px solid rgba(46, 204, 113, 0.25);
+  background: rgba(36, 143, 85, 0.12);
+  border: 1px solid rgba(36, 143, 85, 0.25);
 }
 
 .acct-stats__hero {
@@ -580,23 +580,23 @@
 }
 
 .acct-stat-tile--gold {
-  border-color: rgba(240, 192, 64, 0.35);
-  background: rgba(240, 192, 64, 0.08);
+  border-color: rgba(201, 127, 26, 0.35);
+  background: rgba(201, 127, 26, 0.08);
 }
 
 .acct-stat-tile--blue {
-  border-color: rgba(79, 163, 224, 0.35);
-  background: rgba(79, 163, 224, 0.08);
+  border-color: rgba(37, 111, 168, 0.35);
+  background: rgba(37, 111, 168, 0.08);
 }
 
 .acct-stat-tile--purple {
-  border-color: rgba(155, 89, 182, 0.35);
-  background: rgba(155, 89, 182, 0.08);
+  border-color: rgba(150, 36, 56, 0.35);
+  background: rgba(150, 36, 56, 0.08);
 }
 
 .acct-stat-tile--green {
-  border-color: rgba(46, 204, 113, 0.35);
-  background: rgba(46, 204, 113, 0.08);
+  border-color: rgba(36, 143, 85, 0.35);
+  background: rgba(36, 143, 85, 0.08);
 }
 
 .acct-stat-tile--gold .acct-stat-tile__val {
@@ -609,8 +609,8 @@
   gap: 14px;
   padding: 16px;
   border-radius: 16px;
-  background: rgba(79, 163, 224, 0.12);
-  border: 1px solid rgba(79, 163, 224, 0.28);
+  background: rgba(37, 111, 168, 0.12);
+  border: 1px solid rgba(37, 111, 168, 0.28);
 }
 
 .acct-stats__time-icon {
@@ -787,8 +787,8 @@
 
 .acct-recent-card__status--ok {
   color: var(--green);
-  background: rgba(46, 204, 113, 0.1);
-  border-color: rgba(46, 204, 113, 0.25);
+  background: rgba(36, 143, 85, 0.1);
+  border-color: rgba(36, 143, 85, 0.25);
 }
 
 .acct-recent-card__facts {
@@ -882,7 +882,7 @@
 }
 
 .acct-sheet-game--gold::before {
-  background: linear-gradient(180deg, #f0c040, #d4a017);
+  background: linear-gradient(180deg, #d4920a, #b86a10);
 }
 
 .acct-sheet-game--purple::before {
@@ -994,7 +994,7 @@
 
 .acct-sheet-session__dot--ok {
   background: var(--green);
-  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.25);
+  box-shadow: 0 0 0 2px rgba(36, 143, 85, 0.25);
 }
 
 .acct-sheet-session__line {
@@ -1065,8 +1065,8 @@
 
 .acct-sheet-session__pill--ok {
   color: var(--green);
-  background: rgba(46, 204, 113, 0.1);
-  border-color: rgba(46, 204, 113, 0.28);
+  background: rgba(36, 143, 85, 0.1);
+  border-color: rgba(36, 143, 85, 0.28);
 }
 
 .acct-sheet-session__facts {
@@ -1117,8 +1117,8 @@
 }
 
 .acct-sheet-code--current {
-  border-color: rgba(46, 204, 113, 0.38);
-  background: linear-gradient(145deg, rgba(46, 204, 113, 0.07), var(--surface));
+  border-color: rgba(36, 143, 85, 0.38);
+  background: linear-gradient(145deg, rgba(36, 143, 85, 0.07), var(--surface));
 }
 
 .acct-sheet-code--expired {
@@ -1132,7 +1132,7 @@
 }
 
 .acct-sheet-code--current .acct-sheet-code__accent {
-  background: linear-gradient(180deg, #2ecc71, #27ae60);
+  background: linear-gradient(180deg, #248f55, #1e7344);
 }
 
 .acct-sheet-code--expired .acct-sheet-code__accent {
@@ -1177,8 +1177,8 @@
 
 .acct-sheet-code__badge--current {
   color: var(--green);
-  background: rgba(46, 204, 113, 0.12);
-  border-color: rgba(46, 204, 113, 0.3);
+  background: rgba(36, 143, 85, 0.12);
+  border-color: rgba(36, 143, 85, 0.3);
 }
 
 .acct-sheet-code__badge--expired {

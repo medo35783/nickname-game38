@@ -71,8 +71,8 @@ export default function TitlesSetup(props) {
             <div
               style={{
                 marginTop: 8,
-                background: 'rgba(79,163,224,.08)',
-                border: '1px solid rgba(79,163,224,.25)',
+                background: 'rgba(37,111,168,.08)',
+                border: '1px solid rgba(37,111,168,.25)',
                 borderRadius: 8,
                 padding: '7px 12px',
                 fontSize: 11,
@@ -138,8 +138,8 @@ export default function TitlesSetup(props) {
         )}
         <div
           style={{
-            background: 'rgba(240,192,64,.06)',
-            border: '1px solid rgba(240,192,64,.2)',
+            background: 'var(--titles-tag-bg)',
+            border: '1px solid var(--titles-border)',
             borderRadius: 8,
             padding: '8px 12px',
             fontSize: 11,
@@ -151,8 +151,8 @@ export default function TitlesSetup(props) {
         <div
           style={{
             marginTop: 8,
-            background: 'rgba(79,163,224,.06)',
-            border: '1px solid rgba(79,163,224,.2)',
+            background: 'rgba(37,111,168,.08)',
+            border: '1px solid rgba(37,111,168,.22)',
             borderRadius: 8,
             padding: '8px 12px',
             fontSize: 11,

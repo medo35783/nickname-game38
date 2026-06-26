@@ -30,6 +30,7 @@ import { hasHesbahCompetitionStarted, isGameCancelled } from '../../shared/gameC
 import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
 import GameSeatPinField from '../../shared/GameSeatPinField';
 import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
+import { shareRoomInviteMessage } from '../../shared/roomInviteShare';
 import {
   findSeatByOwnerUid,
   findSeatById,
@@ -384,22 +385,12 @@ const HesbahGame = forwardRef(function HesbahGame(
   }, [voteCountdown, game?.finalVoteActive, role]);
 
   const shareRoomInvite = async (preferWhatsApp = false) => {
-    const inviteText = [
-      '🎮 ساحة الألعاب — حَسْبة',
-      `رمز الغرفة: ${roomCode}`,
-      'https://nickname-game38.vercel.app/',
-    ].join('\n');
-    if (!preferWhatsApp && navigator.share) {
-      try {
-        await navigator.share({ title: 'حَسْبة', text: inviteText });
-        notify('تم فتح المشاركة ✓', 'success');
-        return;
-      } catch (e) {
-        if (e?.name === 'AbortError') return;
-      }
-    }
-    const wa = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
-    window.open(wa, '_blank', 'noopener,noreferrer');
+    await shareRoomInviteMessage({
+      gameName: 'حَسْبة',
+      roomCode,
+      preferWhatsApp,
+      notify,
+    });
   };
 
   const isPermissionErr = (err) => {

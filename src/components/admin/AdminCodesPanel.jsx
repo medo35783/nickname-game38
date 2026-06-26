@@ -393,7 +393,7 @@ export default function AdminCodesPanel({ notify }) {
                   flex: 1,
                   minWidth: 100,
                   borderColor: sel ? 'var(--gold)' : undefined,
-                  background: sel ? 'rgba(240,192,64,.1)' : undefined,
+                  background: sel ? 'rgba(201,127,26,.1)' : undefined,
                   color: sel ? 'var(--gold)' : undefined,
                 }}
                 onClick={() => setSelectedPkg(p)}
@@ -432,8 +432,8 @@ export default function AdminCodesPanel({ notify }) {
               marginTop: 12,
               padding: '10px 12px',
               borderRadius: 10,
-              background: 'rgba(46,204,113,.1)',
-              border: '1px solid rgba(46,204,113,.35)',
+              background: 'rgba(36,143,85,.1)',
+              border: '1px solid rgba(36,143,85,.35)',
               color: 'var(--green)',
               fontSize: 13,
               fontWeight: 700,
@@ -509,9 +509,9 @@ export default function AdminCodesPanel({ notify }) {
                     eff === 'unused' ? 'var(--blue)' : eff === 'active' ? 'var(--green)' : eff === 'expired' ? 'var(--red)' : 'var(--muted)';
                   const bg =
                     eff === 'unused'
-                      ? 'rgba(79,163,224,.06)'
+                      ? 'rgba(37,111,168,.06)'
                       : eff === 'active'
-                        ? 'rgba(46,204,113,.06)'
+                        ? 'rgba(36,143,85,.06)'
                         : eff === 'expired'
                           ? 'rgba(230,57,80,.07)'
                           : 'rgba(255,255,255,.03)';
@@ -534,7 +534,7 @@ export default function AdminCodesPanel({ notify }) {
                           }
                         }}
                         style={{
-                          background: isExpanded ? 'rgba(240,192,64,.08)' : bg,
+                          background: isExpanded ? 'rgba(201,127,26,.08)' : bg,
                           borderBottom: '1px solid rgba(255,255,255,.05)',
                           cursor: 'pointer',
                         }}

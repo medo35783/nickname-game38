@@ -1,9 +1,37 @@
+import path from 'node:path'
+import { readFileSync } from 'node:fs'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { PWA_MANIFEST } from './src/core/pwaManifest.js'
+
+const depsRoot = process.env.NG_DEPS_ROOT || path.dirname(fileURLToPath(import.meta.url))
+const projectRoot = process.env.NG_PROJECT_ROOT
+if (!depsRoot || !projectRoot) {
+  throw new Error('NG_DEPS_ROOT and NG_PROJECT_ROOT are required (set by scripts/dev-win.mjs)')
+}
+
+function depsAliases() {
+  const pkg = JSON.parse(readFileSync(path.join(depsRoot, 'package.json'), 'utf8'))
+  const names = [
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.devDependencies || {}),
+  ]
+  return Object.fromEntries(
+    names.map((name) => [name, path.join(depsRoot, 'node_modules', name)]),
+  )
+}
+
+const { PWA_MANIFEST } = await import(
+  pathToFileURL(path.join(projectRoot, 'src/core/pwaManifest.js')).href
+)
 
 export default defineConfig({
+  root: projectRoot,
+  cacheDir: path.join(depsRoot, 'node_modules', '.vite'),
+  resolve: {
+    alias: depsAliases(),
+  },
   plugins: [
     react(),
     VitePWA({

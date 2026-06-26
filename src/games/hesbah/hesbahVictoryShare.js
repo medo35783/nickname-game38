@@ -1,4 +1,6 @@
 import { sortedHesbahPlayers, formatHesbahDateTime, HESBAH_BRAND } from './HesbahHelpers';
+import { PLATFORM_NAME } from '../../core/constants';
+import { drawReportBrandLogo, reportSiteHost } from '../../shared/reportBrandAssets';
 
 const CARD_W = 1080;
 const CARD_H = 1440;
@@ -85,11 +87,15 @@ export async function buildHesbahVictoryCanvas({
 
   drawBg(ctx);
 
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '600 22px Cairo, Tajawal, sans-serif';
-  ctx.fillText(HESBAH_BRAND.arena, CARD_W / 2, 88);
+  await drawReportBrandLogo(ctx, {
+    centerX: CARD_W / 2,
+    y: 40,
+    maxWidth: 420,
+    maxHeight: 62,
+    theme: 'dark',
+  });
 
+  ctx.textAlign = 'center';
   ctx.fillStyle = '#ffab00';
   ctx.font = '900 56px Cairo, Tajawal, sans-serif';
   ctx.fillText(`${HESBAH_BRAND.emoji} ${HESBAH_BRAND.title}`, CARD_W / 2, 156);
@@ -209,7 +215,7 @@ export async function buildHesbahVictoryCanvas({
 
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '600 16px Cairo, Tajawal, sans-serif';
-  ctx.fillText('ساحة الألعاب — nickname-game38.vercel.app', CARD_W / 2, CARD_H - 82);
+  ctx.fillText(`${PLATFORM_NAME} — ${reportSiteHost()}`, CARD_W / 2, CARD_H - 82);
 
   return canvas;
 }
@@ -243,7 +249,7 @@ export async function shareHesbahVictoryImage(opts) {
     `🏆 نتائج ${HESBAH_BRAND.title}`,
     winner ? `👑 ${winner.name} — ${winner.totalScore || 0} نقطة` : '',
     code ? `رمز الغرفة: ${code}` : '',
-    'ساحة الألعاب',
+    PLATFORM_NAME,
   ]
     .filter(Boolean)
     .join('\n');

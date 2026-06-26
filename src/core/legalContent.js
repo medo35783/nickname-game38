@@ -1,15 +1,17 @@
-import { SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_URL } from './constants';
+import { SUPPORT_WHATSAPP_URL } from './constants';
 
 /** @typedef {'terms' | 'privacy' | 'refund'} LegalDocumentId */
 
 /** @typedef {{ id: LegalDocumentId; title: string; subtitle?: string; points: string[]; contactWhatsApp?: boolean }} LegalDocument */
+
+export const LEGAL_ORG_SUBTITLE = 'مؤسسة لعيب زون للخدمات التجارية';
 
 /** @type {Record<LegalDocumentId, LegalDocument>} */
 export const LEGAL_DOCUMENTS = {
   terms: {
     id: 'terms',
     title: 'الشروط والأحكام',
-    subtitle: 'مؤسسة لعيب زون للخدمات التجارية',
+    subtitle: LEGAL_ORG_SUBTITLE,
     points: [
       'الاشتراك يمنح المشرف صلاحية إنشاء غرف لعب وإدارة جلسات تفاعلية خلال مدة الباقة المختارة',
       'تبدأ مدة الباقة فور تفعيل الكود',
@@ -21,7 +23,7 @@ export const LEGAL_DOCUMENTS = {
   privacy: {
     id: 'privacy',
     title: 'سياسة الخصوصية',
-    subtitle: 'لعيبز',
+    subtitle: LEGAL_ORG_SUBTITLE,
     points: [
       'نجمع فقط البيانات الضرورية لتشغيل الخدمة (اسم المستخدم، رقم الجلسة)',
       'لا نشارك بياناتك مع أطراف ثالثة',
@@ -32,7 +34,7 @@ export const LEGAL_DOCUMENTS = {
   refund: {
     id: 'refund',
     title: 'سياسة الاسترجاع',
-    subtitle: 'لعيبز',
+    subtitle: LEGAL_ORG_SUBTITLE,
     points: [
       'بسبب طبيعة الخدمة الرقمية، لا يُقبل الاسترجاع بعد تفعيل الكود واستخدام الخدمة',
       'في حال وجود خلل تقني يمنع الاستخدام الكامل، يُرجى التواصل معنا خلال 24 ساعة وسنعوّضك بكود جديد',
@@ -41,4 +43,4 @@ export const LEGAL_DOCUMENTS = {
   },
 };
 
-export { SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_URL };
+export { SUPPORT_WHATSAPP_URL };

@@ -1,3 +1,5 @@
+import { PWA_THEME_COLORS } from './pwaManifest';
+
 /** مفتاح حفظ تفضيل المستخدم (light | dark). غيابه = يتبع الجهاز */
 export const THEME_STORAGE_KEY = 'ng_theme';
 
@@ -23,6 +25,8 @@ export function getEffectiveTheme() {
 export function applyTheme(theme) {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', theme);
+  const themeMeta = document.getElementById('pwa-theme-color');
+  if (themeMeta) themeMeta.setAttribute('content', PWA_THEME_COLORS[theme] || PWA_THEME_COLORS.dark);
 }
 
 /** تعيين وضع صريح (يتوقف عن متابعة الجهاز) */

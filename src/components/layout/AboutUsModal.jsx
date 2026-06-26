@@ -1,4 +1,6 @@
+import { createPortal } from 'react-dom';
 import { PLATFORM_NAME } from '../../core/constants';
+import { LEGAL_ORG_SUBTITLE } from '../../core/legalContent';
 
 const AUDIENCES = [
   {
@@ -24,9 +26,9 @@ const AUDIENCES = [
 ];
 
 export default function AboutUsModal({ onClose }) {
-  return (
+  const content = (
     <div
-      className="mbg about-mbg"
+      className="legal-portal about-portal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="about-us-title"
@@ -37,12 +39,12 @@ export default function AboutUsModal({ onClose }) {
       <div className="about-modal" onClick={(e) => e.stopPropagation()}>
         <div className="about-modal-head">
           <div className="about-modal-head-text">
-            <div id="about-us-title" className="about-modal-title">
+            <h2 id="about-us-title" className="about-modal-title">
               منصة {PLATFORM_NAME}
-            </div>
-            <p className="about-modal-slogan">{PLATFORM_NAME} | من فيكم اللعيب؟</p>
+            </h2>
+            <p className="about-modal-slogan">{LEGAL_ORG_SUBTITLE}</p>
           </div>
-          <button type="button" className="btn bgh bxs" onClick={onClose} aria-label="إغلاق">
+          <button type="button" className="btn bgh bxs legal-modal-close" onClick={onClose} aria-label="إغلاق">
             ✕
           </button>
         </div>
@@ -61,7 +63,7 @@ export default function AboutUsModal({ onClose }) {
             <span className="about-highlight-arrow" aria-hidden="true">
               ←
             </span>
-            <span className="about-highlight-label about-highlight-label--gold">مشاركة!</span>
+            <span className="about-highlight-label about-highlight-label--brand">مشاركة!</span>
           </div>
 
           <p className="about-text">
@@ -104,10 +106,12 @@ export default function AboutUsModal({ onClose }) {
           </div>
         </div>
 
-        <button type="button" className="btn bg about-close-btn" onClick={onClose}>
+        <button type="button" className="btn legal-modal-done about-close-btn" onClick={onClose}>
           حسناً
         </button>
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

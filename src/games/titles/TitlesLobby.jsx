@@ -13,6 +13,7 @@ import {
 import { isDecoyRequired } from './titlesRevealHelpers';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import { shareRoomInviteMessage } from '../../shared/roomInviteShare';
 
 export default function TitlesLobby(props) {
   const {
@@ -71,47 +72,12 @@ export default function TitlesLobby(props) {
   const isAdmin = role === 'admin';
 
   const shareRoomInvite = async (preferWhatsApp = false) => {
-    const roomLink = 'https://nickname-game38.vercel.app/';
-    const gameName = 'الألقاب';
-    const inviteText = [
-      '🎮 ساحة الألعاب',
-      'مسابقات جماعية سريعة وممتعة.',
-      'برمز واحد.. تشتعل اللمة ومرحها يزود',
-      '',
-      `اللعبة: ${gameName}`,
-      `رمز الغرفة: ${roomCode}`,
-      `رابط الدخول: ${roomLink}`,
-    ].join('\n');
-
-    if (!preferWhatsApp && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: 'ساحة الألعاب',
-          text: inviteText,
-          url: roomLink,
-        });
-        notify('تم فتح المشاركة ✓', 'success');
-        return;
-      } catch (err) {
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
-    if (typeof window !== 'undefined') {
-      const w = window.open(waUrl, '_blank', 'noopener,noreferrer');
-      if (w) {
-        notify('تم فتح واتساب ✓', 'success');
-        return;
-      }
-    }
-
-    try {
-      await navigator.clipboard?.writeText(inviteText);
-      notify('تم نسخ دعوة الغرفة ✓', 'success');
-    } catch {
-      notify('تعذر فتح المشاركة حالياً', 'error');
-    }
+    await shareRoomInviteMessage({
+      gameName: 'الألقاب',
+      roomCode,
+      preferWhatsApp,
+      notify,
+    });
   };
 
   const roomNickMode = Number(gameState?.nickMode) === 2 ? 2 : 1;
@@ -162,7 +128,7 @@ export default function TitlesLobby(props) {
                   لقبك:{' '}
                   <span style={{ color: 'var(--gold)', fontWeight: 700 }}>
                     "{me.nick}"
-                    {me.nick2 ? <span style={{ color: 'rgba(240,192,64,.6)' }}> · "{me.nick2}"</span> : ''}
+                    {me.nick2 ? <span style={{ color: 'var(--titles-primary-light)' }}> · "{me.nick2}"</span> : ''}
                   </span>
                 </div>
               </div>
@@ -173,9 +139,9 @@ export default function TitlesLobby(props) {
                 color: 'var(--muted)',
                 marginTop: 8,
                 padding: '8px 10px',
-                background: 'rgba(240,192,64,.06)',
+                background: 'var(--titles-tag-bg)',
                 borderRadius: 8,
-                border: '1px solid rgba(240,192,64,.15)',
+                border: '1px solid var(--titles-border)',
               }}
             >
               💡 لقبك لن يظهر لأحد حتى تبدأ اللعبة — ألقاب بقية اللاعبين مخفية عنك أيضاً
@@ -211,8 +177,8 @@ export default function TitlesLobby(props) {
         style={{
           marginBottom: 12,
           textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(240,192,64,.12), rgba(155,89,182,.05))',
-          border: '1px solid rgba(240,192,64,.32)',
+          background: 'linear-gradient(135deg, var(--titles-tag-bg), rgba(37,111,168,.06))',
+          border: '1px solid var(--titles-border)',
         }}
       >
         <div style={{ fontWeight: 900, color: 'var(--gold)', fontSize: 15 }}>👑 أنت مشرف هذه الغرفة</div>
@@ -285,8 +251,8 @@ export default function TitlesLobby(props) {
         <div
           className="card"
           style={{
-            background: 'linear-gradient(135deg,rgba(240,192,64,.05),rgba(155,89,182,.03))',
-            border: '1px solid rgba(240,192,64,.15)',
+            background: 'linear-gradient(135deg, var(--titles-tag-bg), rgba(37,111,168,.04))',
+            border: '1px solid var(--titles-border)',
             marginBottom: 8,
           }}
         >
@@ -355,8 +321,8 @@ export default function TitlesLobby(props) {
       <div
         className="card"
         style={{
-          background: 'linear-gradient(135deg,rgba(155,89,182,.06),rgba(79,163,224,.03))',
-          border: '1px solid rgba(155,89,182,.18)',
+          background: 'linear-gradient(135deg, rgba(150,36,56,.08), rgba(37,111,168,.05))',
+          border: '1px solid var(--titles-border)',
         }}
       >
         <div className="ctitle" style={{ fontSize: 12 }}>
@@ -393,11 +359,11 @@ export default function TitlesLobby(props) {
                   alignItems: 'center',
                   gap: 4,
                   padding: '4px 9px',
-                  background: 'rgba(155,89,182,.12)',
-                  border: '1px solid rgba(155,89,182,.3)',
+                  background: 'var(--titles-tag-bg)',
+                  border: '1px solid var(--titles-border)',
                   borderRadius: 12,
                   fontSize: 11,
-                  color: 'var(--purple)',
+                  color: 'var(--titles-primary)',
                 }}
               >
                 🎭 &quot;{n}&quot;
@@ -428,8 +394,8 @@ export default function TitlesLobby(props) {
           style={{
             textAlign: 'center',
             padding: '18px 14px',
-            background: 'rgba(79,163,224,.06)',
-            border: '1px dashed rgba(79,163,224,.35)',
+            background: 'rgba(37,111,168,.08)',
+            border: '1px dashed rgba(37,111,168,.32)',
           }}
         >
           <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
@@ -452,7 +418,7 @@ export default function TitlesLobby(props) {
                   <div className="pi-nick">
                     &quot;{p.nick}&quot;
                     {p.nick2 ? (
-                      <span style={{ color: 'rgba(240,192,64,.6)' }}>
+                      <span style={{ color: 'var(--titles-primary-light)' }}>
                         {' '}
                         · &quot;{p.nick2}&quot;
                       </span>

@@ -125,8 +125,8 @@ export default function HostSetupPanel({
           className="card"
           style={{
             marginBottom: 12,
-            background: 'linear-gradient(135deg,rgba(155,89,182,.06),rgba(79,163,224,.03))',
-            border: '1px solid rgba(155,89,182,.18)',
+            background: 'linear-gradient(135deg,rgba(150,36,56,.08),rgba(37,111,168,.05))',
+            border: '1px solid var(--titles-border)',
           }}
         >
           <div className="ctitle">③ ألقاب التمويه (قبل أول جولة)</div>
@@ -163,7 +163,7 @@ export default function HostSetupPanel({
                     alignItems: 'center',
                     gap: 4,
                     padding: '4px 9px',
-                    background: 'rgba(155,89,182,.12)',
+                    background: 'var(--titles-tag-bg)',
                     borderRadius: 12,
                     fontSize: 11,
                     color: 'var(--purple)',

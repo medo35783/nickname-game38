@@ -80,7 +80,7 @@ export default function FameeriAdminAttack({
   );
 
   return (
-    <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(79,163,224,.07)', border: '1px solid rgba(79,163,224,.3)' }}>
+    <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(37,111,168,.08)', border: '1px solid rgba(37,111,168,.3)' }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: accent, marginBottom: 6 }}>
         🎮 شن الهجوم نيابةً{mode === 'sequential' && attacker ? ` عن ${attacker.name}` : ''}
       </div>

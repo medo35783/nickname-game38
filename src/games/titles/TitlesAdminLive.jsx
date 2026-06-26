@@ -182,8 +182,8 @@ export default function TitlesAdminLive(props) {
       <div
         className="card"
         style={{
-          background: 'linear-gradient(135deg,rgba(240,192,64,.05),rgba(155,89,182,.03))',
-          border: '1px solid rgba(240,192,64,.15)',
+          background: 'linear-gradient(135deg, var(--titles-tag-bg), rgba(37,111,168,.04))',
+          border: '1px solid var(--titles-border)',
           marginBottom: 8,
         }}
       >

@@ -7,6 +7,7 @@ import {
 import { arenaPointsForRank } from '../../core/arena.constants';
 import ArenaSignupPrompt from '../../shared/ArenaSignupPrompt';
 import PackagePlanCard from './PackagePlanCard';
+import PackagesLegalNotice from './PackagesLegalNotice';
 
 /**
  * شاشة بعد انتهاء اللعبة للمتسابقين غير المشتركين — دعوة للاشتراك والباقات.
@@ -135,7 +136,7 @@ export default function EndGameJoinPrompt({
         </div>
 
         {playerStats && (playerStats.rank != null || playerStats.hits != null || playerStats.accuracy != null || playerStats.time != null) ? (
-          <div className="card" style={{ marginBottom: 12, background: 'linear-gradient(145deg, rgba(79,163,224,.08), rgba(15,15,34,.95))', borderColor: 'rgba(79,163,224,.25)' }}>
+          <div className="card" style={{ marginBottom: 12, background: 'linear-gradient(145deg, rgba(37,111,168,.08), var(--card))', borderColor: 'rgba(37,111,168,.25)' }}>
             <div className="ctitle" style={{ marginBottom: 10 }}>
               📊 أداؤك في الجولة
             </div>
@@ -170,8 +171,8 @@ export default function EndGameJoinPrompt({
             style={{
               marginBottom: 12,
               textAlign: 'center',
-              background: 'linear-gradient(145deg, rgba(240,192,64,.12), rgba(15,15,34,.95))',
-              borderColor: 'rgba(240,192,64,.35)',
+              background: 'linear-gradient(145deg, rgba(201,127,26,.12), var(--card))',
+              borderColor: 'rgba(201,127,26,.35)',
             }}
           >
             <div style={{ fontSize: 28, marginBottom: 4 }}>🏟️</div>
@@ -239,8 +240,8 @@ export default function EndGameJoinPrompt({
           style={{
             textAlign: 'center',
             marginBottom: 12,
-            background: 'linear-gradient(135deg, rgba(155,89,182,.12), rgba(240,192,64,.06))',
-            borderColor: 'rgba(155, 89, 182, 0.35)'
+            background: 'linear-gradient(135deg, rgba(150,36,56,.12), rgba(201,127,26,.06))',
+            borderColor: 'rgba(150, 36, 56, 0.35)'
           }}
         >
           <div style={{ fontSize: 36, marginBottom: 6 }}>💎</div>
@@ -264,7 +265,7 @@ export default function EndGameJoinPrompt({
           💳 اختر باقتك
         </div>
 
-        <div className="pkg-tiers" style={{ marginBottom: 14 }}>
+        <div className="pkg-tiers" style={{ marginBottom: 10 }}>
           {SUBSCRIPTION_PACKAGES.map((pkg) => (
             <PackagePlanCard
               key={pkg.id}
@@ -274,6 +275,8 @@ export default function EndGameJoinPrompt({
             />
           ))}
         </div>
+
+        <PackagesLegalNotice />
 
         <div className="pkg-trust" style={{ marginBottom: 14 }}>
           <span className="pkg-trust__icon" aria-hidden="true">🔒</span>

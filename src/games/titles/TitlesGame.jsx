@@ -2237,7 +2237,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           {/* ══ 👤 أنا — للمتسابق فقط (يشمل وضع إعارة الجوال) ══ */}
           {statsTab==='me'&&effectiveRole==='player'&&<>
             {/* بطاقة الهوية */}
-            <div className="card" style={{textAlign:'center',padding:'18px 14px',background:'linear-gradient(135deg,rgba(240,192,64,.1),rgba(255,140,0,.05))'}}>
+            <div className="card" style={{textAlign:'center',padding:'18px 14px',background:'linear-gradient(135deg, var(--titles-tag-bg), rgba(201,127,26,.05))'}}>
               {myPlayer&&<Av p={myPlayer} sz={52} fs={18}/>}
               <div style={{fontFamily:'Cairo',fontSize:18,fontWeight:900,color:'var(--gold)',marginTop:8}}>{myPlayer?.name||joinName}</div>
               <div style={{fontSize:13,color:'var(--text)',marginTop:3}}>"{effectiveMyNick}"</div>
@@ -2394,8 +2394,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
                             key={n}
                             style={{
                               padding: '8px 12px',
-                              background: 'linear-gradient(135deg,rgba(155,89,182,.12),rgba(79,163,224,.06))',
-                              border: '1px solid rgba(155,89,182,.35)',
+                              background: 'linear-gradient(135deg, var(--titles-tag-bg), rgba(37,111,168,.06))',
+                              border: '1px solid var(--titles-border)',
                               borderRadius: 12,
                               fontSize: 12,
                               color: 'var(--purple)',

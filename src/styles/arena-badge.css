@@ -36,15 +36,15 @@
 }
 
 .arena-badge__ring--gold {
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.22), rgba(212, 146, 10, 0.1));
-  border: 2px solid rgba(240, 192, 64, 0.65);
-  box-shadow: 0 0 22px rgba(240, 192, 64, 0.22);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.22), rgba(212, 146, 10, 0.1));
+  border: 2px solid rgba(201, 127, 26, 0.65);
+  box-shadow: 0 0 22px rgba(201, 127, 26, 0.22);
 }
 
 .arena-badge__ring--legend {
-  background: linear-gradient(145deg, rgba(155, 89, 182, 0.28), rgba(240, 192, 64, 0.12));
-  border: 2px solid rgba(155, 89, 182, 0.7);
-  box-shadow: 0 0 26px rgba(155, 89, 182, 0.28);
+  background: linear-gradient(145deg, rgba(150, 36, 56, 0.28), rgba(201, 127, 26, 0.12));
+  border: 2px solid rgba(150, 36, 56, 0.7);
+  box-shadow: 0 0 26px rgba(150, 36, 56, 0.28);
 }
 
 .arena-badge__icon {
@@ -84,8 +84,8 @@
 .arena-prompt {
   border-radius: 14px;
   padding: 14px;
-  border: 1px solid rgba(240, 192, 64, 0.35);
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.08), rgba(15, 15, 34, 0.95));
+  border: 1px solid rgba(201, 127, 26, 0.35);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.08), rgba(15, 15, 34, 0.95));
 }
 
 .arena-prompt--compact {
@@ -139,14 +139,14 @@
   line-height: 1.6;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(79, 163, 224, 0.08);
-  border: 1px solid rgba(79, 163, 224, 0.2);
+  background: rgba(37, 111, 168, 0.08);
+  border: 1px solid rgba(37, 111, 168, 0.2);
   margin-bottom: 10px;
 }
 
 .arena-prompt__pending {
-  background: rgba(240, 192, 64, 0.08);
-  border-color: rgba(240, 192, 64, 0.25);
+  background: rgba(201, 127, 26, 0.08);
+  border-color: rgba(201, 127, 26, 0.25);
   color: var(--text);
 }
 
@@ -263,16 +263,16 @@
   font-size: 11px;
   line-height: 1.55;
   color: var(--blue);
-  background: rgba(79, 163, 224, 0.08);
-  border: 1px solid rgba(79, 163, 224, 0.22);
+  background: rgba(37, 111, 168, 0.08);
+  border: 1px solid rgba(37, 111, 168, 0.22);
 }
 
 .game-seat-guest-pin-card {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(240, 192, 64, 0.06);
-  border: 1px solid rgba(240, 192, 64, 0.22);
+  background: rgba(201, 127, 26, 0.06);
+  border: 1px solid rgba(201, 127, 26, 0.22);
 }
 
 /* ── شريط تقدم المستوى ── */
@@ -349,8 +349,8 @@
 
 .arena-icon-picker__btn--on {
   border-color: var(--gold);
-  background: rgba(240, 192, 64, 0.12);
-  box-shadow: 0 0 0 1px rgba(240, 192, 64, 0.35);
+  background: rgba(201, 127, 26, 0.12);
+  box-shadow: 0 0 0 1px rgba(201, 127, 26, 0.35);
 }
 
 .arena-icon-picker__btn--locked {
@@ -377,15 +377,15 @@
 .arena-account-card {
   text-align: center;
   padding: 18px 14px;
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.1), rgba(155, 89, 182, 0.06));
-  border-color: rgba(240, 192, 64, 0.3);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.1), rgba(150, 36, 56, 0.06));
+  border-color: rgba(201, 127, 26, 0.3);
 }
 
 .arena-account-card--profile {
   padding: 22px 16px 16px;
-  background: linear-gradient(160deg, rgba(240, 192, 64, 0.12) 0%, rgba(155, 89, 182, 0.08) 50%, rgba(15, 15, 34, 0.02) 100%);
-  border-color: rgba(240, 192, 64, 0.35);
-  box-shadow: 0 8px 28px rgba(240, 192, 64, 0.08);
+  background: linear-gradient(160deg, rgba(201, 127, 26, 0.12) 0%, rgba(150, 36, 56, 0.08) 50%, rgba(15, 15, 34, 0.02) 100%);
+  border-color: rgba(201, 127, 26, 0.35);
+  box-shadow: 0 8px 28px rgba(201, 127, 26, 0.08);
 }
 
 .arena-account-card--profile .arena-badge {
@@ -411,9 +411,9 @@
   padding: 24px 16px 18px;
   margin-bottom: 14px;
   border-radius: 20px;
-  border: 1.5px solid rgba(240, 192, 64, 0.35);
-  background: linear-gradient(165deg, rgba(240, 192, 64, 0.14) 0%, rgba(155, 89, 182, 0.08) 42%, var(--card) 88%);
-  box-shadow: 0 12px 36px rgba(240, 192, 64, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(201, 127, 26, 0.35);
+  background: linear-gradient(165deg, rgba(201, 127, 26, 0.14) 0%, rgba(150, 36, 56, 0.08) 42%, var(--card) 88%);
+  box-shadow: 0 12px 36px rgba(201, 127, 26, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .arena-hero--bronze {
@@ -424,20 +424,20 @@
 
 .arena-hero--silver {
   border-color: rgba(192, 192, 210, 0.55);
-  background: linear-gradient(165deg, rgba(192, 192, 210, 0.22) 0%, rgba(240, 192, 64, 0.08) 38%, var(--card) 90%);
+  background: linear-gradient(165deg, rgba(192, 192, 210, 0.22) 0%, rgba(201, 127, 26, 0.08) 38%, var(--card) 90%);
   box-shadow: 0 14px 40px rgba(192, 192, 210, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
 }
 
 .arena-hero--gold {
-  border-color: rgba(240, 192, 64, 0.55);
-  background: linear-gradient(165deg, rgba(240, 192, 64, 0.2) 0%, rgba(230, 126, 34, 0.08) 45%, var(--card) 90%);
-  box-shadow: 0 14px 42px rgba(240, 192, 64, 0.2);
+  border-color: rgba(201, 127, 26, 0.55);
+  background: linear-gradient(165deg, rgba(201, 127, 26, 0.2) 0%, rgba(230, 126, 34, 0.08) 45%, var(--card) 90%);
+  box-shadow: 0 14px 42px rgba(201, 127, 26, 0.2);
 }
 
 .arena-hero--legend {
-  border-color: rgba(155, 89, 182, 0.55);
-  background: linear-gradient(165deg, rgba(155, 89, 182, 0.2) 0%, rgba(240, 192, 64, 0.1) 45%, var(--card) 90%);
-  box-shadow: 0 16px 44px rgba(155, 89, 182, 0.2);
+  border-color: rgba(150, 36, 56, 0.55);
+  background: linear-gradient(165deg, rgba(150, 36, 56, 0.2) 0%, rgba(201, 127, 26, 0.1) 45%, var(--card) 90%);
+  box-shadow: 0 16px 44px rgba(150, 36, 56, 0.2);
 }
 
 .arena-hero__glow {
@@ -449,7 +449,7 @@
   width: 220px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.28), transparent 68%);
+  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.28), transparent 68%);
 }
 
 .arena-hero--silver .arena-hero__glow {
@@ -457,7 +457,7 @@
 }
 
 .arena-hero--gold .arena-hero__glow {
-  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.38), transparent 68%);
+  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.38), transparent 68%);
 }
 
 .arena-hero__shine {
@@ -515,14 +515,14 @@
 
 .arena-hero__tier-pill--gold {
   color: var(--gold);
-  background: rgba(240, 192, 64, 0.14);
-  border-color: rgba(240, 192, 64, 0.4);
+  background: rgba(201, 127, 26, 0.14);
+  border-color: rgba(201, 127, 26, 0.4);
 }
 
 .arena-hero__tier-pill--legend {
-  color: #b57edc;
-  background: rgba(155, 89, 182, 0.14);
-  border-color: rgba(155, 89, 182, 0.4);
+  color: #c04058;
+  background: rgba(150, 36, 56, 0.14);
+  border-color: rgba(150, 36, 56, 0.4);
 }
 
 .arena-hero__tier-pill-icon {
@@ -544,7 +544,7 @@
   color: var(--gold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 12px rgba(240, 192, 64, 0.25);
+  text-shadow: 0 2px 12px rgba(201, 127, 26, 0.25);
 }
 
 .arena-hero__pts-lbl {
@@ -615,18 +615,18 @@
 }
 
 .arena-hero__quest-node--now.arena-hero__quest-node--gold .arena-hero__quest-node-icon {
-  border-color: rgba(240, 192, 64, 0.7);
-  box-shadow: 0 0 16px rgba(240, 192, 64, 0.35);
+  border-color: rgba(201, 127, 26, 0.7);
+  box-shadow: 0 0 16px rgba(201, 127, 26, 0.35);
 }
 
 .arena-hero__quest-node--next.arena-hero__quest-node--gold .arena-hero__quest-node-icon {
-  border-color: rgba(240, 192, 64, 0.45);
-  background: rgba(240, 192, 64, 0.08);
+  border-color: rgba(201, 127, 26, 0.45);
+  background: rgba(201, 127, 26, 0.08);
 }
 
 .arena-hero__quest-node--next.arena-hero__quest-node--legend .arena-hero__quest-node-icon {
-  border-color: rgba(155, 89, 182, 0.45);
-  background: rgba(155, 89, 182, 0.08);
+  border-color: rgba(150, 36, 56, 0.45);
+  background: rgba(150, 36, 56, 0.08);
 }
 
 .arena-hero__quest-node-tag {
@@ -634,7 +634,7 @@
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 99px;
-  background: rgba(240, 192, 64, 0.15);
+  background: rgba(201, 127, 26, 0.15);
   color: var(--gold);
 }
 
@@ -644,7 +644,7 @@
 }
 
 .arena-hero__quest-node--now .arena-hero__quest-node-tag {
-  background: rgba(46, 204, 113, 0.15);
+  background: rgba(36, 143, 85, 0.15);
   color: var(--green);
 }
 
@@ -669,12 +669,12 @@
   height: 100%;
   border-radius: 99px;
   background: linear-gradient(90deg, #c0c0d8, var(--gold));
-  box-shadow: 0 0 10px rgba(240, 192, 64, 0.35);
+  box-shadow: 0 0 10px rgba(201, 127, 26, 0.35);
   transition: width 0.4s ease;
 }
 
 .arena-hero--silver .arena-hero__quest-fill {
-  background: linear-gradient(90deg, #aeb4c8, #f0c040, #e67e22);
+  background: linear-gradient(90deg, #aeb4c8, #d4920a, #c97f1a);
 }
 
 .arena-hero__quest-pct {
@@ -708,8 +708,8 @@
   font-size: 13px;
   font-weight: 900;
   color: var(--gold);
-  background: rgba(240, 192, 64, 0.1);
-  border: 1px solid rgba(240, 192, 64, 0.25);
+  background: rgba(201, 127, 26, 0.1);
+  border: 1px solid rgba(201, 127, 26, 0.25);
 }
 
 .arena-hero__max-icon {
@@ -749,8 +749,8 @@
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px dashed rgba(240, 192, 64, 0.2);
-  background: rgba(240, 192, 64, 0.03);
+  border: 1px dashed rgba(201, 127, 26, 0.2);
+  background: rgba(201, 127, 26, 0.03);
 }
 
 .arena-points-guide-card .arena-rewards-guide {
@@ -760,15 +760,15 @@
 }
 
 .arena-account-card--guest {
-  background: linear-gradient(145deg, rgba(79, 163, 224, 0.08), rgba(15, 15, 34, 0.95));
-  border-color: rgba(79, 163, 224, 0.25);
+  background: linear-gradient(145deg, rgba(37, 111, 168, 0.08), rgba(15, 15, 34, 0.95));
+  border-color: rgba(37, 111, 168, 0.25);
 }
 
 /* ── هيدر ضيف ── */
 
 .hdr-account-btn--guest {
-  border-color: rgba(240, 192, 64, 0.45) !important;
-  background: rgba(240, 192, 64, 0.08) !important;
+  border-color: rgba(201, 127, 26, 0.45) !important;
+  background: rgba(201, 127, 26, 0.08) !important;
   color: var(--gold) !important;
   max-width: 150px;
 }
@@ -782,8 +782,8 @@
 /* ── أفاتار الشارة في اللعبة ── */
 
 .pi-av--arena {
-  border: 2px solid rgba(240, 192, 64, 0.45);
-  box-shadow: 0 0 10px rgba(240, 192, 64, 0.12);
+  border: 2px solid rgba(201, 127, 26, 0.45);
+  box-shadow: 0 0 10px rgba(201, 127, 26, 0.12);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -792,8 +792,8 @@
 
 .pi-av--arena-bronze { border-color: rgba(205, 127, 50, 0.55); }
 .pi-av--arena-silver { border-color: rgba(192, 192, 210, 0.6); }
-.pi-av--arena-gold { border-color: rgba(240, 192, 64, 0.7); }
-.pi-av--arena-legend { border-color: rgba(155, 89, 182, 0.75); }
+.pi-av--arena-gold { border-color: rgba(201, 127, 26, 0.7); }
+.pi-av--arena-legend { border-color: rgba(150, 36, 56, 0.75); }
 
 /* ── قاعة المجد ── */
 
@@ -810,8 +810,8 @@
   width: 100%;
   padding: 12px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(240, 192, 64, 0.22);
-  background: linear-gradient(135deg, rgba(155, 89, 182, 0.08), rgba(15, 15, 34, 0.92));
+  border: 1px solid rgba(201, 127, 26, 0.22);
+  background: linear-gradient(135deg, rgba(150, 36, 56, 0.08), rgba(15, 15, 34, 0.92));
   cursor: pointer;
   text-align: right;
   font-family: inherit;
@@ -967,8 +967,8 @@
   margin-bottom: 14px;
   border-radius: 14px;
   padding: 14px;
-  border: 1px solid rgba(240, 192, 64, 0.28);
-  background: linear-gradient(145deg, rgba(155, 89, 182, 0.1), rgba(240, 192, 64, 0.06));
+  border: 1px solid rgba(201, 127, 26, 0.28);
+  background: linear-gradient(145deg, rgba(150, 36, 56, 0.1), rgba(201, 127, 26, 0.06));
 }
 
 .arena-hof__head {
@@ -1069,8 +1069,8 @@
   border-radius: 20px;
   padding: 24px 20px 20px;
   text-align: center;
-  border: 1px solid rgba(240, 192, 64, 0.45);
-  background: linear-gradient(160deg, rgba(155, 89, 182, 0.18), rgba(15, 15, 34, 0.98));
+  border: 1px solid rgba(201, 127, 26, 0.45);
+  background: linear-gradient(160deg, rgba(150, 36, 56, 0.18), rgba(15, 15, 34, 0.98));
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
@@ -1146,8 +1146,8 @@
   padding: 8px 10px;
   margin-bottom: 6px;
   border-radius: 10px;
-  background: rgba(240, 192, 64, 0.08);
-  border: 1px solid rgba(240, 192, 64, 0.2);
+  background: rgba(201, 127, 26, 0.08);
+  border: 1px solid rgba(201, 127, 26, 0.2);
   font-size: 12px;
 }
 
@@ -1213,8 +1213,8 @@
 }
 
 .arena-ach-item--on {
-  border-color: rgba(240, 192, 64, 0.4);
-  background: rgba(240, 192, 64, 0.08);
+  border-color: rgba(201, 127, 26, 0.4);
+  background: rgba(201, 127, 26, 0.08);
 }
 
 .arena-ach-item--locked {
@@ -1307,15 +1307,15 @@
 }
 
 .arena-showcase-card--badge {
-  background: linear-gradient(160deg, rgba(240, 192, 64, 0.16) 0%, rgba(240, 192, 64, 0.04) 55%, var(--card) 100%);
-  border-color: rgba(240, 192, 64, 0.45);
-  box-shadow: 0 8px 28px rgba(240, 192, 64, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(201, 127, 26, 0.16) 0%, rgba(201, 127, 26, 0.04) 55%, var(--card) 100%);
+  border-color: rgba(201, 127, 26, 0.45);
+  box-shadow: 0 8px 28px rgba(201, 127, 26, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .arena-showcase-card--ach {
-  background: linear-gradient(160deg, rgba(155, 89, 182, 0.16) 0%, rgba(155, 89, 182, 0.04) 55%, var(--card) 100%);
-  border-color: rgba(155, 89, 182, 0.42);
-  box-shadow: 0 8px 28px rgba(155, 89, 182, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(150, 36, 56, 0.16) 0%, rgba(150, 36, 56, 0.04) 55%, var(--card) 100%);
+  border-color: rgba(150, 36, 56, 0.42);
+  box-shadow: 0 8px 28px rgba(150, 36, 56, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .arena-showcase-card__glow {
@@ -1331,11 +1331,11 @@
 }
 
 .arena-showcase-card__glow--gold {
-  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.35), transparent 70%);
+  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.35), transparent 70%);
 }
 
 .arena-showcase-card__glow--purple {
-  background: radial-gradient(ellipse, rgba(155, 89, 182, 0.32), transparent 70%);
+  background: radial-gradient(ellipse, rgba(150, 36, 56, 0.32), transparent 70%);
 }
 
 .arena-showcase-card__visual {
@@ -1365,7 +1365,7 @@
   justify-content: center;
   background: conic-gradient(var(--gold) var(--pct), rgba(255, 255, 255, 0.08) 0);
   padding: 3px;
-  box-shadow: 0 0 16px rgba(240, 192, 64, 0.2);
+  box-shadow: 0 0 16px rgba(201, 127, 26, 0.2);
 }
 
 .arena-showcase-ach-ring__icon {
@@ -1378,7 +1378,7 @@
   font-size: 26px;
   line-height: 1;
   background: var(--card);
-  border: 1px solid rgba(155, 89, 182, 0.25);
+  border: 1px solid rgba(150, 36, 56, 0.25);
 }
 
 .arena-showcase-ach-ring__count {
@@ -1426,7 +1426,7 @@
 }
 
 .arena-showcase-card--ach .arena-showcase-card__cta {
-  color: #b57edc;
+  color: #c04058;
 }
 
 [data-theme="light"] .arena-showcase-card--badge {
@@ -1467,13 +1467,13 @@
 }
 
 .arena-badge-action--icon {
-  border-color: rgba(240, 192, 64, 0.35);
-  background: linear-gradient(145deg, var(--card), rgba(240, 192, 64, 0.06));
+  border-color: rgba(201, 127, 26, 0.35);
+  background: linear-gradient(145deg, var(--card), rgba(201, 127, 26, 0.06));
 }
 
 .arena-badge-action--ach {
-  border-color: rgba(155, 89, 182, 0.32);
-  background: linear-gradient(145deg, var(--card), rgba(155, 89, 182, 0.06));
+  border-color: rgba(150, 36, 56, 0.32);
+  background: linear-gradient(145deg, var(--card), rgba(150, 36, 56, 0.06));
 }
 
 .arena-badge-action__glyph {
@@ -1490,13 +1490,13 @@
 }
 
 .arena-badge-action--icon .arena-badge-action__glyph {
-  background: rgba(240, 192, 64, 0.12);
-  border-color: rgba(240, 192, 64, 0.25);
+  background: rgba(201, 127, 26, 0.12);
+  border-color: rgba(201, 127, 26, 0.25);
 }
 
 .arena-badge-action--ach .arena-badge-action__glyph {
-  background: rgba(155, 89, 182, 0.12);
-  border-color: rgba(155, 89, 182, 0.25);
+  background: rgba(150, 36, 56, 0.12);
+  border-color: rgba(150, 36, 56, 0.25);
 }
 
 .arena-badge-action__body {
@@ -1559,7 +1559,7 @@ body.arena-sheet-open .site-footer {
   max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 8px));
   border-radius: 22px 22px 0 0;
   background: linear-gradient(180deg, rgba(22, 22, 54, 0.98) 0%, rgba(12, 12, 32, 0.99) 100%);
-  border: 1px solid rgba(240, 192, 64, 0.28);
+  border: 1px solid rgba(201, 127, 26, 0.28);
   border-bottom: none;
   box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.45);
   display: flex;
@@ -1586,7 +1586,7 @@ body.arena-sheet-open .site-footer {
 
 .arena-sheet--center {
   border-radius: 22px;
-  border-bottom: 1px solid rgba(240, 192, 64, 0.28);
+  border-bottom: 1px solid rgba(201, 127, 26, 0.28);
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5);
   height: auto;
   max-height: min(78dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 32px));
@@ -1616,7 +1616,7 @@ body.arena-sheet-open .site-footer {
   transform: translateX(-50%);
   width: 200px;
   height: 80px;
-  background: radial-gradient(ellipse, rgba(240, 192, 64, 0.25), transparent 70%);
+  background: radial-gradient(ellipse, rgba(201, 127, 26, 0.25), transparent 70%);
   opacity: 0.8;
 }
 
@@ -1863,8 +1863,8 @@ body.arena-sheet-open .site-footer {
 }
 
 .arena-ach-item--luxury.arena-ach-item--on {
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.14), rgba(155, 89, 182, 0.08));
-  box-shadow: 0 4px 16px rgba(240, 192, 64, 0.12);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.14), rgba(150, 36, 56, 0.08));
+  box-shadow: 0 4px 16px rgba(201, 127, 26, 0.12);
 }
 
 .arena-ach-item--luxury .arena-ach-item__icon {
@@ -1899,7 +1899,7 @@ body.arena-sheet-open .site-footer {
   font-size: 9px;
   font-weight: 800;
   color: var(--gold);
-  background: rgba(240, 192, 64, 0.12);
+  background: rgba(201, 127, 26, 0.12);
   padding: 2px 8px;
   border-radius: 99px;
 }
@@ -1942,7 +1942,7 @@ body.arena-sheet-open .site-footer {
 
 .arena-ach-cat--on {
   border-color: var(--gold);
-  background: rgba(240, 192, 64, 0.1);
+  background: rgba(201, 127, 26, 0.1);
 }
 
 .arena-ach-cat__icon {
@@ -1967,12 +1967,12 @@ body.arena-sheet-open .site-footer {
 }
 
 .arena-ach-item--epic.arena-ach-item--on {
-  border-color: rgba(155, 89, 182, 0.5);
+  border-color: rgba(150, 36, 56, 0.5);
 }
 
 .arena-ach-item--legendary.arena-ach-item--on {
-  border-color: rgba(240, 192, 64, 0.65);
-  box-shadow: 0 0 12px rgba(240, 192, 64, 0.15);
+  border-color: rgba(201, 127, 26, 0.65);
+  box-shadow: 0 0 12px rgba(201, 127, 26, 0.15);
 }
 
 /* ── مقابل النقاط — عرض فاخر مختصر ── */
@@ -1980,20 +1980,20 @@ body.arena-sheet-open .site-footer {
 .arena-rewards-card {
   border-radius: 16px;
   border: 1px solid var(--border-subtle);
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.06), rgba(155, 89, 182, 0.04));
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.06), rgba(150, 36, 56, 0.04));
   padding: 14px;
   margin-bottom: 12px;
 }
 
 .arena-rewards-card--lux {
   padding: 16px 14px 12px;
-  border-color: rgba(240, 192, 64, 0.28);
-  background: linear-gradient(155deg, rgba(155, 89, 182, 0.08) 0%, rgba(240, 192, 64, 0.06) 45%, rgba(12, 12, 32, 0.02) 100%);
-  box-shadow: 0 6px 24px rgba(155, 89, 182, 0.06);
+  border-color: rgba(201, 127, 26, 0.28);
+  background: linear-gradient(155deg, rgba(150, 36, 56, 0.08) 0%, rgba(201, 127, 26, 0.06) 45%, rgba(12, 12, 32, 0.02) 100%);
+  box-shadow: 0 6px 24px rgba(150, 36, 56, 0.06);
 }
 
 [data-theme="light"] .arena-rewards-card--lux {
-  background: linear-gradient(155deg, rgba(155, 89, 182, 0.06) 0%, rgba(240, 192, 64, 0.08) 50%, #fff 100%);
+  background: linear-gradient(155deg, rgba(150, 36, 56, 0.06) 0%, rgba(201, 127, 26, 0.08) 50%, #fff 100%);
 }
 
 .arena-rewards-hero {
@@ -2010,9 +2010,9 @@ body.arena-sheet-open .site-footer {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(145deg, rgba(240, 192, 64, 0.18), rgba(155, 89, 182, 0.1));
-  border: 2px solid rgba(240, 192, 64, 0.4);
-  box-shadow: 0 0 20px rgba(240, 192, 64, 0.15);
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.18), rgba(150, 36, 56, 0.1));
+  border: 2px solid rgba(201, 127, 26, 0.4);
+  box-shadow: 0 0 20px rgba(201, 127, 26, 0.15);
 }
 
 .arena-rewards-hero__tier-icon {
@@ -2094,13 +2094,13 @@ body.arena-sheet-open .site-footer {
 
 .arena-tier-chip--on {
   opacity: 1;
-  border-color: rgba(240, 192, 64, 0.35);
-  background: rgba(240, 192, 64, 0.06);
+  border-color: rgba(201, 127, 26, 0.35);
+  background: rgba(201, 127, 26, 0.06);
 }
 
 .arena-tier-chip--current {
-  border-color: rgba(240, 192, 64, 0.55);
-  box-shadow: 0 0 12px rgba(240, 192, 64, 0.15);
+  border-color: rgba(201, 127, 26, 0.55);
+  box-shadow: 0 0 12px rgba(201, 127, 26, 0.15);
 }
 
 .arena-tier-chip__icon {
@@ -2199,13 +2199,13 @@ body.arena-sheet-open .site-footer {
 
 .arena-rewards-sheet-tier--on {
   opacity: 1;
-  border-color: rgba(240, 192, 64, 0.35);
-  background: rgba(240, 192, 64, 0.06);
+  border-color: rgba(201, 127, 26, 0.35);
+  background: rgba(201, 127, 26, 0.06);
 }
 
 .arena-rewards-sheet-tier--focus {
-  border-color: rgba(240, 192, 64, 0.55);
-  box-shadow: 0 0 16px rgba(240, 192, 64, 0.12);
+  border-color: rgba(201, 127, 26, 0.55);
+  box-shadow: 0 0 16px rgba(201, 127, 26, 0.12);
 }
 
 .arena-rewards-sheet-tier__head {
@@ -2236,7 +2236,7 @@ body.arena-sheet-open .site-footer {
   font-size: 9px;
   font-weight: 800;
   color: var(--green);
-  background: rgba(46, 204, 113, 0.12);
+  background: rgba(36, 143, 85, 0.12);
   padding: 3px 8px;
   border-radius: 99px;
 }
@@ -2310,8 +2310,8 @@ body.arena-sheet-open .site-footer {
   font-size: 10px;
   color: var(--muted);
   line-height: 1.55;
-  background: rgba(240, 192, 64, 0.06);
-  border: 1px solid rgba(240, 192, 64, 0.15);
+  background: rgba(201, 127, 26, 0.06);
+  border: 1px solid rgba(201, 127, 26, 0.15);
 }
 
 /* ── مقابل النقاط (قديم — للتوافق) ── */
@@ -2370,8 +2370,8 @@ body.arena-sheet-open .site-footer {
 
 .arena-rewards-tier--on {
   opacity: 1;
-  border-color: rgba(240, 192, 64, 0.35);
-  background: rgba(240, 192, 64, 0.06);
+  border-color: rgba(201, 127, 26, 0.35);
+  background: rgba(201, 127, 26, 0.06);
 }
 
 .arena-rewards-tier__icon {

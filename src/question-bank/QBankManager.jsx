@@ -345,7 +345,7 @@ function selectablePillStyle(isSelected) {
   return {
     borderColor: isSelected ? 'var(--gold)' : 'var(--border-subtle)',
     color: isSelected ? 'var(--gold)' : 'var(--text-soft)',
-    background: isSelected ? 'rgba(240,192,64,.1)' : 'var(--surface)',
+    background: isSelected ? 'rgba(201,127,26,.1)' : 'var(--surface)',
   };
 }
 
@@ -875,7 +875,7 @@ export default function QBankManager({ notify }) {
         className="card2"
         style={{
           marginBottom: 10,
-          borderColor: question.status === 'pending' ? 'rgba(240,192,64,.26)' : COLORS.border,
+          borderColor: question.status === 'pending' ? 'rgba(201,127,26,.26)' : COLORS.border,
         }}
       >
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1020,7 +1020,7 @@ export default function QBankManager({ notify }) {
                   style={{
                     ...styles.optionRow,
                     borderColor: selected ? 'var(--gold)' : 'var(--border-subtle)',
-                    background: selected ? 'rgba(240,192,64,.09)' : 'var(--surface)',
+                    background: selected ? 'rgba(201,127,26,.09)' : 'var(--surface)',
                   }}
                 >
                   <input
@@ -1168,7 +1168,7 @@ export default function QBankManager({ notify }) {
                   className="card2"
                   style={{
                     marginBottom: 0,
-                    borderColor: row.error ? 'rgba(230,57,80,.35)' : 'rgba(46,204,113,.24)',
+                    borderColor: row.error ? 'rgba(230,57,80,.35)' : 'rgba(36,143,85,.24)',
                   }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text)', lineHeight: 1.6 }}>
@@ -1340,8 +1340,8 @@ export default function QBankManager({ notify }) {
           <div
             className="ann"
             style={{
-              background: 'rgba(240,192,64,.08)',
-              border: '1px solid rgba(240,192,64,.25)',
+              background: 'rgba(201,127,26,.08)',
+              border: '1px solid rgba(201,127,26,.25)',
               color: COLORS.gold,
             }}
           >
@@ -1417,7 +1417,7 @@ export default function QBankManager({ notify }) {
         {!loading && pendingQuestions.map((question) => {
           const awaitingClass = communityNeedsClassification(question);
           return (
-          <div key={question.id} className="card2" style={{ borderColor: 'rgba(240,192,64,.26)' }}>
+          <div key={question.id} className="card2" style={{ borderColor: 'rgba(201,127,26,.26)' }}>
             <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.7, color: 'var(--text)' }}>
               {question.question_text || '—'}
             </div>
@@ -1495,8 +1495,8 @@ export default function QBankManager({ notify }) {
         <div
           className="ann"
           style={{
-            background: notice.type === 'error' ? 'rgba(230,57,80,.08)' : 'rgba(46,204,113,.08)',
-            border: `1px solid ${notice.type === 'error' ? 'rgba(230,57,80,.25)' : 'rgba(46,204,113,.25)'}`,
+            background: notice.type === 'error' ? 'rgba(230,57,80,.08)' : 'rgba(36,143,85,.08)',
+            border: `1px solid ${notice.type === 'error' ? 'rgba(230,57,80,.25)' : 'rgba(36,143,85,.25)'}`,
             color: notice.type === 'error' ? COLORS.red : COLORS.green,
           }}
         >
@@ -1579,7 +1579,7 @@ const styles = {
     width: 28,
     height: 28,
     borderRadius: 9,
-    background: 'rgba(240,192,64,.11)',
+    background: 'rgba(201,127,26,.11)',
     color: COLORS.gold,
     fontWeight: 900,
     fontFamily: 'Cairo, sans-serif',

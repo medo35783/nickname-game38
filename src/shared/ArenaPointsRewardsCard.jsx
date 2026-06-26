@@ -106,7 +106,7 @@ export default function ArenaPointsRewardsCard({ points = 0 }) {
         subtitle="كل مستوى يفتح إطاراً وأيقونات جديدة لشارتك"
         icon="🎁"
         footer={
-          <button type="button" className="btn bg" onClick={() => setUnlockOpen(false)}>
+          <button type="button" className="btn btn-arena" onClick={() => setUnlockOpen(false)}>
             حسناً
           </button>
         }
@@ -121,7 +121,7 @@ export default function ArenaPointsRewardsCard({ points = 0 }) {
         subtitle="العب، استضف، وتقدّم في الساحة"
         icon="⚡"
         footer={
-          <button type="button" className="btn bg" onClick={() => setEarnOpen(false)}>
+          <button type="button" className="btn btn-arena" onClick={() => setEarnOpen(false)}>
             فهمت
           </button>
         }

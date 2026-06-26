@@ -393,7 +393,7 @@ export default function AccountPage({
                 footer={
                   <button
                     type="button"
-                    className="btn bg"
+                    className="btn btn-arena"
                     onClick={() => setAchSheetOpen(false)}
                   >
                     حسناً
