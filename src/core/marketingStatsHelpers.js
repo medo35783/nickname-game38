@@ -159,6 +159,69 @@ export function formatEngagementMinutes(minutes, { short = false } = {}) {
   return rest > 0 ? `${hours} ساعة و${rest} دقيقة` : `${hours} ساعة`;
 }
 
+export const REPORT_PURPOSES = {
+  sponsorship: {
+    id: 'sponsorship',
+    label: '① رعاية الجولات',
+    subtitle: 'شعار الراعي يظهر أثناء كل جولة — مقياس الظهور والجمهور الحقيقي',
+    titleSuffix: 'تقرير رعاية الجولات',
+    docTitle: 'كشف ظهور الرعاية والجمهور',
+  },
+  prize: {
+    id: 'prize',
+    label: '② جائزة الجولة برعاية',
+    subtitle: 'كوبون أو خصم للفائز — جلسات مؤهلة ومشاركون فعليون',
+    titleSuffix: 'تقرير جائزة الجولة',
+    docTitle: 'كشف الجلسات المؤهلة للجوائز',
+  },
+  full: {
+    id: 'full',
+    label: 'تقرير شراكة شامل',
+    subtitle: 'رعاية الجولات + جوائز + أرقام كاملة',
+    titleSuffix: 'تقرير شراكة B2B',
+    docTitle: 'تقرير تأثير الفعاليات والتفاعل الجماعي',
+  },
+};
+
+/** جلسات مؤهلة للجوائز من السجل الأخير */
+export function derivePrizeReadySessions(recent = []) {
+  return (Array.isArray(recent) ? recent : []).filter(
+    (s) => s.completed && num(s.playerCount) >= 5 && num(s.totalRounds) >= 2
+  );
+}
+
+/** كشف الجلسات مع المشرفين والمتسابقين — للتقرير الرسمي */
+export function deriveSessionRoster(stats) {
+  const recent = Array.isArray(stats?.recentSessions) ? [...stats.recentSessions].reverse() : [];
+  return recent.map((s) => {
+    const gk = normalizeGameKey(s.gameType);
+    const meta = gk ? GAME_REPORT_META[gk] : null;
+    const rounds = num(s.totalRounds);
+    const players = num(s.playerCount);
+    const labels = Array.isArray(s.participantLabels) ? s.participantLabels.filter(Boolean) : [];
+    const prizeReady = s.completed && players >= 5 && rounds >= 2;
+    return {
+      gameLabel: meta ? `${meta.icon} ${meta.label}` : s.gameType || '—',
+      roomCode: s.roomCode || '—',
+      adminName: s.adminName || '—',
+      participantLabels: labels,
+      participantSummary: labels.length ? labels.join(' · ') : `${players} متسابق`,
+      playerCount: players,
+      totalRounds: rounds,
+      roundReach: num(s.roundReach) || rounds * players,
+      engagementMinutes: round1(num(s.engagementMinutes) || players * num(s.durationMinutes)),
+      completed: !!s.completed,
+      prizeReady,
+      sponsorName: s.sponsorName || null,
+      sponsorImpressions: num(s.sponsorImpressions) || (s.sponsorId ? num(s.roundReach) : 0),
+      ts: s.ts || null,
+      dateLabel: s.ts
+        ? new Date(s.ts).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' })
+        : '—',
+    };
+  });
+}
+
 export const GAME_REPORT_META = {
   titles: {
     key: 'titles',
@@ -279,7 +342,11 @@ export function buildMarketingReportModel(stats, options = {}) {
     reportScope = codeLabel ? 'code' : 'platform',
     customNote = '',
     platformAggregate = null,
+    reportPurpose = 'full',
+    sponsorMeta = null,
   } = options;
+
+  const purposeMeta = REPORT_PURPOSES[reportPurpose] || REPORT_PURPOSES.full;
 
   const metrics = reportScope === 'platform' && platformAggregate
     ? platformAggregate
@@ -288,6 +355,11 @@ export function buildMarketingReportModel(stats, options = {}) {
   const recent = Array.isArray(stats?.recentSessions)
     ? [...stats.recentSessions].reverse().slice(0, 12)
     : [];
+  const sessionRoster = deriveSessionRoster(stats);
+  const prizeReadySessions = derivePrizeReadySessions(stats?.recentSessions);
+  const uniqueParticipants = Array.isArray(stats?.uniqueParticipantLabels)
+    ? stats.uniqueParticipantLabels
+    : sessionRoster.flatMap((s) => s.participantLabels).filter((v, i, a) => a.indexOf(v) === i);
 
   const recipientLabels = {
     school: 'مدرسة / مؤسسة تعليمية',
@@ -310,14 +382,30 @@ export function buildMarketingReportModel(stats, options = {}) {
     reportScope,
     scopeLabel: reportScope === 'platform' ? 'تقرير مجمّع للمنصة' : `تقرير كود الاشتراك ${codeLabel || ''}`,
     customNote: customNote.trim(),
+    reportPurpose,
+    purposeMeta,
+    sponsorMeta: sponsorMeta
+      ? {
+          name: String(sponsorMeta.name || '').trim(),
+          logoUrl: String(sponsorMeta.logoUrl || '').trim(),
+          tagline: String(sponsorMeta.tagline || '').trim(),
+          prizeOffer: String(sponsorMeta.prizeOffer || '').trim(),
+        }
+      : null,
     metrics,
     games,
     recent,
+    sessionRoster,
+    prizeReadySessions,
+    uniqueParticipants,
+    uniqueParticipantCount: uniqueParticipants.length,
     periodStart: stats?.firstSessionAt || (recent.length ? recent[recent.length - 1]?.ts : null),
     periodEnd: stats?.lastActiveAt || null,
     periodStartLabel: formatShortDate(stats?.firstSessionAt || (recent.length ? recent[recent.length - 1]?.ts : null)),
     periodEndLabel: formatShortDate(stats?.lastActiveAt),
     totalDurationMinutes: round1(num(stats?.totalDurationMinutes)),
     abandonedGames: num(stats?.abandonedGames),
+    totalSponsorImpressions: num(stats?.totalSponsorImpressions),
+    sponsorImpressionsBySponsor: stats?.sponsorImpressions || {},
   };
 }

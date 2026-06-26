@@ -348,7 +348,7 @@ function renderGameCard(game) {
 
 function renderRecentRows(recent) {
   if (!recent.length) {
-    return '<tr><td colspan="8" style="text-align:center;color:#5c5678;padding:16px">لا توجد جلسات مسجّلة في الفترة الأخيرة</td></tr>';
+    return '<tr><td colspan="10" style="text-align:center;color:#5c5678;padding:16px">لا توجد جلسات مسجّلة في الفترة الأخيرة</td></tr>';
   }
   return recent
     .map((s) => {
@@ -362,9 +362,14 @@ function renderRecentRows(recent) {
       const date = s.ts
         ? new Date(s.ts).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })
         : '—';
+      const names = Array.isArray(s.participantLabels) && s.participantLabels.length
+        ? s.participantLabels.join(' · ')
+        : `${nf(players)} متسابق`;
       return `<tr>
         <td>${label}</td>
         <td class="num">${esc(s.roomCode || '—')}</td>
+        <td>${esc(s.adminName || '—')}</td>
+        <td style="font-size:10px;line-height:1.5">${esc(names)}</td>
         <td class="num">${nf(rounds)}</td>
         <td class="num">${nf(players)}</td>
         <td class="num">${nf(reach)}</td>
@@ -374,6 +379,84 @@ function renderRecentRows(recent) {
       </tr>`;
     })
     .join('');
+}
+
+function renderSessionRosterRows(roster, purpose) {
+  const list = Array.isArray(roster) ? roster : [];
+  const filtered =
+    purpose === 'prize' ? list.filter((s) => s.prizeReady) : list;
+  if (!filtered.length) {
+    const msg =
+      purpose === 'prize'
+        ? 'لا توجد جلسات مؤهلة للجوائز بعد (مطلوب: 5+ متسابقين، جولتان+، مكتملة)'
+        : 'لا توجد جلسات مسجّلة بعد — ابدأ لعباً لتظهر الأسماء والأرقام';
+    return `<tr><td colspan="8" style="text-align:center;color:#5c5678;padding:16px">${msg}</td></tr>`;
+  }
+  return filtered
+    .map(
+      (s) => `<tr>
+        <td style="white-space:nowrap">${esc(s.dateLabel)}</td>
+        <td>${esc(s.gameLabel)}${s.sponsorName ? `<br/><span style="font-size:9px;color:#7a5a10">🤝 ${esc(s.sponsorName)} · ${nf(s.sponsorImpressions || s.roundReach)} ظهور</span>` : ''}</td>
+        <td class="num">${esc(s.roomCode)}</td>
+        <td><strong>${esc(s.adminName)}</strong></td>
+        <td style="font-size:10px;line-height:1.55">${esc(s.participantSummary)}</td>
+        <td class="num">${nf(s.totalRounds)}</td>
+        <td class="num">${nf(s.roundReach)}</td>
+        <td>${s.prizeReady ? '🎁 مؤهلة' : s.completed ? '✅' : '⏸'}</td>
+      </tr>`
+    )
+    .join('');
+}
+
+function renderUniqueParticipants(labels) {
+  const list = Array.isArray(labels) ? labels.filter(Boolean) : [];
+  if (!list.length) {
+    return '<div class="note-box">لم تُسجَّل أسماء بعد — الجلسات القادمة ستظهر أسماء المشرفين والمتسابقين تلقائياً.</div>';
+  }
+  const chips = list
+    .map((name) => `<span class="feat" style="background:#fff9ee;border-color:#e8d4a8;color:#7a5a10">${esc(name)}</span>`)
+    .join('');
+  return `<div class="features">${chips}</div>
+    <div class="note-box" style="margin-top:10px"><strong>إجمالي أسماء فريدة:</strong> ${nf(list.length)} — قد يتكرر نفس الشخص في جلسات مختلفة.</div>`;
+}
+
+function purposeKpiGrid(model) {
+  const m = model.metrics;
+  const purpose = model.reportPurpose || 'full';
+  if (purpose === 'sponsorship') {
+    return [
+      renderKpi('جولات قابلة للرعاية', nf(m.totalRounds), 'blue'),
+      renderKpi('ظهور شعار الراعي', nf(m.roundReach), 'blue'),
+      renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold'),
+      renderKpi('ذروة حضور', nf(m.peakPlayers), 'purple'),
+      renderKpi('جلسات حقيقية', nf(m.totalRealSessions), 'gold'),
+      renderKpi('دقائق تفاعل الجمهور', nf(m.totalEngagementMinutes), 'green'),
+      renderKpi('متوسط جولات / جلسة', m.avgRoundsPerSession, 'blue'),
+      renderKpi('معدل إكمال', `${m.completionRate}%`, 'green'),
+    ].join('');
+  }
+  if (purpose === 'prize') {
+    return [
+      renderKpi('جلسات مؤهلة للجوائز', nf(model.prizeReadySessions?.length || m.couponReadySessions), 'gold'),
+      renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold'),
+      renderKpi('أسماء فريدة مسجّلة', nf(model.uniqueParticipantCount), 'purple'),
+      renderKpi('جلسات حقيقية', nf(m.totalRealSessions), 'gold'),
+      renderKpi('دقائق تفاعل', nf(m.totalEngagementMinutes), 'green'),
+      renderKpi('ذروة حضور', nf(m.peakPlayers), 'purple'),
+      renderKpi('جولات مكتملة', nf(m.totalRounds), 'blue'),
+      renderKpi('معدل إكمال', `${m.completionRate}%`, 'green'),
+    ].join('');
+  }
+  return [
+    renderKpi('جلسات لعب حقيقية', nf(m.totalRealSessions), 'gold'),
+    renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold'),
+    renderKpi('ذروة حضور (جلسة واحدة)', nf(m.peakPlayers), 'purple'),
+    renderKpi('متوسط الحضور / جلسة', m.avgPlayers, 'purple'),
+    renderKpi('جولات قابلة للرعاية', nf(m.totalRounds), 'blue'),
+    renderKpi('ظهور رعاية الجولات', nf(m.roundReach), 'blue'),
+    renderKpi('دقائق تفاعل المتسابقين', nf(m.totalEngagementMinutes), 'green'),
+    renderKpi('معدل إكمال الجلسات', `${m.completionRate}%`, 'green'),
+  ].join('');
 }
 
 function renderGamesTotalsRow(games) {
@@ -398,8 +481,33 @@ function renderGamesTotalsRow(games) {
   </tr>`;
 }
 
+function renderSponsorBlock(model) {
+  const s = model.sponsorMeta;
+  if (!s?.name) return '';
+  const logo = s.logoUrl
+    ? `<img src="${esc(s.logoUrl)}" alt="${esc(s.name)}" style="max-height:64px;max-width:200px;object-fit:contain"/>`
+    : '';
+  const prize =
+    s.prizeOffer && (model.reportPurpose === 'prize' || model.reportPurpose === 'full')
+      ? `<div class="note-box" style="margin-top:10px"><strong>🎁 الجائزة المرتبطة:</strong> ${esc(s.prizeOffer)}</div>`
+      : '';
+  return `<div class="recipient-box" style="margin-top:12px;border-color:#c97f1a">
+        <div class="recipient-box__label">الراعي / الشريك</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px">
+          ${logo}
+          <div>
+            <div class="recipient-box__name">${esc(s.name)}</div>
+            ${s.tagline ? `<div class="recipient-box__type">${esc(s.tagline)}</div>` : ''}
+          </div>
+        </div>
+        ${prize}
+      </div>`;
+}
+
 function buildReportHtml(model) {
   const m = model.metrics;
+  const purpose = model.reportPurpose || 'full';
+  const purposeMeta = model.purposeMeta || {};
   const features = SUBSCRIPTION_PLATFORM_FEATURES.map((f) => `<span class="feat">✓ ${esc(f)}</span>`).join('');
 
   const codeInfo = model.codeMeta
@@ -424,11 +532,17 @@ function buildReportHtml(model) {
     ? `<div class="custom-note"><strong>ملاحظة:</strong> ${esc(model.customNote)}</div>`
     : '';
 
+  const purposeBanner = `<div class="recipient-box" style="margin-top:0">
+        <div class="recipient-box__label">نوع التقرير B2B</div>
+        <div class="recipient-box__name">${esc(purposeMeta.label || 'تقرير شراكة')}</div>
+        <div class="recipient-box__type">${esc(purposeMeta.subtitle || '')}</div>
+      </div>`;
+
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-  <title>${esc(`تقرير تأثير ${PLATFORM_NAME} — ${model.recipientName || model.scopeLabel}`)}</title>
+  <title>${esc(`${purposeMeta.titleSuffix || 'تقرير'} — ${PLATFORM_NAME} — ${model.recipientName || model.scopeLabel}`)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
   <style>${reportStyles()}</style>
 </head>
@@ -457,25 +571,47 @@ function buildReportHtml(model) {
         </div>
       </header>
 
-      <h1 class="doc-title">تقرير تأثير الفعاليات والتفاعل الجماعي</h1>
+      <h1 class="doc-title">${esc(purposeMeta.docTitle || 'تقرير تأثير الفعاليات والتفاعل الجماعي')}</h1>
       <p class="doc-sub">
-        وثيقة شفافة تعرض أرقاماً حقيقية مُسحوبة من نظام تتبع جلسات ${esc(PLATFORM_NAME)} —
-        لدعم قرارات الشراكة، حزم المؤسسات، رعاية الجولات، وبرامج الجوائز.
+        وثيقة رسمية بتاريخ ووقت الإصدار — تعرض أرقاماً حقيقية مع أسماء المشرفين والمتسابقين
+        من نظام تتبع جلسات ${esc(PLATFORM_NAME)}.
+        ${purpose === 'sponsorship' ? 'مخصّصة لإقناع الراعي بقيمة ظهور شعاره في الجولات.' : ''}
+        ${purpose === 'prize' ? 'مخصّصة لجهة تقدّم جائزة أو خصماً للفائزين — مع كشف الجلسات المؤهلة.' : ''}
       </p>
 
+      ${purposeBanner}
+      ${renderSponsorBlock(model)}
       ${recipientBlock}
       ${codeInfo}
       ${customNote}
 
       <div class="kpi-grid">
-        ${renderKpi('جلسات لعب حقيقية', nf(m.totalRealSessions), 'gold')}
-        ${renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold')}
-        ${renderKpi('ذروة حضور (جلسة واحدة)', nf(m.peakPlayers), 'purple')}
-        ${renderKpi('متوسط الحضور / جلسة', m.avgPlayers, 'purple')}
-        ${renderKpi('جولات قابلة للرعاية', nf(m.totalRounds), 'blue')}
-        ${renderKpi('ظهور رعاية الجولات', nf(m.roundReach), 'blue')}
-        ${renderKpi('دقائق تفاعل المتسابقين', nf(m.totalEngagementMinutes), 'green')}
-        ${renderKpi('معدل إكمال الجلسات', `${m.completionRate}%`, 'green')}
+        ${purposeKpiGrid(model)}
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="sec">
+        <h2 class="sec-title">👥 كشف المشرفين والمتسابقين</h2>
+        <p class="sec-lead">
+          سجل رسمي يوضح من أشرف على كل جلسة ومن شارك فعلياً — وليس أرقاماً مجردة.
+          ${purpose === 'prize' ? 'يُبرز الجلسات المؤهلة لربط الجائزة أو الكوبون.' : ''}
+        </p>
+        <table class="data">
+          <thead>
+            <tr>
+              <th>التاريخ والوقت</th><th>اللعبة</th><th>الغرفة</th><th>المشرف</th>
+              <th>المتسابقون</th><th>جولات</th><th>ظهور رعاية</th><th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody>${renderSessionRosterRows(model.sessionRoster, purpose)}</tbody>
+        </table>
+      </div>
+
+      <div class="sec">
+        <h2 class="sec-title">📇 سجل الأسماء الفريدة</h2>
+        <p class="sec-lead">جميع الأسماء/الألقاب المسجّلة عبر الجلسات — للتحقق من حجم الجمهور الحقيقي.</p>
+        ${renderUniqueParticipants(model.uniqueParticipants)}
       </div>
     </section>
 
@@ -539,14 +675,14 @@ function buildReportHtml(model) {
               <td>إثبات حجم الفعاليات المنفّذة فعلياً</td>
             </tr>
             <tr>
-              <td>رعاية الجولات</td>
-              <td class="num">${nf(m.totalRounds)} جولة · ${nf(m.roundReach)} ظهور</td>
-              <td>كل جولة × متسابق = فرصة ظهور للعلامة الراعية</td>
+              <td>① رعاية الجولات — شعار الراعي في كل جولة</td>
+              <td class="num">${nf(m.totalRounds)} جولة · ${nf(m.roundReach)} ظهور · ${nf(m.totalParticipants)} مشاركة</td>
+              <td>كل جولة × متسابق = فرصة ظهور للعلامة — مع كشف الأسماء أعلاه</td>
             </tr>
             <tr>
-              <td>كوبونات الجوائز</td>
-              <td class="num">${nf(m.couponReadySessions)} جلسة مؤهلة · ${nf(m.totalEngagementMinutes)} د تفاعل</td>
-              <td>جلسات مكتملة (5+ لاعبين، جولتان+) مناسبة لربط الجوائز</td>
+              <td>② جائزة الجولة برعاية — كوبون/خصم للفائز</td>
+              <td class="num">${nf(model.prizeReadySessions?.length || m.couponReadySessions)} جلسة مؤهلة · ${nf(model.uniqueParticipantCount)} اسم فريد</td>
+              <td>جلسات مكتملة (5+ لاعبين، جولتان+) — مناسبة لربط الجائزة بالفائز</td>
             </tr>
             <tr>
               <td>مدة الاستخدام الفعلي</td>
@@ -558,13 +694,13 @@ function buildReportHtml(model) {
       </div>
 
       <div class="sec">
-        <h2 class="sec-title">📋 سجل الجلسات الأخيرة (شفافية كاملة)</h2>
-        <p class="sec-lead">آخر ${model.recent.length} جلسة مسجّلة — للتحقق والمراجعة.</p>
+        <h2 class="sec-title">📋 سجل الجلسات التفصيلي</h2>
+        <p class="sec-lead">آخر ${model.recent.length} جلسة — مع المشرف وأسماء المتسابقين.</p>
         <table class="data">
           <thead>
             <tr>
-              <th>اللعبة</th><th>الغرفة</th><th>جولات</th><th>متسابقين</th>
-              <th>ظهور رعاية</th><th>تفاعل (د)</th><th>الحالة</th><th>التاريخ</th>
+              <th>اللعبة</th><th>الغرفة</th><th>المشرف</th><th>المتسابقون</th>
+              <th>جولات</th><th>عدد</th><th>ظهور رعاية</th><th>تفاعل (د)</th><th>الحالة</th><th>التاريخ</th>
             </tr>
           </thead>
           <tbody>${renderRecentRows(model.recent)}</tbody>

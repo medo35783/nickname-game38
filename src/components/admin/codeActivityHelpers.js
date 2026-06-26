@@ -11,7 +11,7 @@ export function getCodeActivityInfo(stats) {
     return { label: 'نشط اليوم', color: 'var(--green)', pulse: true };
   }
   if (age <= MS_WEEK) {
-    return { label: 'نشط هذا الأسبوع', color: 'var(--gold)', pulse: false };
+    return { label: 'نشط هذا الأسبوع', color: 'var(--brand-blue)', pulse: false };
   }
   return { label: 'غير نشط', color: 'var(--dim)', pulse: false };
 }

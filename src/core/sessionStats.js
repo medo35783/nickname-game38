@@ -2,8 +2,76 @@
 import { auth, db } from '../firebase';
 import { rewardHostIfRegistered } from './arenaRewards';
 import { emitArenaCelebration } from './arenaEvents';
+import { mergeSponsorStats, readActiveCodeSponsorFromLocal } from './sponsorStatsHelpers';
+import { readHostSubscriptionMeta } from './roomLifecycle';
 
 const MAX_RECENT_SESSIONS = 20;
+const MAX_ROSTER_LABELS = 40;
+const MAX_UNIQUE_PARTICIPANTS = 120;
+
+function trimLabel(str, max = 60) {
+  return String(str ?? '').trim().slice(0, max);
+}
+
+/** أسماء المتسابقين من عقدة اللاعبين — للتقرير الرسمي B2B */
+export function extractParticipantLabels(gameType, players = {}) {
+  const type = normalizeGameType(gameType);
+  const labels = [];
+
+  Object.values(players).forEach((p) => {
+    if (!p || typeof p !== 'object') return;
+    let label = null;
+
+    if (type === 'titles') {
+      const name = trimLabel(p.name);
+      const nick = trimLabel(p.nick);
+      if (name && nick) label = `${name} (${nick})`;
+      else label = name || nick;
+    } else if (type === 'fameeri') {
+      label = trimLabel(p.name);
+    } else {
+      const base = trimLabel(p.name);
+      const arena = trimLabel(p.arenaName);
+      if (p.isHost && arena) label = arena;
+      else if (base && arena && arena !== base) label = `${base} · ${arena}`;
+      else label = base || arena;
+    }
+
+    if (label && label !== 'المشرف') labels.push(label);
+  });
+
+  return [...new Set(labels)].slice(0, MAX_ROSTER_LABELS);
+}
+
+/** اسم المشرف للتقرير — من الساحة أو من بيانات الغرفة */
+export async function resolveAdminDisplayName(adminId, players = {}) {
+  const hostPlayer = Object.values(players).find((p) => p?.isHost);
+  const fromHost = hostPlayer?.arenaName || (hostPlayer?.name !== 'المشرف' ? hostPlayer?.name : '');
+  if (fromHost && String(fromHost).trim()) return trimLabel(fromHost, 80);
+
+  if (adminId) {
+    try {
+      const snap = await get(ref(db, `users/${adminId}/profile`));
+      const dn = snap.val()?.displayName;
+      if (dn && String(dn).trim()) return trimLabel(dn, 80);
+    } catch {
+      /* ignore */
+    }
+  }
+  return 'مشرف الجلسة';
+}
+
+function mergeUniqueLabels(prev = [], next = []) {
+  const seen = new Set();
+  const out = [];
+  [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(next) ? next : [])].forEach((label) => {
+    const key = String(label || '').trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(key);
+  });
+  return out.slice(0, MAX_UNIQUE_PARTICIPANTS);
+}
 
 /** Firebase Auth ثم localStorage — معرّف المشرف الموحّد */
 export function resolveUserId() {
@@ -40,21 +108,33 @@ export function persistActiveCodeLocal(codeData) {
       codeId,
       id: codeId,
       code: codeData.code || null,
+      sponsorId: codeData.sponsorId || null,
+      sponsorName: codeData.sponsorName || null,
+      sponsorLogoUrl: codeData.sponsorLogoUrl || null,
+      sponsorTagline: codeData.sponsorTagline || null,
     })
   );
 }
 
 /** حقول تتبع الجلسة على عقدة game عند إنشاء غرفة جديدة */
 export function buildGameSessionTracking(gameType) {
+  const sponsor = readActiveCodeSponsorFromLocal();
+  const sub = readHostSubscriptionMeta();
   return {
     adminId: resolveUserId(),
     adminCode: resolveCodeId(),
     sessionStart: Date.now(),
+    subscriptionExpiresAt: sub?.expiresAt ?? null,
+    subscriptionActivatedAt: sub?.activatedAt ?? null,
+    subscriptionCodeId: sub?.codeId ?? null,
     sessionEnd: null,
     totalRounds: 0,
     completed: false,
     playerCount: 0,
     gameType,
+    sponsorId: sponsor?.id || null,
+    sponsorName: sponsor?.name || null,
+    sponsorLogoUrl: sponsor?.logoUrl || null,
   };
 }
 
@@ -89,6 +169,12 @@ export function computeNextStats(prev = {}, sessionData) {
     durationMinutes = 0,
     roomCode,
     timestamp = Date.now(),
+    adminName = null,
+    participantLabels = [],
+    sponsorId = null,
+    sponsorName = null,
+    sponsorImpressions = 0,
+    roundReach: sessionRoundReach = 0,
   } = sessionData;
 
   const isRealSession = totalRounds > 0;
@@ -98,7 +184,8 @@ export function computeNextStats(prev = {}, sessionData) {
     totalRealSessions > 0 ? totalPlayerCount / totalRealSessions : prev.avgPlayers || 0;
 
   const engagementMinutes = playerCount * durationMinutes;
-  const roundReach = totalRounds * playerCount;
+  const roundReach = sessionRoundReach || totalRounds * playerCount;
+  const sponsorReach = sponsorId ? roundReach : 0;
   const gk = normalizeGameType(gameType);
   const prevByGame = prev.byGame && typeof prev.byGame === 'object' ? prev.byGame : {};
   const prevGame = prevByGame[gk] || {};
@@ -126,6 +213,13 @@ export function computeNextStats(prev = {}, sessionData) {
     roundReach,
     roomCode,
     ts: timestamp,
+    adminName: adminName ? trimLabel(adminName, 80) : null,
+    participantLabels: Array.isArray(participantLabels)
+      ? participantLabels.map((l) => trimLabel(l, 60)).filter(Boolean).slice(0, MAX_ROSTER_LABELS)
+      : [],
+    sponsorId: sponsorId || null,
+    sponsorName: sponsorName ? trimLabel(sponsorName, 80) : null,
+    sponsorImpressions: sponsorId ? sponsorReach : 0,
   };
   const recentSessions = [
     ...(Array.isArray(prev.recentSessions) ? prev.recentSessions : []),
@@ -154,6 +248,16 @@ export function computeNextStats(prev = {}, sessionData) {
     },
     byGame: nextByGame,
     recentSessions,
+    uniqueParticipantLabels: mergeUniqueLabels(prev.uniqueParticipantLabels, participantLabels),
+    hostSessions: (prev.hostSessions || 0) + (adminName ? 1 : 0),
+    sponsorImpressions: mergeSponsorStats(prev.sponsorImpressions, {
+      sponsorId,
+      sponsorName,
+      totalRounds,
+      playerCount,
+      roundReach: sponsorReach,
+    }),
+    totalSponsorImpressions: (Number(prev.totalSponsorImpressions) || 0) + sponsorReach,
   };
 }
 
@@ -188,6 +292,8 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
   if (type !== 'titles' && type !== 'fameeri' && type !== 'hesbah') return;
   try {
     const base = roomBase(type, roomCode);
+    const roomSnap = await get(ref(db, base));
+    const roomData = roomSnap.val() || {};
     const playersSnap = await get(ref(db, playersPath(type, roomCode)));
     const players = playersSnap.val() || {};
     const playerCount = Object.keys(players).length;
@@ -203,18 +309,29 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
     const game = gameSnap.val() || {};
     const sessionStart = Number(game.sessionStart) || sessionEnd;
     const durationMinutes = Math.max(0, (sessionEnd - sessionStart) / 60000);
+    const adminId = game.adminId || roomData.adminId || resolveUserId();
+    const adminName = await resolveAdminDisplayName(adminId, players);
+    const participantLabels = extractParticipantLabels(type, players);
+    const sponsorId = game.sponsorId || null;
+    const sponsorName = game.sponsorName || null;
+    const totalRounds = Number(game.totalRounds) || 0;
+    const roundReach = totalRounds * playerCount;
 
     const sessionData = {
       gameType: type,
-      totalRounds: Number(game.totalRounds) || 0,
+      totalRounds,
       completed,
       playerCount,
       durationMinutes,
       roomCode,
       timestamp: sessionEnd,
+      adminName,
+      participantLabels,
+      sponsorId,
+      sponsorName,
+      roundReach,
+      sponsorImpressions: sponsorId ? roundReach : 0,
     };
-
-    const adminId = game.adminId || resolveUserId();
     await updateCodeStats(adminId, game.adminCode || resolveCodeId(), sessionData);
 
     if (completed && adminId) {

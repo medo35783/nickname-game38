@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PLATFORM_NAME, SUPPORT_EMAIL } from '../core/constants';
+import { auth } from '../firebase';
+import { submitPlatformFeedback } from '../core/platformFeedback';
 import ArenaHallOfFame from '../shared/ArenaHallOfFame';
 import KnowledgeBankSpotlight from '../shared/KnowledgeBankSpotlight';
 import GameTopNav from '../shared/GameTopNav';
@@ -64,11 +66,30 @@ export default function VoicePage({
 
   const cfg = CONTACT_TYPES[contactType];
 
-  const sendMail = () => {
+  const sendMail = async () => {
     if (!form.text.trim()) {
       notify?.('اكتب رسالتك أولاً', 'error');
       return;
     }
+
+    const user = auth.currentUser;
+    if (user && !user.isAnonymous) {
+      try {
+        await submitPlatformFeedback({
+          type: contactType,
+          category: form.cat,
+          text: form.text,
+          uid: user.uid,
+          email: user.email,
+        });
+        setForm((f) => ({ ...f, text: '' }));
+        notify?.('✅ وصلنا رسالتك — شكراً!', 'success');
+        return;
+      } catch {
+        notify?.('تعذّر الإرسال المباشر — جاري فتح البريد…', 'error');
+      }
+    }
+
     const sub = encodeURIComponent(cfg.emailSubject);
     const bod = encodeURIComponent(`النوع: ${cfg.label}\nالتصنيف: ${form.cat}\n\n${form.text}`);
     window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${sub}&body=${bod}`;

@@ -9,8 +9,7 @@ import VoicePage from './pages/VoicePage';
 import QuestionContribute from './question-bank/QuestionContribute';
 import { fetchBankStats } from './question-bank/qbank.helpers';
 import './styles/knowledge-chest.css';
-import AdminCodesPanel from './components/admin/AdminCodesPanel';
-import QBankManager from './question-bank/QBankManager';
+import AdminHub from './components/admin/AdminHub';
 import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
 import AccountPage from './components/account/AccountPage';
 import { renderPlatformGame, handlePlatformGameBack } from './games/platformGameRouter';
@@ -31,6 +30,8 @@ import { ensureArenaProfile } from './core/arenaProfile';
 import { arenaPointsForRank } from './core/arena.constants';
 import { rewardCurrentPlayerIfRegistered } from './core/arenaRewards';
 import { onArenaCelebration } from './core/arenaEvents';
+import { subscribePlatformSettings } from './core/platformSettings';
+import { subscribeCommunityPosts } from './core/platformCommunity';
 import useArenaProfile from './hooks/useArenaProfile';
 import ArenaLevelUpModal from './shared/ArenaLevelUpModal';
 import La3ibzBrandMark from './shared/La3ibzBrandMark';
@@ -47,11 +48,6 @@ const CONTRIBUTE_BACK_LABELS = {
   game: ARENA_BACK_LABEL,
   account: ACCOUNT_BACK_LABEL,
 };
-
-const COMMUNITY_SUGGESTIONS = [
-  { id: 1, cat: 'تصميم', text: 'وضع داكن أكثر', date: '2025-03-10' },
-  { id: 2, cat: 'لعبة', text: 'مؤقت صوتي عند النهاية', date: '2025-03-12' },
-];
 
 /* ══════════════════════════════════════════════════
    MAIN APP
@@ -85,13 +81,15 @@ export default function App() {
   const [endGameData, setEndGameData] = useState(null);
   const [arenaCelebration, setArenaCelebration] = useState(null);
   const [voicePortal, setVoicePortal] = useState(null);
-  const [adminPanelTab, setAdminPanelTab] = useState('codes');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountAuthMode, setAccountAuthMode] = useState('login');
+  const [pendingAuthMode, setPendingAuthMode] = useState(null);
   const [bankTotal, setBankTotal] = useState(null);
   const [contributeOpen, setContributeOpen] = useState(false);
   const [contributeReturnTab, setContributeReturnTab] = useState('game');
   const accountMenuRef = useRef(null);
+  const [platformSettings, setPlatformSettings] = useState(null);
+  const [communitySuggestions, setCommunitySuggestions] = useState([]);
 
   const openContribute = useCallback((fromTab = 'game') => {
     setContributeReturnTab(fromTab);
@@ -188,6 +186,16 @@ export default function App() {
       clearTimeout(safety);
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribePlatformSettings(setPlatformSettings);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeCommunityPosts(setCommunitySuggestions);
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -390,7 +398,7 @@ export default function App() {
   const navItems = [
     { id: 'game', icon: 'brand', label: 'الألعاب' },
     { id: 'voice', icon: '💬', label: 'صوّتك', dot: false },
-    ...(isAdmin ? [{ id: 'codes', icon: '🎫', label: 'الأكواد' }] : []),
+    ...(isAdmin ? [{ id: 'codes', icon: '👑', label: 'التحكم' }] : []),
     { id: 'pricing', icon: '💎', label: 'الباقات' },
   ];
 
@@ -398,17 +406,49 @@ export default function App() {
   const user = auth.currentUser;
   const isGuest = arena.isGuest;
   const accountDisplayName = isGuest
-    ? 'سجّل دخول'
+    ? 'حسابي والكود'
     : `${arena.avatarIcon} ${arena.displayName}`;
   const accountBtnClass = isGuest
     ? 'hdr-account-btn hdr-account-btn--guest'
     : 'hdr-account-btn hdr-account-btn--arena';
 
+  const openCodeActivation = () => {
+    setAccountMenuOpen(false);
+    setPendingAuthMode(null);
+    setShowCodeActivation(true);
+  };
+
   const openAccountTab = (mode = 'login') => {
+    setAccountMenuOpen(false);
     setAccountAuthMode(mode);
     setTab('account');
-    setAccountMenuOpen(false);
   };
+
+  const finishCodeActivation = useCallback(
+    (codeData, authModeAfter = null) => {
+      if (codeData) {
+        setActiveCode(codeData);
+        persistActiveCodeLocal(codeData);
+      }
+      setShowCodeActivation(false);
+      setPendingAuthMode(null);
+      if (authModeAfter === 'login' || authModeAfter === 'register') {
+        setAccountAuthMode(authModeAfter);
+        setTab('account');
+        notify('✅ تم تفعيل الكود — أكمل تسجيل الدخول', 'success');
+        return;
+      }
+      notify('✅ تم تفعيل الكود — تابع من اللعبة', 'success');
+    },
+    [notify]
+  );
+
+  const openLoginAfterCode = useCallback(() => {
+    setShowCodeActivation(false);
+    setAccountAuthMode('login');
+    setTab('account');
+    setPendingAuthMode(null);
+  }, []);
 
   const handleHeaderSignOut = async () => {
     try {
@@ -477,7 +517,7 @@ export default function App() {
               type="button"
               className={accountBtnClass}
               onClick={() => setAccountMenuOpen((v) => !v)}
-              title={isGuest ? 'سجّل واحصل على شارة الساحة' : `${arena.points} نقطة ساحة`}
+              title={isGuest ? 'تفعيل الكود · تسجيل دخول · حساب جديد' : `${arena.points} نقطة ساحة`}
             >
               {isGuest ? `👤 ${accountDisplayName}` : (
                 <>
@@ -492,6 +532,9 @@ export default function App() {
               <div className="hdr-account-menu">
                 {isGuest ? (
                   <>
+                    <button type="button" className="hdr-account-item hdr-account-item--primary" onClick={openCodeActivation}>
+                      🔑 تفعيل الكود
+                    </button>
                     <button type="button" className="hdr-account-item" onClick={() => openAccountTab('login')}>
                       تسجيل دخول
                     </button>
@@ -566,16 +609,22 @@ export default function App() {
       </div>
 
       <div className="main">
+        {platformSettings?.maintenanceMode && !isAdmin ? (
+          <div className="maintenance-banner" role="status">
+            <span aria-hidden>🛠️</span>
+            <p>{platformSettings.maintenanceMessage || 'المنصة تحت الصيانة — نعود قريباً'}</p>
+          </div>
+        ) : null}
         {showCodeActivation ? (
           <CodeActivation
             notify={notify}
-            onActivationSuccess={(codeData) => {
-              setActiveCode(codeData);
-              persistActiveCodeLocal(codeData);
+            pendingAuthMode={pendingAuthMode}
+            onActivationSuccess={finishCodeActivation}
+            onRequestLogin={openLoginAfterCode}
+            onBack={() => {
               setShowCodeActivation(false);
-              notify('✅ تم تفعيل الكود — تابع من اللعبة', 'success');
+              setPendingAuthMode(null);
             }}
-            onBack={() => setShowCodeActivation(false)}
           />
         ) : null}
         {!showCodeActivation && contributeOpen ? (
@@ -594,37 +643,12 @@ export default function App() {
             isGuest={isGuest}
             bankTotal={bankTotal}
             initialPortal={voicePortal}
-            communitySuggestions={COMMUNITY_SUGGESTIONS}
+            communitySuggestions={communitySuggestions}
           />
         )}
         {!showCodeActivation && !contributeOpen && tab==='game'&&(()=>{try{return renderGame();}catch(e){console.error('Render error:',e);return <div style={{padding:20,textAlign:'center',color:'var(--red)'}}><div style={{fontSize:40}}>⚠️</div><div style={{marginTop:8}}>خطأ في العرض — حدّث الصفحة</div><div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{e?.message}</div><button className="btn bg mt2" onClick={()=>window.location.reload()}>🔄 تحديث</button></div>;}})()}
         {!showCodeActivation && !contributeOpen && tab === 'codes' && isAdmin && (
-          <div className="scr">
-            <GameTopNav onBack={() => goToTab('game')} variant="arena" />
-            <div className="tabs">
-              <button
-                type="button"
-                className={`tab ${adminPanelTab === 'codes' ? 'on' : ''}`}
-                onClick={() => setAdminPanelTab('codes')}
-              >
-                الأكواد
-              </button>
-              <button
-                type="button"
-                className={`tab ${adminPanelTab === 'qbank' ? 'on' : ''}`}
-                onClick={() => setAdminPanelTab('qbank')}
-              >
-                بنك الأسئلة
-              </button>
-            </div>
-
-            {adminPanelTab === 'codes' && <AdminCodesPanel notify={notify} />}
-            {adminPanelTab === 'qbank' &&
-              typeof localStorage !== 'undefined' &&
-              localStorage.getItem('pfcc_is_admin') === 'true' && (
-                <QBankManager notify={notify} />
-              )}
-          </div>
+          <AdminHub notify={notify} onBack={() => goToTab('game')} />
         )}
         {!showCodeActivation && !contributeOpen && tab === 'account' && (
           <AccountPage

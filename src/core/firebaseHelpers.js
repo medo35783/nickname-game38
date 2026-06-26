@@ -1,5 +1,6 @@
 import { ref, set, get, update, onValue, off, push, remove } from "firebase/database";
 import { db } from './firebase';
+import { buildActiveCodeSponsorPayload } from './sponsorStatsHelpers';
 
 // ── لعبة الألقاب ──
 export const roomRef    = code => ref(db, `rooms/${code}`);
@@ -59,6 +60,17 @@ export function normalizeSubscriptionCode(raw) {
   if (/^[A-Z0-9]{6}$/.test(t)) return formatStoredCode(t);
   if (/^CODE-[A-Z0-9]{6}$/.test(t)) return t;
   return t;
+}
+
+/** يُحوّل رقم واتساب محلي (05…) إلى صيغة wa.me (966…) */
+export function normalizeWhatsappPhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('966') && digits.length >= 12) return digits.slice(0, 15);
+  if (digits.startsWith('05') && digits.length >= 10) return `966${digits.slice(1)}`;
+  if (digits.startsWith('5') && digits.length === 9) return `966${digits}`;
+  if (digits.length >= 9 && digits.length <= 15) return digits;
+  return '';
 }
 
 /**
@@ -141,9 +153,10 @@ export async function ensureCodeIndexesFromRows(rows) {
  * @param {string} code - الكود المراد تفعيله
  * @param {string} userId - معرف المستخدم
  * @param {object} deviceInfo - معلومات الجهاز
+ * @param {{ phone?: string }} [options] - رقم واتساب اختياري يُحفظ في codes/{codeId}/phone
  * @returns {Promise<object>} بيانات الكود المُفعّل
  */
-export async function activateCode(code, userId, deviceInfo) {
+export async function activateCode(code, userId, deviceInfo, options = {}) {
   const storedCode = normalizeSubscriptionCode(code);
   if (!/^CODE-[A-Z0-9]{6}$/.test(storedCode)) {
     throw new Error('الكود غير صحيح');
@@ -219,6 +232,7 @@ export async function activateCode(code, userId, deviceInfo) {
       activatedAt: isFirstActivation ? now : foundCodeData.activatedAt ?? now,
       expiresAt,
       duration: foundCodeData.duration,
+      ...buildActiveCodeSponsorPayload(foundCodeData),
     };
 
     const indexUpdate = {
@@ -234,6 +248,8 @@ export async function activateCode(code, userId, deviceInfo) {
       devices,
     };
 
+    const phone = normalizeWhatsappPhone(options.phone);
+
     const updates = {
       [`codeIndex/${storedCode}`]: indexUpdate,
       [`users/${userId}/activeCode`]: activeSummary,
@@ -243,6 +259,10 @@ export async function activateCode(code, userId, deviceInfo) {
       [`codes/${foundCodeId}/userId`]: userId,
       [`codes/${foundCodeId}/devices`]: devices,
     };
+
+    if (phone && isFirstActivation) {
+      updates[`codes/${foundCodeId}/phone`] = phone;
+    }
 
     if (isFirstActivation) {
       const histKey = push(ref(db, `users/${userId}/subscriptionHistory`)).key;
@@ -267,6 +287,8 @@ export async function activateCode(code, userId, deviceInfo) {
       expiresAt,
       userId,
       devices,
+      phone: phone || foundCodeData.phone || null,
+      ...buildActiveCodeSponsorPayload(foundCodeData),
     };
   } catch (error) {
     console.error('خطأ في تفعيل الكود:', error);
@@ -360,29 +382,40 @@ export async function ensurePlayerProfile(userId, userLike) {
   const snap = await get(profileRef);
   const now = Date.now();
   const displayName = (userLike?.displayName || '').trim().slice(0, 80);
+  const phone = normalizeWhatsappPhone(userLike?.phone);
 
   if (!snap.exists()) {
-    await set(profileRef, {
+    const payload = {
       email,
       displayName,
       createdAt: now,
       lastLoginAt: now,
       totalLogins: 1,
       gamesHosted: 0,
-      // حقول شارة الساحة تُكمَّل في ensureArenaProfile
-    });
+    };
+    if (phone) payload.phone = phone;
+    await set(profileRef, payload);
     return;
   }
 
   const prev = snap.val() || {};
-  await update(profileRef, {
+  const patch = {
     email,
     lastLoginAt: now,
     totalLogins: (Number(prev.totalLogins) || 0) + 1,
     displayName: displayName || prev.displayName || '',
     gamesHosted: Number(prev.gamesHosted) || 0,
     createdAt: prev.createdAt || now,
-  });
+  };
+  if (phone) patch.phone = phone;
+  await update(profileRef, patch);
+}
+
+/** حفظ رقم واتساب على الكود (لقاعدة العملاء وتذكير التجديد) */
+export async function saveCodePhone(codeId, phone) {
+  const normalized = normalizeWhatsappPhone(phone);
+  if (!codeId || !normalized) return;
+  await update(ref(db), { [`codes/${codeId}/phone`]: normalized });
 }
 
 export const codesRef = () => ref(db, 'codes');

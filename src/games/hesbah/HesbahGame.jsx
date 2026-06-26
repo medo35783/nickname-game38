@@ -5,6 +5,7 @@ import { auth, db } from '../../firebase';
 import { genCode, playSound } from '../../core/helpers';
 import '../../styles/hesbah.css';
 import { buildGameSessionTracking, recordRoundCompleted, recordSessionEnd } from '../../core/sessionStats';
+import { allocateFreeRoomCode, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
 import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import { AV_COLORS } from '../../core/constants';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
@@ -22,6 +23,7 @@ import HesbahLeaderboardList from './HesbahLeaderboardList';
 import HesbahPlayerLeaderboard from './HesbahPlayerLeaderboard';
 import HesbahTopNav from './HesbahTopNav';
 import HesbahGuideModal from './HesbahGuideModal';
+import SponsorRoundBadge from '../../shared/SponsorRoundBadge';
 import GameQuickRules from '../../shared/GameQuickRules';
 import { HESBAH_QUICK_RULES } from '../../shared/quickRulesContent';
 import { GameSessionChecking } from '../../shared/GameTopNav';
@@ -416,6 +418,11 @@ const HesbahGame = forwardRef(function HesbahGame(
       onRequestActivation?.();
       return;
     }
+    if (hostMustBindSubscription() && !readHostSubscriptionMeta()) {
+      notify('انتهى اشتراكك — لا يمكن فتح غرفة جديدة. جدّد الكود من «الباقات».', 'error');
+      onRequestActivation?.();
+      return;
+    }
     if (!totalQ) {
       notify('اختر عدد الأسئلة أولاً', 'error');
       return;
@@ -433,7 +440,11 @@ const HesbahGame = forwardRef(function HesbahGame(
         return;
       }
 
-      const code = genCode();
+      const code = await allocateFreeRoomCode('srooms');
+      if (!code) {
+        notify('لم يتاح رمز غرفة فاضٍ — حاول بعد قليل', 'error');
+        return;
+      }
       const poolNorm = normalizePoolToStructured(pool || {});
       const poolSize = countHesbahPool(poolNorm);
       if (source !== QSOURCE.EXTERNAL && poolSize === 0) {
@@ -521,6 +532,11 @@ const HesbahGame = forwardRef(function HesbahGame(
         return;
       }
       const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setJoinErr(subGuard.message);
+        return;
+      }
       const phase = data.game?.phase || 'lobby';
       const playerEntries = Object.entries(data.players || {});
       const saved = readSavedHesbah();
@@ -656,6 +672,13 @@ const HesbahGame = forwardRef(function HesbahGame(
         return;
       }
       const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify(subGuard.message, subGuard.expired ? 'error' : 'info');
+        return;
+      }
       const player = data.players?.[pid];
       const uid = auth.currentUser?.uid;
       const tokenOk =
@@ -780,6 +803,11 @@ const HesbahGame = forwardRef(function HesbahGame(
   };
 
   const startQuestion = async (qNum, { ultimate = false, fixedScore = null } = {}) => {
+    const subGuard = assertRoomSubscriptionForPlay({ game });
+    if (!subGuard.ok) {
+      notify(subGuard.message, 'error');
+      return;
+    }
     const q = drawNextQuestion();
     await update(dbRef(db, `srooms/${roomCode}/game`), {
       phase: 'question',
@@ -1199,10 +1227,28 @@ const HesbahGame = forwardRef(function HesbahGame(
     }
   };
 
-  const cancelCompetitionFromExit = async () => {
+  const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
-    await cancelCompetition();
+    const code = roomCode;
+    const started = hasHesbahCompetitionStarted(game);
     resetHesbahRoomState();
+    if (!code) return;
+    try {
+      await recordSessionEnd('hesbah', code, true);
+      await update(dbRef(db, `srooms/${code}/game`), {
+        phase: 'ended',
+        endedAt: Date.now(),
+        endedByHost: true,
+        ...(started ? {} : { closedFromLobby: true }),
+      });
+      clearHesbahSession();
+      notify(
+        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
+        'info'
+      );
+    } catch {
+      notify('تعذّر إنهاء المسابقة', 'error');
+    }
   };
 
   const requestEarlyEnd = async () => {
@@ -1706,6 +1752,9 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   return (
     <>
+      {roomCode && phase && !['lobby', 'ended', 'cancelled'].includes(phase) ? (
+        <SponsorRoundBadge gameKey="hesbah" phase={phase} />
+      ) : null}
       {renderMain()}
       <HesbahConfirmModal
         open={confirmEarlyEndOpen}
@@ -1731,7 +1780,7 @@ const HesbahGame = forwardRef(function HesbahGame(
         phase={phase}
         onContinue={() => setExitSheetOpen(false)}
         onPause={() => void pauseFromGame()}
-        onQuit={role === 'admin' ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onQuit={role === 'admin' ? () => void endCompetitionFromExit() : () => void withdrawFromCompetition()}
         onArena={() => void withdrawToArena()}
         onClose={() => setExitSheetOpen(false)}
       />

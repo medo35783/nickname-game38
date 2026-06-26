@@ -1,8 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import { activateCode, normalizeSubscriptionCode, formatCodeForDisplay } from '../../firebaseHelpers';
+import {
+  activateCode,
+  normalizeSubscriptionCode,
+  formatCodeForDisplay,
+} from '../../firebaseHelpers';
 import { auth } from '../../firebase';
 import { PLATFORM_NAME, ARENA_BACK_LABEL } from '../../core/constants';
 import GameTopNav from '../../shared/GameTopNav';
+import CodeActivationSignup from './CodeActivationSignup';
+import '../../styles/code-activation.css';
 
 /** بصمة جهاز بسيطة: userAgent + أبعاد الشاشة → base64 (آمن لمسار RTDB) */
 function buildDeviceInfo() {
@@ -18,7 +24,7 @@ function buildDeviceInfo() {
     fingerprint,
     userAgent: navigator.userAgent,
     width: screen.width,
-    height: screen.height
+    height: screen.height,
   };
 }
 
@@ -45,19 +51,45 @@ function mapActivationError(message) {
   return 'حدث خطأ، يرجى المحاولة مرة أخرى';
 }
 
-/** شاشة تفعيل كود الاشتراك للمستخدمين العاديين. */
-export default function CodeActivation({ onActivationSuccess, notify, onBack, backLabel = ARENA_BACK_LABEL }) {
+/**
+ * شاشة تفعيل كود الاشتراك — الخطوة الأولى قبل التسجيل أو الدخول.
+ */
+export default function CodeActivation({
+  onActivationSuccess,
+  notify,
+  onBack,
+  backLabel = ARENA_BACK_LABEL,
+  onRequestLogin,
+  pendingAuthMode = null,
+}) {
   const [codeInput, setCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activatedData, setActivatedData] = useState(null);
 
   const deviceInfo = useMemo(() => buildDeviceInfo(), []);
 
   const normalizedCode = useMemo(() => normalizeSubscriptionCode(codeInput), [codeInput]);
 
+  const finishActivation = useCallback(
+    (codeData, authModeAfter = null) => {
+      onActivationSuccess(codeData ?? activatedData, authModeAfter ?? pendingAuthMode);
+    },
+    [onActivationSuccess, activatedData, pendingAuthMode]
+  );
+
+  const handleLoginRequest = useCallback(() => {
+    if (activatedData) {
+      finishActivation(activatedData, 'login');
+      return;
+    }
+    onRequestLogin?.();
+  }, [activatedData, finishActivation, onRequestLogin]);
+
   const handleActivate = useCallback(async () => {
     if (loading) return;
     setError('');
+
     if (!normalizedCode || !/^[A-Z0-9]{6}$/.test(formatCodeForDisplay(normalizedCode))) {
       setError('أدخل 6 أحرف أو أرقام');
       return;
@@ -74,7 +106,12 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack, ba
     setLoading(true);
     try {
       const codeData = await activateCode(normalizedCode, user.uid, deviceInfo);
-      onActivationSuccess(codeData);
+
+      if (user.isAnonymous) {
+        setActivatedData(codeData);
+      } else {
+        onActivationSuccess(codeData, pendingAuthMode);
+      }
     } catch (e) {
       const msg = mapActivationError(e?.message);
       setError(msg);
@@ -82,26 +119,36 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack, ba
     } finally {
       setLoading(false);
     }
-  }, [loading, normalizedCode, deviceInfo, notify, onActivationSuccess]);
+  }, [loading, normalizedCode, deviceInfo, notify, onActivationSuccess, pendingAuthMode]);
 
   const goPackages = useCallback(() => {
     window.dispatchEvent(new CustomEvent('pfcc-open-packages'));
     onBack?.();
   }, [onBack]);
 
-  const freeTrial = useCallback(() => {
-    notify('🎁 التجربة المجانية قريباً — تابعنا!', 'info');
-  }, [notify]);
+  if (activatedData) {
+    return (
+      <div className="scr code-activation-scr">
+        {onBack ? <GameTopNav onBack={() => finishActivation()} variant="arena" label={backLabel} /> : null}
+        <CodeActivationSignup
+          codeId={activatedData.id}
+          notify={notify}
+          onDone={() => finishActivation()}
+          onRequestLogin={handleLoginRequest}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="scr">
+    <div className="scr code-activation-scr">
       {onBack ? <GameTopNav onBack={onBack} variant="arena" label={backLabel} /> : null}
       <div style={{ textAlign: 'center', padding: '12px 0 14px' }}>
         <div className="ptitle" style={{ fontSize: 22 }}>
           🎮 مرحباً بك في {PLATFORM_NAME}!
         </div>
         <p className="psub" style={{ marginBottom: 14 }}>
-          أدخل كود الاشتراك (6 أحرف) — لا يتطلب تسجيل بريد
+          أدخل كود اشتراكك للوصول الكامل للمنصة
         </p>
       </div>
 
@@ -130,11 +177,12 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack, ba
             disabled={loading}
           />
         </div>
+
         {error ? <div className="err-msg">⚠️ {error}</div> : null}
 
         <button
           type="button"
-          className="btn bg mt2"
+          className="btn btn-bbrand mt2"
           disabled={loading}
           onClick={handleActivate}
         >
@@ -142,33 +190,15 @@ export default function CodeActivation({ onActivationSuccess, notify, onBack, ba
         </button>
       </div>
 
-      <div className="card ann ag" style={{ textAlign: 'right' }}>
-        <div className="ctitle" style={{ marginBottom: 8 }}>
-          ℹ️ ملاحظات مهمة
-        </div>
-        <ul
-          style={{
-            margin: 0,
-            padding: '0 18px 0 0',
-            fontSize: 12,
-            color: 'var(--muted)',
-            lineHeight: 1.85
-          }}
-        >
-          <li>الكود يعمل على جهازين كحد أقصى</li>
-          <li>صالح لحين التفعيل</li>
-          <li>يبدأ العداد من لحظة التفعيل</li>
-        </ul>
+      <div className="card ann ag code-act-notes" style={{ textAlign: 'right' }}>
+        <p className="code-act-notes__single">
+          ℹ️ صالح لحين التفعيل — يبدأ العداد من لحظة التفعيل
+        </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button type="button" className="btn bo" onClick={goPackages}>
-          💳 شراء اشتراك جديد
-        </button>
-        <button type="button" className="btn bo" onClick={freeTrial}>
-          🎁 تجربة مجانية
-        </button>
-      </div>
+      <button type="button" className="btn bo-bbrand" onClick={goPackages}>
+        💳 شراء اشتراك جديد
+      </button>
     </div>
   );
 }

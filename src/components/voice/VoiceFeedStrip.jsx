@@ -1,5 +1,9 @@
-import { useState } from 'react';
-import { VOICE_NEWS, formatVoiceNewsDate } from '../../core/voiceNews';
+import { useEffect, useState } from 'react';
+import {
+  subscribePlatformNews,
+  formatVoiceNewsDate,
+  mergeNewsWithFallback,
+} from '../../core/platformNews';
 
 /**
  * شريط فاخر مدمج — آخر الأخبار + اقتراحات المجتمع (تبويب واحد يختصر الصفحة)
@@ -7,6 +11,12 @@ import { VOICE_NEWS, formatVoiceNewsDate } from '../../core/voiceNews';
 export default function VoiceFeedStrip({ communitySuggestions = [] }) {
   const hasCommunity = communitySuggestions.length > 0;
   const [tab, setTab] = useState('news');
+  const [news, setNews] = useState(() => mergeNewsWithFallback([]));
+
+  useEffect(() => {
+    const unsub = subscribePlatformNews(setNews);
+    return unsub;
+  }, []);
 
   return (
     <section className="voice-feed" aria-label="آخر الأخبار والمجتمع">
@@ -38,7 +48,10 @@ export default function VoiceFeedStrip({ communitySuggestions = [] }) {
 
       {tab === 'news' ? (
         <div className="voice-feed__track" role="tabpanel">
-          {VOICE_NEWS.map((n) => (
+          {!news.length ? (
+            <p className="voice-feed__empty">لا توجد أخبار حالياً — تابعنا قريباً.</p>
+          ) : null}
+          {news.map((n) => (
             <article
               key={n.id}
               className={`voice-feed__card${n.isNew ? ' voice-feed__card--new' : ''}`}
@@ -60,7 +73,11 @@ export default function VoiceFeedStrip({ communitySuggestions = [] }) {
             <article key={s.id} className="voice-feed__card voice-feed__card--suggest">
               <div className="voice-feed__card-top">
                 <span className="voice-feed__cat">{s.cat}</span>
-                <span className="voice-feed__date">{s.date}</span>
+                {s.date ? (
+                  <time className="voice-feed__date" dateTime={s.date}>
+                    {s.date}
+                  </time>
+                ) : null}
               </div>
               <p className="voice-feed__body">{s.text}</p>
             </article>

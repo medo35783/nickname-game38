@@ -284,7 +284,12 @@ export default function AccountPage({
 
           {isGuest ? (
             <div className="card" style={{ marginBottom: 12 }}>
-              <div className="ctitle">تسجيل بالبريد (اختياري)</div>
+              <div className="ctitle">حسابك</div>
+              <p className="psub" style={{ fontSize: 11, marginBottom: 10 }}>
+                {activeOk
+                  ? 'سجّل دخولك أو أنشئ حساباً — اشتراكك مفعّل'
+                  : 'لديك حساب؟ سجّل دخول — جديد؟ أنشئ حساباً'}
+              </p>
               <PlayerAuthScreen notify={notify} compact initialMode={initialAuthMode} />
             </div>
           ) : (

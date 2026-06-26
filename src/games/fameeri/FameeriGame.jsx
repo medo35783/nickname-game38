@@ -5,6 +5,7 @@ import { auth, db } from '../../firebase';
 import { Q_TREES, Q_WEAPONS, Q_TOTAL } from '../../core/constants';
 import { genCode, playSound } from '../../core/helpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
+import { allocateFreeRoomCode, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
 import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import FameeriRevealOverlay from './FameeriRevealOverlay';
 import { openFameeriPrintableReport } from './fameeriPrintReport';
@@ -14,6 +15,7 @@ import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import FameeriGuideModal from './FameeriGuideModal';
 import GameQuickRules from '../../shared/GameQuickRules';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import SponsorRoundBadge from '../../shared/SponsorRoundBadge';
 import { FAMEERI_QUICK_RULES } from '../../shared/quickRulesContent';
 import { ROOM_CODE_PLACEHOLDER, GROUP_MEMBER_NAME_PLACEHOLDER } from '../../core/formLabels';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
@@ -138,7 +140,15 @@ const FameeriGame = forwardRef(function FameeriGame(
 
   const createQumairiRoom = async () => {
     if (!canCreateRoom) {
-      notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».', 'error');
+      notify(
+        'لا يمكن إنشاء غرفة جديدة بدون اشتراك نشط. غرفك الحالية تبقى مفتوحة — فعّل كودك من «الباقات» للغرف الجديدة.',
+        'error'
+      );
+      onRequestActivation();
+      return;
+    }
+    if (hostMustBindSubscription() && !readHostSubscriptionMeta()) {
+      notify('انتهى اشتراكك — لا يمكن فتح غرفة جديدة. جدّد الكود من «الباقات».', 'error');
       onRequestActivation();
       return;
     }
@@ -147,7 +157,11 @@ const FameeriGame = forwardRef(function FameeriGame(
     } catch {
       /* ignore */
     }
-    const code = genCode();
+    const code = await allocateFreeRoomCode('qrooms');
+    if (!code) {
+      notify('لم يتاح رمز غرفة فاضٍ — حاول بعد قليل', 'error');
+      return;
+    }
     setQRoom(code);
     setQRole('admin');
     await set(dbRef(db, `qrooms/${code}`), {
@@ -539,6 +553,11 @@ const FameeriGame = forwardRef(function FameeriGame(
         return;
       }
       const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setQJoinErr(subGuard.message);
+        return;
+      }
       const phase = data.game?.phase || 'lobby';
       const uid = auth.currentUser?.uid;
       const isLoggedIn = !!uid;
@@ -769,22 +788,27 @@ const FameeriGame = forwardRef(function FameeriGame(
     notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
   };
 
-  const cancelCompetitionFromExit = async () => {
+  const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
     const code = qRoom;
+    const started = hasFameeriCompetitionStarted(qGameState, qAttacks);
     resetFameeriRoomState();
     if (!code) return;
     try {
       await recordSessionEnd('fameeri', code, true).catch(() => {});
       await update(dbRef(db, `qrooms/${code}/game`), {
         phase: 'ended',
-        cancelled: true,
         endedAt: Date.now(),
+        endedByHost: true,
+        ...(started ? {} : { closedFromLobby: true }),
       });
       localStorage.removeItem('ng_qumairi');
-      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+      notify(
+        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
+        'info'
+      );
     } catch {
-      notify('تعذّر إلغاء المسابقة — حاول مجدداً', 'error');
+      notify('تعذّر إنهاء المسابقة — حاول مجدداً', 'error');
     }
   };
 
@@ -942,6 +966,11 @@ const FameeriGame = forwardRef(function FameeriGame(
   }, [qRoom, isAdmin]);
 
   const applyQuestionSetup = async ({ source, pool, poolStructured, bankMeta, keepOpen = false }) => {
+    const subGuard = assertRoomSubscriptionForPlay({ game: qGameState });
+    if (!subGuard.ok) {
+      notify(subGuard.message, 'error');
+      return;
+    }
     setQSource(source);
     const structured = normalizePoolToStructured(poolStructured || pool);
     setQPool(structured);
@@ -966,6 +995,11 @@ const FameeriGame = forwardRef(function FameeriGame(
   };
 
   const drawNextQuestion = async (weaponId) => {
+    const subGuard = assertRoomSubscriptionForPlay({ game: qGameState });
+    if (!subGuard.ok) {
+      notify(subGuard.message, 'error');
+      return;
+    }
     const structured = normalizePoolToStructured(qPool);
     const total = structured.hard.length + structured.medium.length + structured.easy.length;
     if (!isAdmin || qDrawingRef.current || !total) {
@@ -1730,11 +1764,14 @@ const FameeriGame = forwardRef(function FameeriGame(
         phase={qPhase}
         onContinue={() => setExitSheetOpen(false)}
         onPause={withdrawToFameeriHome}
-        onQuit={isAdmin ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onQuit={isAdmin ? () => void endCompetitionFromExit() : () => void withdrawFromCompetition()}
         onArena={withdrawToArena}
         onClose={() => setExitSheetOpen(false)}
       />
       {showGuide && <FameeriGuideModal onClose={() => setShowGuide(false)} />}
+      {qRoom && qPhase && !['lobby', 'ended', 'cancelled', 'distributing'].includes(qPhase) ? (
+        <SponsorRoundBadge gameKey="fameeri" phase={qPhase} />
+      ) : null}
       {renderMain()}
     </div>
   );

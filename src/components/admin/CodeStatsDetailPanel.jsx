@@ -110,7 +110,7 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
   const hesbahPlayed = m.gamesPlayed.hesbah;
   const completionRate = m.completionRate;
   const barColor =
-    completionRate > 70 ? 'var(--green)' : completionRate >= 40 ? 'var(--gold)' : 'var(--red)';
+    completionRate > 70 ? 'var(--green)' : completionRate >= 40 ? 'var(--brand-blue)' : 'var(--red)';
 
   const recent = Array.isArray(stats.recentSessions) ? stats.recentSessions.slice(-5).reverse() : [];
   const lastActiveFormatted = formatLastActive(stats.lastActiveAt);
@@ -133,18 +133,18 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
           marginBottom: 12,
           padding: '12px 10px',
           borderRadius: 12,
-          background: 'linear-gradient(135deg, rgba(201,127,26,.12), rgba(37,111,168,.08))',
-          border: '1px solid rgba(201,127,26,.22)',
+          background: 'linear-gradient(135deg, rgba(37,111,168,.1), rgba(201,127,26,.06))',
+          border: '1px solid rgba(37,111,168,.2)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--gold)' }}>📣 أرقام تسويقية</div>
+          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--brand-blue)' }}>📣 أرقام تسويقية</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {onOpenReport && (
               <button
                 type="button"
                 className="btn bgh bxs"
-                style={{ width: 'auto', fontSize: 10, padding: '4px 10px', borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                style={{ width: 'auto', fontSize: 10, padding: '4px 10px', borderColor: 'var(--brand-blue)', color: 'var(--brand-blue)' }}
                 onClick={onOpenReport}
               >
                 📄 تقرير رسمي PDF
@@ -161,7 +161,7 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {detailStatBox('مشاركات المتسابقين', m.totalParticipants, 'var(--gold)')}
+          {detailStatBox('مشاركات المتسابقين', m.totalParticipants, 'var(--brand-blue)')}
           {detailStatBox('ذروة الحضور', m.peakPlayers, 'var(--purple)')}
           {detailStatBox('ظهور الرعاية', m.roundReach, 'var(--fameeri-primary)')}
           {detailStatBox('دقائق التفاعل', formatEngagementMinutes(m.totalEngagementMinutes, { short: true }), 'var(--blue)')}
@@ -174,7 +174,7 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-        {detailStatBox('جلسات حقيقية', totalReal, 'var(--gold)')}
+        {detailStatBox('جلسات حقيقية', totalReal, 'var(--brand-blue)')}
         {detailStatBox('جولات مكتملة', m.totalRounds, 'var(--fameeri-primary)')}
         {detailStatBox('ألعاب مكتملة', completed, 'var(--green)')}
         {detailStatBox('تُركت مبكراً', Number(stats.abandonedGames) || 0, 'var(--red)')}
@@ -246,7 +246,7 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ color: 'var(--muted)', textAlign: 'right' }}>
-                {['اللعبة', 'الجولات', 'متسابقين', 'ظهور رعاية', 'تفاعل', 'التاريخ'].map((h) => (
+                {['اللعبة', 'الراعي', 'الجولات', 'متسابقين', 'ظهور رعاية', 'تفاعل', 'التاريخ'].map((h) => (
                   <th
                     key={h}
                     style={{ padding: '6px 5px', borderBottom: '1px solid rgba(255,255,255,.08)', fontWeight: 700 }}
@@ -262,10 +262,13 @@ export default function CodeStatsDetailPanel({ loading, stats, codeLabel = null,
                   <td style={{ padding: '7px 5px' }}>
                     {gameTypeIcon(s.gameType)} {gameTypeLabel(s.gameType)}
                   </td>
+                  <td style={{ padding: '7px 5px', fontSize: 10, color: 'var(--brand-blue)' }}>
+                    {s.sponsorName || '—'}
+                  </td>
                   <td style={{ padding: '7px 5px', fontWeight: 800 }}>{s.totalRounds ?? 0}</td>
                   <td style={{ padding: '7px 5px' }}>{s.playerCount ?? 0}</td>
                   <td style={{ padding: '7px 5px' }}>
-                    {s.roundReach ?? (Number(s.totalRounds) || 0) * (Number(s.playerCount) || 0)}
+                    {s.sponsorImpressions ?? s.roundReach ?? (Number(s.totalRounds) || 0) * (Number(s.playerCount) || 0)}
                   </td>
                   <td style={{ padding: '7px 5px' }}>
                     {formatEngagementMinutes(

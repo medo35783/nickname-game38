@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { db, ref, set, get, update, onValue, off, push, remove, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
+import { tryReclaimStaleRoom, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
 import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
 import { genCode, fmtMs, shuffle, mkInitials } from '../../core/helpers';
 import { AV_COLORS } from '../../core/constants';
@@ -45,6 +46,7 @@ import GameExitSheet from '../../shared/GameExitSheet';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
+import SponsorRoundBadge from '../../shared/SponsorRoundBadge';
 import { formatOtherSessionsHint, getOtherActiveSessions, getSavedRoomForGame } from '../../shared/gameSessionRegistry';
 import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
 import {
@@ -417,23 +419,32 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
   };
 
-  const cancelCompetitionFromExit = async () => {
+  const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
     const code = roomCode;
+    const started = hasTitlesCompetitionStarted(gameState, allRoundsData);
+    const livePhase = gameState?.phase;
     resetTitlesRoomState();
     if (!code) return;
     try {
-      recordSessionEnd('titles', code, true).catch(() => {});
+      if (started && (livePhase === 'attacking' || livePhase === 'revealing')) {
+        await recordRoundCompleted('titles', code).catch(() => {});
+      }
+      await recordSessionEnd('titles', code, true).catch(() => {});
       await update(gameRef(code), {
         phase: 'ended',
-        cancelled: true,
         endedAt: Date.now(),
+        endedByHost: true,
+        ...(started ? {} : { closedFromLobby: true }),
       });
       localStorage.removeItem('ng_session');
       localStorage.removeItem('ng_admin_session');
-      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+      notify(
+        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
+        'info'
+      );
     } catch {
-      notify('تعذّر إلغاء المسابقة — حاول مجدداً', 'error');
+      notify('تعذّر إنهاء المسابقة — حاول مجدداً', 'error');
     }
   };
 
@@ -461,6 +472,13 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         return;
       }
       const roomData = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(roomData);
+      if (!subGuard.ok) {
+        localStorage.removeItem('ng_session');
+        localStorage.removeItem('ng_admin_session');
+        notify(subGuard.message, subGuard.expired ? 'error' : 'info');
+        return;
+      }
       if (roomData?.game?.phase === 'ended') {
         localStorage.removeItem('ng_session');
         localStorage.removeItem('ng_admin_session');
@@ -500,7 +518,15 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   /* ══ ADMIN: CREATE ROOM ══ */
   const createRoom = async () => {
     if (!canCreateRoom) {
-      notify('لا يمكن إنشاء غرفة بدون اشتراك نشط. فعّل كودك أو جدّده من تبويب «الباقات».', 'error');
+      notify(
+        'لا يمكن إنشاء غرفة جديدة بدون اشتراك نشط. غرفك الحالية تبقى مفتوحة — فعّل كودك من «الباقات» للغرف الجديدة.',
+        'error'
+      );
+      onRequestActivation();
+      return;
+    }
+    if (hostMustBindSubscription() && !readHostSubscriptionMeta()) {
+      notify('انتهى اشتراكك — لا يمكن فتح غرفة جديدة. جدّد الكود من «الباقات».', 'error');
       onRequestActivation();
       return;
     }
@@ -538,9 +564,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       try {
         const existing = await get(roomRef(tryCode));
         if (existing.exists()) {
-          lastWasCollision = true;
-          lastErr = new Error('room_taken');
-          continue;
+          const reclaimed = await tryReclaimStaleRoom('rooms', tryCode, existing.val());
+          if (reclaimed !== 'reclaimed') {
+            lastWasCollision = true;
+            lastErr = new Error('room_taken');
+            continue;
+          }
         }
         lastWasCollision = false;
         await update(ref(db), {
@@ -633,6 +662,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       const snap = await get(roomRef(joinInput));
       if(!snap.exists()){setJoinErr('الغرفة غير موجودة');return;}
       const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setJoinErr(subGuard.message);
+        return;
+      }
       const gamePhase = data.game?.phase || 'lobby';
       const hostUid = auth.currentUser?.uid;
 
@@ -817,6 +851,11 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
 
   /* ══ ADMIN: START GAME / LAUNCH ROUND ══ */
   const launchRound = async (rn) => {
+    const subGuard = assertRoomSubscriptionForPlay({ game: gameState });
+    if (!subGuard.ok) {
+      notify(subGuard.message, 'error');
+      return;
+    }
     const dl = Date.now() + totalMs();
     const decoyNicks = Array.isArray(gameState?.decoyNicks) ? gameState.decoyNicks : [];
     const allNicks = shuffle([
@@ -2815,11 +2854,14 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         phase={phase}
         onContinue={() => setExitSheetOpen(false)}
         onPause={withdrawToTitlesHome}
-        onQuit={role === 'admin' ? () => void cancelCompetitionFromExit() : () => void withdrawFromCompetition()}
+        onQuit={role === 'admin' ? () => void endCompetitionFromExit() : () => void withdrawFromCompetition()}
         onArena={withdrawToArena}
         onClose={() => setExitSheetOpen(false)}
       />
       {renderOverlays()}
+      {roomCode && phase && !['lobby', 'ended', 'cancelled'].includes(phase) ? (
+        <SponsorRoundBadge gameKey="titles" phase={phase} />
+      ) : null}
       {mainEl}
     </div>
   );});

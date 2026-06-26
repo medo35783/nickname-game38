@@ -345,7 +345,7 @@ function selectablePillStyle(isSelected) {
   return {
     borderColor: isSelected ? 'var(--gold)' : 'var(--border-subtle)',
     color: isSelected ? 'var(--gold)' : 'var(--text-soft)',
-    background: isSelected ? 'rgba(201,127,26,.1)' : 'var(--surface)',
+    background: isSelected ? 'color-mix(in srgb, var(--gold) 10%, transparent)' : 'var(--surface)',
   };
 }
 
@@ -361,7 +361,10 @@ function getStatusColor(status) {
   return COLORS.red;
 }
 
-export default function QBankManager({ notify }) {
+export default function QBankManager({ notify, layout = 'standalone' }) {
+  const isPage = layout === 'page';
+  const isEmbedded = layout === 'embedded';
+  const showHeader = layout === 'standalone' || isPage;
   const [isAdmin] = useState(() => (
     typeof localStorage !== 'undefined' && localStorage.getItem('pfcc_is_admin') === 'true'
   ));
@@ -875,7 +878,7 @@ export default function QBankManager({ notify }) {
         className="card2"
         style={{
           marginBottom: 10,
-          borderColor: question.status === 'pending' ? 'rgba(201,127,26,.26)' : COLORS.border,
+          borderColor: question.status === 'pending' ? 'color-mix(in srgb, var(--gold) 26%, transparent)' : COLORS.border,
         }}
       >
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -941,7 +944,7 @@ export default function QBankManager({ notify }) {
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="ctitle">إحصائيات بنك الأسئلة</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 8 }}>
-            {renderStatCard('إجمالي المعتمد', bankStats.total, COLORS.gold)}
+            {renderStatCard('إجمالي المعتمد', bankStats.total, 'var(--gold)')}
             {renderStatCard('سهل', bankStats.easy, COLORS.green)}
             {renderStatCard('متوسط', bankStats.medium, COLORS.blue)}
             {renderStatCard('صعب', bankStats.hard, COLORS.red)}
@@ -1020,7 +1023,7 @@ export default function QBankManager({ notify }) {
                   style={{
                     ...styles.optionRow,
                     borderColor: selected ? 'var(--gold)' : 'var(--border-subtle)',
-                    background: selected ? 'rgba(201,127,26,.09)' : 'var(--surface)',
+                    background: selected ? 'color-mix(in srgb, var(--gold) 9%, transparent)' : 'var(--surface)',
                   }}
                 >
                   <input
@@ -1340,9 +1343,9 @@ export default function QBankManager({ notify }) {
           <div
             className="ann"
             style={{
-              background: 'rgba(201,127,26,.08)',
-              border: '1px solid rgba(201,127,26,.25)',
-              color: COLORS.gold,
+              background: 'color-mix(in srgb, var(--gold) 8%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--gold) 25%, transparent)',
+              color: 'var(--gold)',
             }}
           >
             {liveDuplicate && (
@@ -1407,7 +1410,7 @@ export default function QBankManager({ notify }) {
       <div className="card">
         <div className="ctitle">المقترحات بانتظار الموافقة ({pendingQuestions.length})</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 8, marginBottom: 12 }}>
-          {renderStatCard('إجمالي المقترحات', pendingStats.total, COLORS.gold)}
+          {renderStatCard('إجمالي المقترحات', pendingStats.total, 'var(--gold)')}
           {renderStatCard('سهل', pendingStats.easy, COLORS.green)}
           {renderStatCard('متوسط', pendingStats.medium, COLORS.blue)}
           {renderStatCard('صعب', pendingStats.hard, COLORS.red)}
@@ -1417,7 +1420,7 @@ export default function QBankManager({ notify }) {
         {!loading && pendingQuestions.map((question) => {
           const awaitingClass = communityNeedsClassification(question);
           return (
-          <div key={question.id} className="card2" style={{ borderColor: 'rgba(201,127,26,.26)' }}>
+          <div key={question.id} className="card2" style={{ borderColor: 'color-mix(in srgb, var(--gold) 26%, transparent)' }}>
             <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.7, color: 'var(--text)' }}>
               {question.question_text || '—'}
             </div>
@@ -1487,9 +1490,13 @@ export default function QBankManager({ notify }) {
   }
 
   return (
-    <div className="scr">
-      <div className="ptitle">بنك الأسئلة</div>
-      <div className="psub">إدارة الأسئلة المركزية للألعاب الجماعية</div>
+    <div className={isEmbedded ? 'admin-qbank-embedded' : isPage ? 'admin-qbank-page' : 'scr'}>
+      {showHeader && (
+        <>
+          <div className="ptitle">بنك الأسئلة</div>
+          <div className="psub">إدارة الأسئلة المركزية للألعاب الجماعية</div>
+        </>
+      )}
 
       {notice && (
         <div
@@ -1579,8 +1586,8 @@ const styles = {
     width: 28,
     height: 28,
     borderRadius: 9,
-    background: 'rgba(201,127,26,.11)',
-    color: COLORS.gold,
+    background: 'color-mix(in srgb, var(--gold) 11%, transparent)',
+    color: 'var(--gold)',
     fontWeight: 900,
     fontFamily: 'Cairo, sans-serif',
   },

@@ -151,8 +151,10 @@ body{
 .hdr-account-wrap{position:relative;flex-shrink:0}
 .hdr-account-btn{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--border-subtle);background:var(--surface);color:var(--text);font-family:'Tajawal',sans-serif;font-size:11px;font-weight:700;cursor:pointer;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hdr-account-btn:hover{border-color:var(--brand-blue)}
-.hdr-account-menu{position:absolute;top:38px;right:0;left:auto;min-width:132px;background:var(--card);border:1px solid var(--border-subtle);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:0 10px 30px rgba(0,0,0,.22);z-index:90}
+.hdr-account-menu{position:absolute;top:38px;right:0;left:auto;min-width:148px;background:var(--card);border:1px solid var(--border-subtle);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:0 10px 30px rgba(0,0,0,.22);z-index:90}
 .hdr-account-item{border:none;background:var(--surface);color:var(--text);font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;padding:8px 9px;border-radius:8px;cursor:pointer;text-align:right}
+.hdr-account-item--primary{background:rgba(37,111,168,.1);color:var(--brand-blue);border:1px solid rgba(37,111,168,.22)}
+.hdr-account-item--primary:hover{background:rgba(37,111,168,.16)}
 .hdr-account-item:hover{background:var(--card2)}
 .hdr-account-item.danger{color:var(--red)}
 .theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:10px;border:1px solid var(--border-subtle);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;transition:all .18s;flex-shrink:0}

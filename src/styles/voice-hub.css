@@ -1101,6 +1101,17 @@
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  min-height: 120px;
+}
+
+.voice-feed__empty {
+  flex: 1;
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .voice-feed__track::-webkit-scrollbar {

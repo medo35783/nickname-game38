@@ -17,6 +17,8 @@ import {
 import { ADMIN_PACKAGE_OPTIONS } from '../../core/subscriptionPackages';
 import CodeStatsDetailPanel from './CodeStatsDetailPanel';
 import CodeActivityBadge from './CodeActivityBadge';
+import CodeAdminNote from './CodeAdminNote';
+import CodeSponsorLink from './CodeSponsorLink';
 import { formatCodeMiniStats, getCodeActivityInfo } from './codeActivityHelpers';
 import { aggregateMarketingMetrics, formatEngagementMinutes } from '../../core/marketingStatsHelpers';
 import MarketingReportDialog from './MarketingReportDialog';
@@ -80,11 +82,14 @@ function mergeByGameStats(a = {}, b = {}) {
  * لوحة إدارة أكواد الاشتراك — إحصائيات، توليد، قائمة، تصدير CSV
  * @param {{ notify: (text: string, type?: string) => void }} props
  */
-export default function AdminCodesPanel({ notify }) {
+export default function AdminCodesPanel({ notify, layout = 'standalone', sharedSnapshot = null }) {
+  const useShared = Boolean(sharedSnapshot);
+  const isPage = layout === 'page';
+  const isEmbedded = layout === 'embedded';
   /** سجل الأكواد من Realtime DB */
-  const [rows, setRows] = useState([]);
+  const [internalRows, setInternalRows] = useState([]);
   /** حالة التفعيل الفعلية من codeIndex */
-  const [indexByCode, setIndexByCode] = useState({});
+  const [internalIndexByCode, setInternalIndexByCode] = useState({});
   /** الباقة المختارة للتوليد */
   const [selectedPkg, setSelectedPkg] = useState(PACKAGES[0]);
   /** عدد الأكواد المراد توليدها */
@@ -98,9 +103,9 @@ export default function AdminCodesPanel({ notify }) {
   /** كود مُوسَّع لعرض إحصائيات الجلسات */
   const [expandedCodeId, setExpandedCodeId] = useState(null);
   /** إحصائيات مختصرة للجدول (get عند التحميل / التحديث اليدوي) */
-  const [codeStatsById, setCodeStatsById] = useState({});
+  const [internalCodeStatsById, setInternalCodeStatsById] = useState({});
   /** تحميل الإحصائيات المختصرة */
-  const [statsBulkLoading, setStatsBulkLoading] = useState(false);
+  const [internalStatsBulkLoading, setInternalStatsBulkLoading] = useState(false);
   /** بيانات لوحة التفاصيل الموسّعة (onValue مباشر) */
   const [expandedStats, setExpandedStats] = useState(null);
   const [expandedStatsLoading, setExpandedStatsLoading] = useState(false);
@@ -109,14 +114,20 @@ export default function AdminCodesPanel({ notify }) {
   const expandedUnsubRef = useRef(null);
   const [reportDialog, setReportDialog] = useState(null);
 
+  const rows = useShared ? sharedSnapshot.rows : internalRows;
+  const indexByCode = useShared ? sharedSnapshot.indexByCode : internalIndexByCode;
+  const codeStatsById = useShared ? sharedSnapshot.codeStatsById : internalCodeStatsById;
+  const statsBulkLoading = useShared ? sharedSnapshot.loading : internalStatsBulkLoading;
+
   // الاشتراك في codes بعد تأكيد جلسة مشرف (تجنّب قراءة أثناء auth مجهول)
   useEffect(() => {
+    if (useShared) return undefined;
     let dbUnsub = null;
 
     const authUnsub = onAuthStateChanged(auth, async (user) => {
       if (dbUnsub) dbUnsub();
       dbUnsub = null;
-      setRows([]);
+      setInternalRows([]);
 
       if (!user) return;
 
@@ -131,7 +142,7 @@ export default function AdminCodesPanel({ notify }) {
             list.push({ id: child.key, ...child.val() });
           });
           list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          setRows(list);
+          setInternalRows(list);
         },
         (err) => {
           console.error(err);
@@ -152,26 +163,27 @@ export default function AdminCodesPanel({ notify }) {
       authUnsub();
       if (dbUnsub) dbUnsub();
     };
-  }, [notify]);
+  }, [notify, useShared]);
 
   useEffect(() => {
-    if (!rows.length) return;
-    ensureCodeIndexesFromRows(rows).catch((err) => {
+    if (useShared || !internalRows.length) return;
+    ensureCodeIndexesFromRows(internalRows).catch((err) => {
       console.warn('ensureCodeIndexesFromRows:', err);
     });
-  }, [rows]);
+  }, [internalRows, useShared]);
 
   const loadAllMiniStats = useCallback(async () => {
-    if (!rows.length) {
-      setCodeStatsById({});
-      setStatsBulkLoading(false);
+    if (useShared) return;
+    if (!internalRows.length) {
+      setInternalCodeStatsById({});
+      setInternalStatsBulkLoading(false);
       return;
     }
 
-    setStatsBulkLoading(true);
+    setInternalStatsBulkLoading(true);
     try {
       const results = await Promise.all(
-        rows.map(async (row) => {
+        internalRows.map(async (row) => {
           try {
             const snap = await get(ref(db, `codes/${row.id}/stats`));
             return {
@@ -189,20 +201,23 @@ export default function AdminCodesPanel({ notify }) {
       results.forEach(({ id, data, error }) => {
         map[id] = { loading: false, data, error };
       });
-      setCodeStatsById(map);
+      setInternalCodeStatsById(map);
     } finally {
-      setStatsBulkLoading(false);
+      setInternalStatsBulkLoading(false);
     }
-  }, [rows]);
+  }, [internalRows, useShared]);
+
+  const reloadAllStats = useShared
+    ? () => sharedSnapshot.reloadAllStats?.()
+    : () => {
+        void loadAllMiniStats();
+      };
 
   /** تحميل الإحصائيات المختصرة مرة عند توفر قائمة الأكواد */
   useEffect(() => {
+    if (useShared) return;
     void loadAllMiniStats();
-  }, [loadAllMiniStats]);
-
-  const reloadAllStats = () => {
-    void loadAllMiniStats();
-  };
+  }, [loadAllMiniStats, useShared]);
 
   /** اشتراك مباشر لإحصائيات الكود الموسّع فقط */
   useEffect(() => {
@@ -254,23 +269,24 @@ export default function AdminCodesPanel({ notify }) {
   }, [expandedCodeId]);
 
   useEffect(() => {
+    if (useShared) return undefined;
     let unsub = null;
     const authUnsub = onAuthStateChanged(auth, async (user) => {
       if (unsub) unsub();
       unsub = null;
-      setIndexByCode({});
+      setInternalIndexByCode({});
       if (!user) return;
       const isAdmin = await adminProfileExistsForUid(user.uid);
       if (!isAdmin) return;
       unsub = onValue(ref(db, 'codeIndex'), (snap) => {
-        setIndexByCode(snap.val() || {});
+        setInternalIndexByCode(snap.val() || {});
       });
     });
     return () => {
       authUnsub();
       if (unsub) unsub();
     };
-  }, []);
+  }, [useShared]);
 
   /** إحصائيات مجمّعة حسب الحالة الفعلية */
   const stats = useMemo(() => {
@@ -431,6 +447,7 @@ export default function AdminCodesPanel({ notify }) {
           statusLabel: statusLabel(eff),
           activatedAt: merged.activatedAt || row.activatedAt || null,
         },
+        initialSponsorId: merged.sponsorId || row.sponsorId || null,
       });
     },
     [indexByCode]
@@ -462,6 +479,12 @@ export default function AdminCodesPanel({ notify }) {
             recentSessions: [...(acc.recentSessions || []), ...(Array.isArray(s.recentSessions) ? s.recentSessions : [])]
               .sort((a, b) => (a.ts || 0) - (b.ts || 0))
               .slice(-20),
+            uniqueParticipantLabels: [
+              ...new Set([
+                ...(acc.uniqueParticipantLabels || []),
+                ...(Array.isArray(s.uniqueParticipantLabels) ? s.uniqueParticipantLabels : []),
+              ]),
+            ].slice(0, 120),
           }), {}),
         }
       : null;
@@ -491,37 +514,46 @@ export default function AdminCodesPanel({ notify }) {
   );
 
   return (
-    <div className="scr" style={{ paddingBottom: 24 }}>
-      <div className="ptitle" style={{ fontSize: 20 }}>
-        🎟️ لوحة الأكواد
-      </div>
-      <div className="psub" style={{ marginBottom: 12 }}>
-        إحصائيات، توليد، وقائمة الأكواد
-      </div>
+    <div
+      className={isEmbedded ? 'admin-codes-embedded' : isPage ? 'admin-codes-page' : 'scr'}
+      style={{ paddingBottom: isEmbedded ? 0 : isPage ? 0 : 24 }}
+    >
+      {(layout === 'standalone' || isPage) && (
+        <>
+          <div className="ptitle" style={{ fontSize: 20 }}>
+            🎟️ لوحة الأكواد
+          </div>
+          <div className="psub" style={{ marginBottom: 12 }}>
+            إحصائيات، توليد، وقائمة الأكواد
+          </div>
+        </>
+      )}
 
       {/* إحصائيات */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="ctitle">📊 إحصائيات الأكواد</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {statBox('إجمالي الأكواد', stats.total, 'var(--gold)')}
+          {statBox('إجمالي الأكواد', stats.total, 'var(--brand-blue)')}
           {statBox('غير مستخدم', stats.unused, 'var(--blue)')}
           {statBox('مُفعّل', stats.active, 'var(--green)')}
           {statBox('منتهي', stats.expired, 'var(--red)')}
         </div>
       </div>
 
+      {layout === 'standalone' && (
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="ctitle">📣 ملخص تسويقي للمنصة</div>
         <div className="psub" style={{ marginBottom: 10, fontSize: 11 }}>
-          أرقام مجمّعة من {platformMarketing.codesWithActivity || 0} كود نشط — لعروض B2B والرعاة والجوائز
+          أرقام مجمّعة من {platformMarketing.codesWithActivity || 0} كود نشط —
+          ① رعاية الجولات · ② جائزة برعاية · كشف مشرفين ومتسابقين
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {statBox('مشاركات المتسابقين', platformMarketing.totalParticipants, 'var(--gold)')}
+          {statBox('مشاركات المتسابقين', platformMarketing.totalParticipants, 'var(--brand-blue)')}
           {statBox('ذروة حضور', platformMarketing.peakPlayers, 'var(--purple)')}
           {statBox('جولات قابلة للرعاية', platformMarketing.totalRounds, 'var(--fameeri-primary)')}
           {statBox('ظهور الرعاية', platformMarketing.roundReach, 'var(--green)')}
           {statBox('دقائق التفاعل', formatEngagementMinutes(platformMarketing.totalEngagementMinutes, { short: true }), 'var(--blue)')}
-          {statBox('جلسات مؤهلة للجوائز', platformMarketing.couponReadySessions, 'var(--gold)')}
+          {statBox('جلسات مؤهلة للجوائز', platformMarketing.couponReadySessions, 'var(--brand-orange)')}
         </div>
         <button
           type="button"
@@ -529,9 +561,10 @@ export default function AdminCodesPanel({ notify }) {
           style={{ width: '100%' }}
           onClick={openPlatformReport}
         >
-          📄 إنشاء تقرير B2B رسمي (PDF)
+          📄 إنشاء تقرير B2B رسمي (PDF + كشف أسماء)
         </button>
       </div>
+      )}
 
       {/* توليد أكواد */}
       <div className="card" style={{ marginBottom: 12 }}>
@@ -549,9 +582,9 @@ export default function AdminCodesPanel({ notify }) {
                 style={{
                   flex: 1,
                   minWidth: 100,
-                  borderColor: sel ? 'var(--gold)' : undefined,
-                  background: sel ? 'rgba(201,127,26,.1)' : undefined,
-                  color: sel ? 'var(--gold)' : undefined,
+                  borderColor: sel ? 'var(--brand-blue)' : undefined,
+                  background: sel ? 'rgba(37,111,168,.1)' : undefined,
+                  color: sel ? 'var(--brand-blue)' : undefined,
                 }}
                 onClick={() => setSelectedPkg(p)}
               >
@@ -694,7 +727,7 @@ export default function AdminCodesPanel({ notify }) {
                           }
                         }}
                         style={{
-                          background: isExpanded ? 'rgba(201,127,26,.08)' : bg,
+                          background: isExpanded ? 'rgba(37,111,168,.08)' : bg,
                           borderBottom: '1px solid rgba(255,255,255,.05)',
                           cursor: 'pointer',
                         }}
@@ -704,7 +737,7 @@ export default function AdminCodesPanel({ notify }) {
                             style={{
                               fontWeight: 800,
                               fontFamily: 'monospace',
-                              color: 'var(--gold)',
+                              color: 'var(--brand-blue)',
                               fontSize: 13,
                               marginBottom: 5,
                             }}
@@ -749,12 +782,25 @@ export default function AdminCodesPanel({ notify }) {
                                 تعذّر تحميل الإحصائيات
                               </div>
                             ) : (
-                              <CodeStatsDetailPanel
-                                loading={expandedStatsLoading}
-                                stats={expandedStats}
-                                codeLabel={formatCodeForDisplay(row.code)}
-                                onOpenReport={() => openCodeReport(row, expandedStats)}
-                              />
+                              <>
+                                <CodeAdminNote
+                                  codeId={row.id}
+                                  initialNote={merged.adminNote || row.adminNote}
+                                  notify={notify}
+                                />
+                                <CodeSponsorLink
+                                  codeId={row.id}
+                                  codeRow={row}
+                                  indexRow={merged}
+                                  notify={notify}
+                                />
+                                <CodeStatsDetailPanel
+                                  loading={expandedStatsLoading}
+                                  stats={expandedStats}
+                                  codeLabel={formatCodeForDisplay(row.code)}
+                                  onOpenReport={() => openCodeReport(row, expandedStats)}
+                                />
+                              </>
                             )}
                           </td>
                         </tr>
@@ -776,6 +822,7 @@ export default function AdminCodesPanel({ notify }) {
         codeMeta={reportDialog?.codeMeta}
         reportScope={reportDialog?.reportScope || 'code'}
         platformAggregate={reportDialog?.platformAggregate}
+        initialSponsorId={reportDialog?.initialSponsorId || null}
         notify={notify}
       />
     </div>

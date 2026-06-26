@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { openMarketingImpactReport } from '../../core/marketingImpactReport';
+import { REPORT_PURPOSES } from '../../core/marketingStatsHelpers';
+import { fetchSponsorsAdmin } from '../../core/platformSponsors';
 
 const RECIPIENT_TYPES = [
   { id: 'school', label: '🏫 مدرسة / مؤسسة تعليمية' },
   { id: 'company', label: '🏢 شركة / مؤسسة' },
   { id: 'sponsor', label: '🎯 راعٍ / شريك تسويقي' },
   { id: 'general', label: '📋 جهة مهتمة' },
+];
+
+const PURPOSE_OPTIONS = [
+  REPORT_PURPOSES.sponsorship,
+  REPORT_PURPOSES.prize,
+  REPORT_PURPOSES.full,
 ];
 
 /**
@@ -20,17 +28,39 @@ export default function MarketingReportDialog({
   reportScope = 'code',
   platformAggregate = null,
   notify,
+  initialSponsorId = null,
 }) {
   const [recipientName, setRecipientName] = useState('');
   const [recipientType, setRecipientType] = useState('company');
   const [customNote, setCustomNote] = useState('');
+  const [reportPurpose, setReportPurpose] = useState('full');
+  const [sponsors, setSponsors] = useState([]);
+  const [sponsorId, setSponsorId] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setRecipientName('');
-    setRecipientType(reportScope === 'school' ? 'school' : 'company');
+    setRecipientType(reportScope === 'school' ? 'school' : 'sponsor');
     setCustomNote('');
-  }, [open, reportScope, codeLabel]);
+    setReportPurpose('full');
+    setSponsorId(initialSponsorId || '');
+    fetchSponsorsAdmin()
+      .then((list) => {
+        const active = list.filter((s) => s.active !== false);
+        setSponsors(active);
+        if (initialSponsorId && active.some((s) => s.id === initialSponsorId)) {
+          setSponsorId(initialSponsorId);
+          const sp = active.find((s) => s.id === initialSponsorId);
+          if (sp) setRecipientName((prev) => prev || sp.name);
+        }
+      })
+      .catch(() => setSponsors([]));
+  }, [open, reportScope, codeLabel, initialSponsorId]);
+
+  const selectedSponsor = useMemo(
+    () => sponsors.find((s) => s.id === sponsorId) || null,
+    [sponsors, sponsorId]
+  );
 
   const hasData = useMemo(() => {
     if (!stats) return false;
@@ -56,7 +86,16 @@ export default function MarketingReportDialog({
       codeMeta,
       reportScope,
       customNote,
+      reportPurpose,
       platformAggregate: reportScope === 'platform' ? platformAggregate : null,
+      sponsorMeta: selectedSponsor
+        ? {
+            name: selectedSponsor.name,
+            logoUrl: selectedSponsor.logoUrl,
+            tagline: selectedSponsor.tagline,
+            prizeOffer: selectedSponsor.prizeOffer,
+          }
+        : null,
     });
 
     if (ok) {
@@ -94,7 +133,7 @@ export default function MarketingReportDialog({
           width: 'min(480px, 100%)',
           maxHeight: '90vh',
           overflow: 'auto',
-          border: '1px solid rgba(201,127,26,.28)',
+          border: '1px solid rgba(37,111,168,.22)',
           boxShadow: '0 24px 64px rgba(0,0,0,.45)',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -104,15 +143,64 @@ export default function MarketingReportDialog({
         </div>
         <p className="psub" style={{ marginBottom: 14, fontSize: 12 }}>
           {reportScope === 'platform'
-            ? 'تقرير مجمّع بشعار لعيب زون — للإرسال لمدرسة أو شركة'
-            : `تقرير كود ${codeLabel || ''} — أرقام حقيقية من الجلسات`}
+            ? 'كشف أرقام + أسماء المشرفين والمتسابقين — للإرسال للراعي أو مقدّم الجائزة'
+            : `تقرير كود ${codeLabel || ''} — أرقام وأسماء حقيقية من الجلسات`}
         </p>
+
+        <div className="ig" style={{ marginBottom: 12 }}>
+          <label className="lbl">نوع التقرير *</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {PURPOSE_OPTIONS.map((p) => {
+              const sel = reportPurpose === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`btn bgh ${sel ? 'bo' : ''}`}
+                  style={{
+                    width: '100%',
+                    textAlign: 'right',
+                    padding: '10px 12px',
+                    borderColor: sel ? 'var(--brand-blue)' : undefined,
+                  }}
+                  onClick={() => setReportPurpose(p.id)}
+                >
+                  <div style={{ fontWeight: 900, fontSize: 13 }}>{p.label}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>{p.subtitle}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {sponsors.length > 0 ? (
+          <div className="ig" style={{ marginBottom: 10 }}>
+            <label className="lbl">الراعي (شعار يظهر في التقرير)</label>
+            <select
+              className="inp"
+              value={sponsorId}
+              onChange={(e) => {
+                setSponsorId(e.target.value);
+                const sp = sponsors.find((s) => s.id === e.target.value);
+                if (sp && !recipientName.trim()) setRecipientName(sp.name);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <option value="">— بدون شعار —</option>
+              {sponsors.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         <div className="ig" style={{ marginBottom: 10 }}>
           <label className="lbl">اسم الجهة الموجّه إليها التقرير *</label>
           <input
             className="inp"
-            placeholder="مثال: مدرسة الأمل الأهلية"
+            placeholder="مثال: شركة الراعي / مدرسة الأمل"
             value={recipientName}
             onChange={(e) => setRecipientName(e.target.value)}
             autoFocus

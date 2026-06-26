@@ -5,6 +5,7 @@ import { setLastPlayedGame } from '../question-bank/qbank.helpers';
 import La3ibzBrandMark from '../shared/La3ibzBrandMark';
 import HomeGameIcon from '../shared/HomeGameIcons';
 import PwaInstallCard from '../components/layout/PwaInstallCard';
+import LobbyPromoStrip from '../shared/LobbyPromoStrip';
 
 const GAME_BANK_TYPE = {
   nicknames: 'titles',
@@ -28,6 +29,8 @@ export default function Home({ setSelectedGame, onOpenVoiceSuggest, notify }) {
       </div>
 
       <PwaInstallCard notify={notify} compact />
+
+      <LobbyPromoStrip />
 
       <div
         className="home-game-card home-game-card--nicknames"

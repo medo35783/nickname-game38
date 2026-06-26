@@ -1,0 +1,133 @@
+.code-act-phone-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.code-activation-scr .ptitle {
+  background: linear-gradient(135deg, var(--brand-blue), var(--brand-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.code-activation-scr .inp:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(37, 111, 168, 0.1);
+}
+
+.code-act-notes__single {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+  font-weight: 700;
+}
+
+.code-act-notes__list {
+  margin: 0;
+  padding: 0 18px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.85;
+}
+
+.code-act-signup {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.code-act-signup--form {
+  text-align: right;
+}
+
+.code-act-signup__success {
+  font-size: 42px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.code-act-signup__perks li {
+  font-weight: 700;
+}
+
+.code-act-signup__skip,
+.code-act-signup__link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.code-act-signup__skip {
+  color: var(--muted);
+}
+
+.code-act-signup__skip:hover {
+  color: var(--text);
+}
+
+.code-act-signup__link {
+  color: var(--brand-blue);
+  font-weight: 800;
+}
+
+.code-act-signup__link:hover {
+  text-decoration: underline;
+}
+
+.auth-forgot-link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--brand-blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+}
+
+.auth-forgot-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.auth-forgot-link:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.auth-reset-msg {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1.55;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(36, 143, 85, 0.1);
+  border: 1px solid rgba(36, 143, 85, 0.25);
+}
+
+.packages-scr .pkg-code-row--top {
+  margin-bottom: 14px;
+}
+
+.packages-scr .pkg-code-row--top .btn {
+  border-color: rgba(37, 111, 168, 0.35);
+  color: var(--brand-blue);
+  font-weight: 800;
+}
+
+.packages-scr .pkg-code-row--top .btn:hover {
+  border-color: var(--brand-blue);
+  background: rgba(37, 111, 168, 0.08);
+}

@@ -39,6 +39,13 @@ export default function Packages({ onSubscribe, onBack }) {
         </p>
       </header>
 
+      <div className="pkg-code-row pkg-code-row--top">
+        <span className="pkg-code-row__text">لديك كود اشتراك؟</span>
+        <button type="button" className="btn bo bsm" onClick={openCodes}>
+          🔑 تفعيل الكود
+        </button>
+      </div>
+
       <div className="pkg-includes">
         {SUBSCRIPTION_FEATURES.map((line) => (
           <span key={line} className="pkg-include-chip">
@@ -82,13 +89,6 @@ export default function Packages({ onSubscribe, onBack }) {
               لا نخزّن بيانات بطاقتك. التفعيل فوري بكود الاشتراك بعد إتمام الدفع.
             </p>
           </div>
-        </div>
-
-        <div className="pkg-code-row">
-          <span className="pkg-code-row__text">لديك كود اشتراك؟</span>
-          <button type="button" className="btn bo bsm" onClick={openCodes}>
-            🔑 تفعيل الكود
-          </button>
         </div>
       </footer>
     </div>

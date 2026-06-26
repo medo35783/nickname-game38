@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ARENA_BACK_LABEL } from '../core/constants';
 import { getGameBrand } from './gameBrands';
+import { getOtherActiveSessions, formatOtherSessionsHint } from './gameSessionRegistry';
 
 /**
  * ورقة خروج موحّدة — 3 خيارات أثناء اللعب، خياران بعد انتهاء المسابقة.
@@ -45,6 +46,7 @@ export default function GameExitSheet({
   const brand = getGameBrand(game);
   const isAdmin = role === 'admin';
   const gameEnded = phase === 'final' || phase === 'ended';
+  const otherGamesHint = isAdmin ? formatOtherSessionsHint(getOtherActiveSessions(game)) : '';
 
   const handleOverlayClick = () => {
     if (busy) return;
@@ -76,11 +78,11 @@ export default function GameExitSheet({
             {isAdmin ? '⚠️' : '🚪'}
           </span>
           <h2 id="game-exit-confirm-title" className="game-exit-sheet__title">
-            {isAdmin ? 'إلغاء المسابقة؟' : 'انسحاب من المسابقة؟'}
+            {isAdmin ? 'إنهاء المسابقة؟' : 'انسحاب من المسابقة؟'}
           </h2>
           <p className="game-exit-sheet__lead">
             {isAdmin
-              ? 'المتسابقون سيُخرجون من الغرفة — لا يمكن العودة لهذه الغرفة.'
+              ? 'بعد التأكيد تُغلق الغرفة نهائياً — المتسابقون يرون أن المسابقة انتهت. لا يمكن التراجع.'
               : 'ستُسجَّل كمنسحب — يمكنك العودة لاحقاً برمز الغرفة ونفس اسمك.'}
           </p>
         </div>
@@ -97,7 +99,7 @@ export default function GameExitSheet({
             </span>
             <span className="game-exit-card__body">
               <span className="game-exit-card__title">
-                {busy ? 'جاري التنفيذ…' : isAdmin ? 'نعم، إلغاء المسابقة' : 'نعم، انسحاب'}
+                {busy ? 'جاري التنفيذ…' : isAdmin ? 'نعم، إنهاء المسابقة' : 'نعم، انسحاب'}
               </span>
             </span>
           </button>
@@ -179,11 +181,13 @@ export default function GameExitSheet({
                 </span>
                 <span className="game-exit-card__body">
                   <span className="game-exit-card__title">
-                    {isAdmin ? 'مغادرة الشاشة فقط' : 'مغادرة مؤقتة'}
+                    {isAdmin ? 'خروج مؤقت' : 'مغادرة مؤقتة'}
                   </span>
                   <span className="game-exit-card__sub">
                     {isAdmin
-                      ? 'الغرفة تبقى مفتوحة — ترجع بـ «العودة للغرفة»'
+                      ? otherGamesHint
+                        ? `الغرفة تبقى مفتوحة — يمكنك إدارة ألعاب أخرى (${otherGamesHint}) والعودة لاحقاً`
+                        : 'الغرفة تبقى مفتوحة — يمكنك فتح لعبة أخرى والعودة بـ «العودة للغرفة»'
                       : 'تبقى مسجّلاً — ارجع بـ «العودة للغرفة»'}
                   </span>
                 </span>
@@ -200,11 +204,11 @@ export default function GameExitSheet({
                 </span>
                 <span className="game-exit-card__body">
                   <span className="game-exit-card__title">
-                    {isAdmin ? 'إلغاء المسابقة' : 'انسحاب من المسابقة'}
+                    {isAdmin ? 'إنهاء المسابقة' : 'انسحاب من المسابقة'}
                   </span>
                   <span className="game-exit-card__sub">
                     {isAdmin
-                      ? 'إغلاق الغرفة — المتسابقون يُخرجون'
+                      ? 'يتطلب تأكيداً — إغلاق نهائي (ليس خروجاً مؤقتاً)'
                       : 'تُسجَّل كمنسحب — يمكنك العودة بالرمز والاسم'}
                   </span>
                 </span>

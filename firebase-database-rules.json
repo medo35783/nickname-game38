@@ -25,12 +25,12 @@
         "activeCode": {
           ".read": "auth != null && (auth.uid === $userId || (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()))",
           ".write": "auth != null && (auth.uid === $userId || (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()))",
-          ".validate": "!newData.exists() || (newData.hasChildren(['codeId', 'code', 'activatedAt', 'expiresAt', 'duration']) && newData.child('codeId').isString() && newData.child('code').isString() && newData.child('activatedAt').isNumber() && newData.child('expiresAt').isNumber() && newData.child('duration').isNumber())"
+          ".validate": "!newData.exists() || (newData.hasChildren(['codeId', 'code', 'activatedAt', 'expiresAt', 'duration']) && newData.child('codeId').isString() && newData.child('code').isString() && newData.child('activatedAt').isNumber() && newData.child('expiresAt').isNumber() && newData.child('duration').isNumber() && (!newData.hasChild('sponsorId') || newData.child('sponsorId').isString()) && (!newData.hasChild('sponsorName') || (newData.child('sponsorName').isString() && newData.child('sponsorName').val().length <= 80)) && (!newData.hasChild('sponsorLogoUrl') || newData.child('sponsorLogoUrl').isString()) && (!newData.hasChild('sponsorTagline') || (newData.child('sponsorTagline').isString() && newData.child('sponsorTagline').val().length <= 120)))"
         },
         "profile": {
           ".read": "auth != null && (auth.uid === $userId || (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()))",
           ".write": "auth != null && auth.uid === $userId",
-          ".validate": "newData.hasChildren(['email', 'createdAt', 'lastLoginAt', 'totalLogins', 'gamesHosted']) && newData.child('email').isString() && newData.child('email').val() == auth.token.email && newData.child('email').val().length > 3 && newData.child('email').val().length <= 120 && newData.child('createdAt').isNumber() && newData.child('lastLoginAt').isNumber() && newData.child('totalLogins').isNumber() && newData.child('totalLogins').val() >= 0 && newData.child('gamesHosted').isNumber() && newData.child('gamesHosted').val() >= 0 && (!newData.hasChild('displayName') || (newData.child('displayName').isString() && newData.child('displayName').val().length <= 80))"
+          ".validate": "newData.hasChildren(['email', 'createdAt', 'lastLoginAt', 'totalLogins', 'gamesHosted']) && newData.child('email').isString() && newData.child('email').val() == auth.token.email && newData.child('email').val().length > 3 && newData.child('email').val().length <= 120 && newData.child('createdAt').isNumber() && newData.child('lastLoginAt').isNumber() && newData.child('totalLogins').isNumber() && newData.child('totalLogins').val() >= 0 && newData.child('gamesHosted').isNumber() && newData.child('gamesHosted').val() >= 0 && (!newData.hasChild('displayName') || (newData.child('displayName').isString() && newData.child('displayName').val().length <= 80)) && (!newData.hasChild('phone') || (newData.child('phone').isString() && newData.child('phone').val().matches(/^[0-9]{9,15}$/)))"
         },
         "subscriptionHistory": {
           "$histId": {
@@ -63,7 +63,7 @@
       "$codeId": {
         ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
         ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (data.child('status').val() == 'unused' && newData.child('status').val() == 'active' && newData.child('userId').val() == auth.uid) || (data.child('status').val() == 'active' && data.child('userId').val() == auth.uid && newData.child('status').val() == 'active'))",
-        ".validate": "newData.hasChildren(['code', 'duration', 'price', 'status', 'createdAt']) && newData.child('code').isString() && newData.child('code').val().matches(/^CODE-[A-Z0-9]{6}$/) && newData.child('duration').isNumber() && (newData.child('duration').val() == 1 || newData.child('duration').val() == 3 || newData.child('duration').val() == 7) && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('price').val() <= 1000000 && newData.child('status').isString() && (newData.child('status').val() == 'unused' || newData.child('status').val() == 'active' || newData.child('status').val() == 'expired') && newData.child('createdAt').isNumber() && (!newData.hasChild('activatedAt') || newData.child('activatedAt').val() == null || newData.child('activatedAt').isNumber()) && (!newData.hasChild('expiresAt') || newData.child('expiresAt').val() == null || newData.child('expiresAt').isNumber()) && (!newData.hasChild('userId') || newData.child('userId').val() == null || newData.child('userId').isString())",
+        ".validate": "newData.hasChildren(['code', 'duration', 'price', 'status', 'createdAt']) && newData.child('code').isString() && newData.child('code').val().matches(/^CODE-[A-Z0-9]{6}$/) && newData.child('duration').isNumber() && (newData.child('duration').val() == 1 || newData.child('duration').val() == 3 || newData.child('duration').val() == 7) && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('price').val() <= 1000000 && newData.child('status').isString() && (newData.child('status').val() == 'unused' || newData.child('status').val() == 'active' || newData.child('status').val() == 'expired') && newData.child('createdAt').isNumber() && (!newData.hasChild('activatedAt') || newData.child('activatedAt').val() == null || newData.child('activatedAt').isNumber()) && (!newData.hasChild('expiresAt') || newData.child('expiresAt').val() == null || newData.child('expiresAt').isNumber()) && (!newData.hasChild('userId') || newData.child('userId').val() == null || newData.child('userId').isString()) && (!newData.hasChild('adminNote') || (newData.child('adminNote').isString() && newData.child('adminNote').val().length <= 200)) && (!newData.hasChild('sponsorId') || newData.child('sponsorId').isString()) && (!newData.hasChild('sponsorName') || (newData.child('sponsorName').isString() && newData.child('sponsorName').val().length <= 80)) && (!newData.hasChild('sponsorLogoUrl') || newData.child('sponsorLogoUrl').isString()) && (!newData.hasChild('sponsorTagline') || (newData.child('sponsorTagline').isString() && newData.child('sponsorTagline').val().length <= 120)) && (!newData.hasChild('prizeOffer') || (newData.child('prizeOffer').isString() && newData.child('prizeOffer').val().length <= 120)) && (!newData.hasChild('phone') || (newData.child('phone').isString() && newData.child('phone').val().matches(/^[0-9]{9,15}$/)))",
         "stats": {
           ".read": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('codes').child($codeId).child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('activeCode').child('codeId').val() == $codeId)",
           ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('codes').child($codeId).child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('activeCode').child('codeId').val() == $codeId)"
@@ -80,9 +80,10 @@
       }
     },
     "rooms": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
       "$roomCode": {
         ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-        ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('players') && newData.child('adminId').isString() && !newData.child('players').hasChildren() && newData.child('game').hasChild('phase') && newData.child('game').child('phase').isString()))",
+        ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && (!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('players') && newData.child('adminId').isString() && !newData.child('players').hasChildren() && newData.child('game').hasChild('phase') && newData.child('game').child('phase').isString())))",
         "adminId": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
           ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (!data.exists() && newData.isString() && newData.val() == auth.uid) || (data.exists() && data.val() == auth.uid && newData.val() == data.val()))",
@@ -90,7 +91,7 @@
         },
         "game": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-          ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('rooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('rooms').child($roomCode).exists())"
+          ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && (root.child('rooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('rooms').child($roomCode).exists())))"
         },
         "players": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
@@ -122,9 +123,10 @@
       }
     },
     "qrooms": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
       "$roomCode": {
         ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-        ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('groups') && newData.hasChild('members') && newData.hasChild('attacks') && newData.child('adminId').isString() && !newData.child('groups').hasChildren() && !newData.child('members').hasChildren() && !newData.child('attacks').hasChildren() && newData.child('game').hasChild('phase')) || (data.exists() && newData.child('game').hasChild('currentAttack') && data.child('game').child('phase').val() == 'playing' && newData.child('game').child('currentAttack').child('attackerId').val() == data.child('game').child('turnGroup').val() && (root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).child('leaderUid').val() == auth.uid || (root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).hasChild('leaderMemberId') && root.child('qrooms').child($roomCode).child('members').child(root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).child('leaderMemberId').val()).child('ownerUid').val() == auth.uid))) || (data.exists() && newData.child('game').hasChild('speedClaims') && data.child('game').child('playMode').val() == 'speed' && root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).exists() && newData.child('game').child('speedClaims').hasChild(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val())))",
+        ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && ((!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('groups') && newData.hasChild('members') && newData.hasChild('attacks') && newData.child('adminId').isString() && !newData.child('groups').hasChildren() && !newData.child('members').hasChildren() && !newData.child('attacks').hasChildren() && newData.child('game').hasChild('phase')) || (data.exists() && newData.child('game').hasChild('currentAttack') && data.child('game').child('phase').val() == 'playing' && newData.child('game').child('currentAttack').child('attackerId').val() == data.child('game').child('turnGroup').val() && (root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).child('leaderUid').val() == auth.uid || (root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).hasChild('leaderMemberId') && root.child('qrooms').child($roomCode).child('members').child(root.child('qrooms').child($roomCode).child('groups').child(data.child('game').child('turnGroup').val()).child('leaderMemberId').val()).child('ownerUid').val() == auth.uid))) || (data.exists() && newData.child('game').hasChild('speedClaims') && data.child('game').child('playMode').val() == 'speed' && root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).exists() && newData.child('game').child('speedClaims').hasChild(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val())))))",
         "leaderByUid": {
           "$uid": {
             ".read": "$roomCode.matches(/^[0-9]{4}$/)",
@@ -146,7 +148,7 @@
         },
         "game": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-          ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('qrooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('qrooms').child($roomCode).exists() || (data.child('phase').val() == 'playing' && newData.hasChild('currentAttack') && newData.child('currentAttack').child('attackerId').val() == data.child('turnGroup').val() && (root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).child('leaderUid').val() == auth.uid || (root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).hasChild('leaderMemberId') && root.child('qrooms').child($roomCode).child('members').child(root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).child('leaderMemberId').val()).child('ownerUid').val() == auth.uid))) || (data.child('playMode').val() == 'speed' && data.child('speedBatchActive').val() != true && newData.hasChild('speedClaims') && root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).exists() && newData.child('speedClaims').hasChild(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()) && newData.child('speedClaims').child(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()).child('attackerId').val() == root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()))",
+          ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && (root.child('qrooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('qrooms').child($roomCode).exists() || (data.child('phase').val() == 'playing' && newData.hasChild('currentAttack') && newData.child('currentAttack').child('attackerId').val() == data.child('turnGroup').val() && (root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).child('leaderUid').val() == auth.uid || (root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).hasChild('leaderMemberId') && root.child('qrooms').child($roomCode).child('members').child(root.child('qrooms').child($roomCode).child('groups').child(data.child('turnGroup').val()).child('leaderMemberId').val()).child('ownerUid').val() == auth.uid))) || (data.child('playMode').val() == 'speed' && data.child('speedBatchActive').val() != true && newData.hasChild('speedClaims') && root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).exists() && newData.child('speedClaims').hasChild(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()) && newData.child('speedClaims').child(root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()).child('attackerId').val() == root.child('qrooms').child($roomCode).child('leaderByUid').child(auth.uid).val()))))",
           ".validate": "!newData.exists() || newData.hasChild('phase')",
           "speedClaims": {
             "$groupId": {
@@ -214,9 +216,10 @@
       }
     },
     "srooms": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
       "$roomCode": {
         ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-        ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('players') && newData.hasChild('answers') && newData.hasChild('votes') && newData.child('adminId').isString() && !newData.child('answers').hasChildren() && !newData.child('votes').hasChildren() && newData.child('game').hasChild('phase') && newData.child('game').child('phase').isString()) || (data.exists() && root.child('srooms').child($roomCode).child('adminId').val() == auth.uid))",
+        ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && ((!data.exists() && newData.child('adminId').val() == auth.uid && newData.hasChild('game') && newData.hasChild('players') && newData.hasChild('answers') && newData.hasChild('votes') && newData.child('adminId').isString() && !newData.child('answers').hasChildren() && !newData.child('votes').hasChildren() && newData.child('game').hasChild('phase') && newData.child('game').child('phase').isString()) || (data.exists() && root.child('srooms').child($roomCode).child('adminId').val() == auth.uid))))",
         "adminId": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
           ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || (!data.exists() && newData.isString() && newData.val() == auth.uid) || (data.exists() && data.val() == auth.uid && newData.val() == data.val()))",
@@ -224,7 +227,7 @@
         },
         "game": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
-          ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('srooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('srooms').child($roomCode).exists())"
+          ".write": "auth != null && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || ($roomCode.matches(/^[0-9]{4}$/) && (root.child('srooms').child($roomCode).child('adminId').val() == auth.uid || !root.child('srooms').child($roomCode).exists())))"
         },
         "players": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
@@ -256,6 +259,63 @@
         "hostAnswer": {
           ".read": "$roomCode.matches(/^[0-9]{4}$/)",
           ".write": "auth != null && $roomCode.matches(/^[0-9]{4}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()) || root.child('srooms').child($roomCode).child('adminId').val() == auth.uid)"
+        }
+      }
+    },
+    "platform": {
+      "news": {
+        ".read": true,
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$newsId": {
+          ".read": true,
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".validate": "newData.hasChildren(['title', 'body', 'date']) && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 2000 && newData.child('date').isString()"
+        }
+      },
+      "feedback": {
+        ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$feedbackId": {
+          ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".write": "auth != null && ((!data.exists() && newData.hasChildren(['type', 'text', 'status', 'createdAt']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('status').val() == 'new' && newData.child('createdAt').isNumber()) || (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists()))"
+        }
+      },
+      "settings": {
+        ".read": true,
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())"
+      },
+      "sponsors": {
+        ".read": true,
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$sponsorId": {
+          ".read": true,
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".validate": "newData.hasChildren(['name']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 80"
+        }
+      },
+      "lobbyAds": {
+        ".read": true,
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$adId": {
+          ".read": true,
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".validate": "newData.hasChildren(['title']) && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 80"
+        }
+      },
+      "prizeAwards": {
+        ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$awardId": {
+          ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())"
+        }
+      },
+      "communityPosts": {
+        ".read": true,
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+        "$postId": {
+          ".read": true,
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists())",
+          ".validate": "newData.hasChildren(['text', 'publishedAt']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 500 && newData.child('publishedAt').isNumber()"
         }
       }
     }
