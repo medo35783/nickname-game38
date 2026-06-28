@@ -7,11 +7,7 @@ import {
 
 export { purgeRoomList } from './roomLifecycle';
 
-const ROOM_CODE_RE = /^\d{4}$/;
-
-export function isLegacyRoomCode(roomCode) {
-  return !ROOM_CODE_RE.test(String(roomCode || ''));
-}
+export { isLegacyRoomCode } from './roomCode';
 
 /**
  * غرف نشطة لكن اشتراك مشرفها انتهى (أو بيانات قديمة بلا اشتراك).

@@ -6,7 +6,15 @@ import { Q_TREES, Q_WEAPONS, Q_TOTAL } from '../../core/constants';
 import { genCode, playSound } from '../../core/helpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
 import { allocateFreeRoomCode, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
-import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
+import {
+  ROOM_CODE_LEN,
+  normalizeRoomCodeInput,
+  roomCodeValidationMessage,
+} from '../../core/roomCode';
+import { verifyHostRejoinAccess } from '../../core/hostPin';
+import HostRejoinPanel from '../../shared/HostRejoinPanel';
+import { fetchArenaFieldsForJoin, isArenaRegisteredUser } from '../../core/arenaProfile';
+import { resolveActiveHostRoom, resolveActivePlayerRoom, setHostActiveRoom, clearHostActiveRoom } from '../../core/hostActiveRoom';
 import FameeriRevealOverlay from './FameeriRevealOverlay';
 import { openFameeriPrintableReport } from './fameeriPrintReport';
 import { patchLeaderByUid } from './fameeriLeaderIndex';
@@ -122,18 +130,68 @@ const FameeriGame = forwardRef(function FameeriGame(
     setShowOnboarding('admin');
   }, [canCreateRoom]);
 
-  const handleAdminEntry = () => {
+  const enterAsFameeriAdmin = (roomCode, phase) => {
+    setQRoom(roomCode);
+    setQRole('admin');
+    setQMyId(null);
+    setQGroupId(null);
+    localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: roomCode, qRole: 'admin' }));
+    setGameScreen(qumairiScreenForPhase(phase || 'lobby'));
+  };
+
+  const handleAdminEntry = async () => {
     if (!canCreateRoom) {
       pendingOnboardingRef.current = 'admin';
       onRequestActivation();
       return;
     }
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActiveHostRoom('fameeri', auth.currentUser);
+      if (active) {
+        enterAsFameeriAdmin(active.roomCode, active.data?.game?.phase);
+        notify('✅ عدت لغرفتك النشطة', 'gold');
+        return;
+      }
+    } catch {
+      /* continue */
+    } finally {
+      setSessionGate('ready');
+    }
     setShowOnboarding('admin');
   };
 
-  const handlePlayerEntry = () => {
+  const handlePlayerEntry = async () => {
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActivePlayerRoom('fameeri');
+      if (active) {
+        const ps = active.local;
+        const uid = auth.currentUser?.uid;
+        const existing = findExistingQumairiMember(active.data.members, {
+          memberId: ps.qMyId,
+          uid,
+        });
+        if (existing) {
+          applyFameeriMemberState(
+            active.roomCode,
+            existing[0],
+            existing[1],
+            active.data?.game?.phase || 'lobby',
+            active.data.groups
+          );
+          return;
+        }
+      }
+    } catch {
+      /* continue */
+    } finally {
+      setSessionGate('ready');
+    }
     const saved = readSavedFameeri();
-    if (saved.qRoom) setQJoinInput(saved.qRoom);
+    if (saved.qRoom && saved.qRole !== 'admin') setQJoinInput(saved.qRoom);
     if (saved.qMyName) setQMyName(saved.qMyName);
     setShowOnboarding('player');
   };
@@ -157,6 +215,13 @@ const FameeriGame = forwardRef(function FameeriGame(
     } catch {
       /* ignore */
     }
+    const hostUid = auth.currentUser?.uid;
+    const existingHost = await resolveActiveHostRoom('fameeri', auth.currentUser);
+    if (existingHost) {
+      enterAsFameeriAdmin(existingHost.roomCode, existingHost.data?.game?.phase);
+      notify('✅ لديك غرفة نشطة — عدت إليها', 'gold');
+      return;
+    }
     const code = await allocateFreeRoomCode('qrooms');
     if (!code) {
       notify('لم يتاح رمز غرفة فاضٍ — حاول بعد قليل', 'error');
@@ -177,6 +242,9 @@ const FameeriGame = forwardRef(function FameeriGame(
     });
     localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
     setGameScreen('qumairi_lobby');
+    if (hostUid && isArenaRegisteredUser(auth.currentUser)) {
+      void setHostActiveRoom(hostUid, 'fameeri', code);
+    }
     notify(`✅ الغرفة: ${code}`, 'gold');
   };
 
@@ -194,6 +262,10 @@ const FameeriGame = forwardRef(function FameeriGame(
   const [qAttacks, setQAttacks]   = useState({});
   const [qJoinInput, setQJoinInput] = useState('');
   const [qJoinPin, setQJoinPin] = useState('');
+  const [hostRejoinCode, setHostRejoinCode] = useState('');
+  const [hostRejoinPin, setHostRejoinPin] = useState('');
+  const [hostRejoinErr, setHostRejoinErr] = useState('');
+  const [hostRejoinLoading, setHostRejoinLoading] = useState(false);
   const [qJoinErr, setQJoinErr]   = useState('');
   const [authUid, setAuthUid] = useState(auth.currentUser?.uid || null);
   const [qDistribution, setQDistribution] = useState({});
@@ -489,12 +561,7 @@ const FameeriGame = forwardRef(function FameeriGame(
 
       const uid = auth.currentUser?.uid;
       if (saved.qRole === 'admin' || (uid && data.adminId === uid)) {
-        setQRoom(roomCode);
-        setQRole('admin');
-        setQMyId(null);
-        setQGroupId(null);
-        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: roomCode, qRole: 'admin' }));
-        setGameScreen(qumairiScreenForPhase(phase));
+        enterAsFameeriAdmin(roomCode, phase);
         notify('✅ عدت للغرفة كمشرف', 'gold');
         return true;
       }
@@ -537,10 +604,73 @@ const FameeriGame = forwardRef(function FameeriGame(
     }
   };
 
+  const rejoinAsQumairiHost = async () => {
+    if (hostRejoinLoading) return;
+    setHostRejoinErr('');
+    const code = hostRejoinCode.trim();
+    if (code.length !== ROOM_CODE_LEN) {
+      setHostRejoinErr(roomCodeValidationMessage());
+      return;
+    }
+    setHostRejoinLoading(true);
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const snap = await get(dbRef(db, `qrooms/${code}`));
+      if (!snap.exists()) {
+        setHostRejoinErr('الغرفة غير موجودة');
+        return;
+      }
+      const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setHostRejoinErr(subGuard.message);
+        return;
+      }
+      const phase = data.game?.phase || 'lobby';
+      if (phase === 'ended') {
+        setHostRejoinErr('انتهت هذه الجولة');
+        return;
+      }
+      const uid = auth.currentUser?.uid;
+      if (uid && data.adminId === uid) {
+        setQRoom(code);
+        setQRole('admin');
+        setQMyId(null);
+        setQGroupId(null);
+        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
+        setGameScreen(qumairiScreenForPhase(phase));
+        notify('✅ دخلت كمشرف — صاحب الغرفة', 'gold');
+        return;
+      }
+      const saved = readSavedFameeri();
+      const hasLocalAdminSession = saved.qRole === 'admin' && saved.qRoom === code;
+      const access = await verifyHostRejoinAccess(data, code, {
+        uid,
+        hostPin: hostRejoinPin,
+        hasLocalAdminSession,
+      });
+      if (access.ok) {
+        setQRoom(code);
+        setQRole('admin');
+        setQMyId(null);
+        setQGroupId(null);
+        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
+        setGameScreen(qumairiScreenForPhase(phase));
+        notify('✅ دخلت كمشرف — لوحة التحكم جاهزة', 'gold');
+        return;
+      }
+      setHostRejoinErr(access.reason || 'تعذّر الدخول كمشرف');
+    } catch {
+      setHostRejoinErr('خطأ في الاتصال');
+    } finally {
+      setHostRejoinLoading(false);
+    }
+  };
+
   const joinQumairiRoom = async () => {
     if (qJoinLoading) return;
-    if (qJoinInput.length !== 4) {
-      setQJoinErr('الرمز 4 أرقام');
+    if (qJoinInput.length !== ROOM_CODE_LEN) {
+      setQJoinErr(roomCodeValidationMessage());
       return;
     }
     setQJoinLoading(true);
@@ -563,17 +693,6 @@ const FameeriGame = forwardRef(function FameeriGame(
       const isLoggedIn = !!uid;
       const memberEntries = Object.entries(data.members || {});
       const saved = readSavedFameeri();
-
-      if (uid && data.adminId === uid) {
-        setQRoom(qJoinInput);
-        setQRole('admin');
-        setQMyId(null);
-        setQGroupId(null);
-        localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: qJoinInput, qRole: 'admin' }));
-        setGameScreen(qumairiScreenForPhase(phase));
-        notify('✅ دخلت كمشرف — صاحب الغرفة', 'gold');
-        return;
-      }
 
       const byUid = findSeatByOwnerUid(memberEntries, uid);
       if (byUid) {
@@ -704,8 +823,8 @@ const FameeriGame = forwardRef(function FameeriGame(
   // الدخول كشاشة عرض (بروجكتر) — قراءة فقط، بلا انضمام كعضو
   const joinAsSpectator = async () => {
     const code = String(qJoinInput || '').trim();
-    if (code.length !== 4) {
-      setQJoinErr('الرمز 4 أرقام');
+    if (code.length !== ROOM_CODE_LEN) {
+      setQJoinErr(roomCodeValidationMessage());
       return;
     }
     setQJoinLoading(true);
@@ -803,6 +922,9 @@ const FameeriGame = forwardRef(function FameeriGame(
         ...(started ? {} : { closedFromLobby: true }),
       });
       localStorage.removeItem('ng_qumairi');
+      if (auth.currentUser?.uid) {
+        void clearHostActiveRoom(auth.currentUser.uid, 'fameeri');
+      }
       notify(
         started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
         'info'
@@ -1496,19 +1618,9 @@ const FameeriGame = forwardRef(function FameeriGame(
               وزّع القميري على الأشجار واهجم مجموعات الخصوم
             </div>
           </div>
-          {readSavedFameeri().qRoom && (
-            <button
-              type="button"
-              className="btn bo"
-              style={{ marginBottom: 8 }}
-              onClick={() => void restoreQumairiSession(readSavedFameeri().qRoom)}
-            >
-              🔙 العودة للغرفة ({readSavedFameeri().qRoom})
-            </button>
-          )}
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button type="button" className="btn bg" onClick={handleAdminEntry}>👑 إنشاء غرفة كمسؤول</button>
-            <button type="button" className="btn bo" onClick={handlePlayerEntry}>🎮 انضمام كمجموعة برمز الغرفة</button>
+            <button type="button" className="btn bg" onClick={() => void handleAdminEntry()}>👑 إنشاء غرفة كمسؤول</button>
+            <button type="button" className="btn bo" onClick={() => void handlePlayerEntry()}>🎮 انضمام كمجموعة برمز الغرفة</button>
             <button type="button" className="btn bgh" onClick={() => { setQJoinInput(''); setQJoinErr(''); setGameScreen('qumairi_spectator_join'); }}>📺 شاشة عرض (بروجكتر)</button>
           </div>
           <button type="button" className="btn bgh game-guide-open-btn" style={{ marginTop: 4 }} onClick={() => setShowGuide(true)}>
@@ -1530,14 +1642,14 @@ const FameeriGame = forwardRef(function FameeriGame(
           </div>
           <div className="card">
             <div className="ig">
-              <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
+              <label className="lbl">🔢 رمز الغرفة ({ROOM_CODE_LEN} أرقام)</label>
               <input
                 className="inp big"
                 placeholder={ROOM_CODE_PLACEHOLDER}
-                maxLength={4}
+                maxLength={ROOM_CODE_LEN}
                 value={qJoinInput}
                 onChange={(e) => {
-                  setQJoinInput(e.target.value.replace(/\D/g, ''));
+                  setQJoinInput(normalizeRoomCodeInput(e.target.value));
                   setQJoinErr('');
                 }}
               />
@@ -1575,14 +1687,14 @@ const FameeriGame = forwardRef(function FameeriGame(
           </div>
           <div className="card">
             <div className="ig">
-              <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
+              <label className="lbl">🔢 رمز الغرفة ({ROOM_CODE_LEN} أرقام)</label>
               <input
                 className="inp big"
                 placeholder={ROOM_CODE_PLACEHOLDER}
-                maxLength={4}
+                maxLength={ROOM_CODE_LEN}
                 value={qJoinInput}
                 onChange={(e) => {
-                  setQJoinInput(e.target.value.replace(/\D/g, ''));
+                  setQJoinInput(normalizeRoomCodeInput(e.target.value));
                   setQJoinErr('');
                 }}
               />
@@ -1607,8 +1719,19 @@ const FameeriGame = forwardRef(function FameeriGame(
             )}
             {qJoinErr && <div className="err-msg">⚠️ {qJoinErr}</div>}
             <button type="button" className="btn bg mt2" disabled={qJoinLoading} onClick={() => void joinQumairiRoom()}>
-              {qJoinLoading ? '⏳' : '🚀 انضمام / عودة'}
+              {qJoinLoading ? '⏳' : '🚀 انضمام كمتسابق'}
             </button>
+            <HostRejoinPanel
+              code={hostRejoinCode}
+              onCodeChange={setHostRejoinCode}
+              hostPin={hostRejoinPin}
+              onHostPinChange={setHostRejoinPin}
+              loading={hostRejoinLoading}
+              error={hostRejoinErr}
+              onRejoin={rejoinAsQumairiHost}
+              isLoggedIn={!!authUid}
+              onRegister={() => setTab?.('account')}
+            />
             <GameGuideOpenButton onClick={() => setShowGuide(true)} />
           </div>
         </div>
@@ -1618,7 +1741,7 @@ const FameeriGame = forwardRef(function FameeriGame(
     if(gameScreen==='qumairi_lobby'){return(
 <div className="scr"><GameTopNav onBack={openExitSheet} sticky />{!isAdmin && qMyId && (
   <GameSeatWelcomeOverlay gameId="fameeri" seatId={qMyId} isLoggedIn={!!authUid} onSignup={() => setTab?.('account')} />
-)}{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} onOpenGuide={() => setShowGuide(true)} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(<><FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="distributing" /><div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div></>);})()}{!isAdmin&&qPhase==='lobby'&&(<>{isLeader&&qGroupId&&<FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="lobby" />}<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>{isLeader&&qGroupId?'👑':'⏳'}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?(isLeader?`قائد مجموعة ${qMyGroup?.name||'—'}`:`مجموعتك: ${qMyGroup?.name||'—'}`):'انتظر المشرف'}</div></div></>)}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}{!isAdmin&&<GameGuideOpenButton onClick={() => setShowGuide(true)} />}
+)}{isAdmin?<FameeriAdminLobby qRoom={qRoom} qPhase={qPhase} qGameState={qGameState} qGList={qGList} qMList={qMList} qGroupName={qGroupName} setQGroupName={setQGroupName} notify={notify} accent={FAMEERI_ACCENT} shareRoomInvite={shareRoomInvite} qSetupOpen={qSetupOpen} setQSetupOpen={setQSetupOpen} qEffectiveSource={qEffectiveSource} qPool={qPool} qBankMeta={qBankMeta} applyQuestionSetup={applyQuestionSetup} assignGroupLeader={assignGroupLeader} QB_GAME_TYPE={QB_GAME_TYPE} authUid={auth.currentUser?.uid} onGoAccount={onGoAccount} onOpenGuide={() => setShowGuide(true)} onSaveHostPin={async (hostPinHash) => { await update(dbRef(db, `qrooms/${qRoom}/game`), { hostPinHash }); }} isRegisteredEmail={isArenaRegisteredUser(auth.currentUser)} />:<><div className="card" style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--muted)'}}>رمز الغرفة</div><div className="room-code-big" style={{fontSize:28}}>{qRoom}</div></div></>}{!isAdmin&&qPhase==='distributing'&&(()=>{if(!qGroupId||!qMyGroup) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>انتظر المشرف يحدد مجموعتك</div></div>;if(qMyGroup.distributed) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>✅</div><div style={{fontSize:15,fontWeight:900,color:'var(--green)',marginTop:8}}>تم التوزيع — انتظار الباقين</div></div>;if(!isLeader) return <div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>⏳</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>القائد 👑 يوزع — انتظر</div></div>;const total=Object.values(qDistribution).reduce((s,v)=>s+(parseInt(v)||0),0);const remaining=Q_TOTAL-total;return(<><FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="distributing" /><div className="card"><div className="ctitle">🌳 وزّع {Q_TOTAL} قميري</div><div style={{textAlign:'center',marginBottom:12}}><div style={{fontFamily:'Cairo',fontSize:32,fontWeight:900,color:remaining===0?'var(--green)':remaining<0?'var(--red)':'var(--fameeri-primary)'}}>{remaining}</div><div style={{fontSize:11,color:'var(--muted)'}}>متبقي</div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{Q_TREES.map(tree=>(<div key={tree} style={{background:'var(--surface)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:22}}>🌳</div><div style={{fontSize:11,fontWeight:700,marginTop:2}}>{tree}</div><input type="number" min="0" max="100" className="inp" style={{marginTop:6,padding:'6px',fontSize:16,textAlign:'center',width:'100%'}} value={qDistribution[tree]||''} placeholder="0" onChange={e=>setQDistribution(prev=>({...prev,[tree]:e.target.value}))}/></div>))}</div><button type="button" className="btn bg mt3" disabled={remaining!==0||qDistSubmitting} onClick={()=>void submitQumairiDistribution()}>{qDistSubmitting?'⏳ جاري الحفظ…':remaining===0?'✅ تأكيد':`وزّع ${Math.abs(remaining)}`}</button></div></>);})()}{!isAdmin&&qPhase==='lobby'&&(<>{isLeader&&qGroupId&&<FameeriPlayerLeaderNotice groupName={qMyGroup?.name} phase="lobby" />}<div className="card" style={{textAlign:'center',padding:20}}><div style={{fontSize:40}}>{isLeader&&qGroupId?'👑':'⏳'}</div><div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>{qGroupId?(isLeader?`قائد مجموعة ${qMyGroup?.name||'—'}`:`مجموعتك: ${qMyGroup?.name||'—'}`):'انتظر المشرف'}</div></div></>)}{!isAdmin&&qGroupId&&<FameeriGroupChat qRoom={qRoom} groupId={qGroupId} me={{uid:auth.currentUser?.uid,name:qMyName}} accent={FAMEERI_ACCENT} />}{!isAdmin&&<GameGuideOpenButton onClick={() => setShowGuide(true)} />}
 </div>);}
 
     if (gameScreen === 'qumairi_play') {

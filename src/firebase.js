@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
+import { setupAppCheck } from "./core/appCheck";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDwt9h7MaOo2Dh03qGm43FfWad1cOtgex4",
@@ -14,5 +16,12 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+setupAppCheck(app);
+
+export { app };
 export const auth = getAuth(app);
 export const db = getDatabase(app);
+export const functions = getFunctions(
+  app,
+  import.meta.env.VITE_FIREBASE_FUNCTIONS_REGION || 'us-central1'
+);

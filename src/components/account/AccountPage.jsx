@@ -6,7 +6,7 @@ import {
 } from 'firebase/auth';
 import { onValue, ref } from 'firebase/database';
 import { auth, db } from '../../firebase';
-import PlayerAuthScreen from '../auth/PlayerAuthScreen';
+import PlayerAccessPanel from '../auth/PlayerAccessPanel';
 import ThemeToggle from '../layout/ThemeToggle';
 import AccountKnowledgeBank from '../../shared/AccountKnowledgeBank';
 import ArenaBadge from '../../shared/ArenaBadge';
@@ -65,7 +65,8 @@ export default function AccountPage({
   followSystem = true,
   onSetTheme,
   onFollowSystem,
-  initialAuthMode = 'login',
+  initialAuthMode = 'code',
+  onCodeActivated,
 }) {
   const user = auth.currentUser;
   const [tab, setTab] = useState('sub');
@@ -283,14 +284,22 @@ export default function AccountPage({
           ) : null}
 
           {isGuest ? (
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div className="ctitle">حسابك</div>
+            <div className="card player-access-card" style={{ marginBottom: 12 }}>
+              <div className="ctitle">🔑 الدخول والاشتراك</div>
               <p className="psub" style={{ fontSize: 11, marginBottom: 10 }}>
                 {activeOk
-                  ? 'سجّل دخولك أو أنشئ حساباً — اشتراكك مفعّل'
-                  : 'لديك حساب؟ سجّل دخول — جديد؟ أنشئ حساباً'}
+                  ? 'اشتراكك مفعّل — سجّل حساباً لحفظه أو سجّل دخولك'
+                  : 'فعّل كودك أو سجّل دخولك — ثلاث خيارات في مكان واحد'}
               </p>
-              <PlayerAuthScreen notify={notify} compact initialMode={initialAuthMode} />
+              <PlayerAccessPanel
+                key={initialAuthMode}
+                notify={notify}
+                compact
+                initialMode={initialAuthMode}
+                codeAlreadyActive={Boolean(activeOk)}
+                activeCodeId={activeOk ? activeCode?.id : null}
+                onCodeActivated={onCodeActivated}
+              />
             </div>
           ) : (
             <button type="button" className="btn bo-bbrand" onClick={handleSignOut}>

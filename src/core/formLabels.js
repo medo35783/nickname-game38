@@ -1,6 +1,6 @@
 /** نصوص حقول موحّدة — بدون أمثلة أسماء قد تُربك اللاعب */
 
-export const ROOM_CODE_PLACEHOLDER = '• • • •';
+export const ROOM_CODE_PLACEHOLDER = '• • • • • •';
 
 export const PLAYER_DISPLAY_NAME_PLACEHOLDER = 'اسمك (للتعريف داخل اللعبة)';
 

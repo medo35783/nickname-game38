@@ -9,6 +9,11 @@ import {
 } from '../../core/formLabels';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 import GameSeatPinField from '../../shared/GameSeatPinField';
+import {
+  ROOM_CODE_LEN,
+  normalizeRoomCodeInput,
+} from '../../core/roomCode';
+import HostRejoinPanel from '../../shared/HostRejoinPanel';
 
 export default function TitlesSetup(props) {
   const {
@@ -26,16 +31,24 @@ export default function TitlesSetup(props) {
     setJoinNick2,
     joinPin,
     setJoinPin,
+    hostRejoinCode,
+    setHostRejoinCode,
+    hostRejoinPin,
+    setHostRejoinPin,
+    hostRejoinErr,
+    hostRejoinLoading,
+    onRejoinAsHost,
     joinLoading,
     joinRoomNickMode,
     joinRoomModeLoading,
     joinRoom,
     isLoggedIn,
     onOpenGuide,
+    onRegister,
   } = props;
 
   const isDualMode = joinRoomNickMode === 2;
-  const roomCodeComplete = joinInput.length === 4;
+  const roomCodeComplete = joinInput.length === ROOM_CODE_LEN;
   const roomReady = roomCodeComplete && !joinRoomModeLoading;
 
   if (gameScreen !== 'join') return null;
@@ -49,18 +62,18 @@ export default function TitlesSetup(props) {
       <div className="psub">
         {isDualMode && roomReady
           ? 'رمز الغرفة + اسمك + لقبان سريان (وضع اللقبين)'
-          : 'رمز الغرفة (4 أرقام) + اسمك ولقبك السري'}
+          : `رمز الغرفة (${ROOM_CODE_LEN} أرقام) + اسمك ولقبك السري`}
       </div>
       <div className="card">
         <div className="ig">
-          <label className="lbl">🔢 رمز الغرفة (4 أرقام)</label>
+          <label className="lbl">🔢 رمز الغرفة ({ROOM_CODE_LEN} أرقام)</label>
           <input
             className={`inp big${joinErr ? ' err-b' : ''}`}
             placeholder={ROOM_CODE_PLACEHOLDER}
-            maxLength={4}
+            maxLength={ROOM_CODE_LEN}
             value={joinInput}
             onChange={(e) => {
-              setJoinInput(e.target.value.replace(/\D/g, ''));
+              setJoinInput(normalizeRoomCodeInput(e.target.value));
               setJoinErr('');
             }}
           />
@@ -85,7 +98,7 @@ export default function TitlesSetup(props) {
         </div>
       </div>
       <div className="card">
-        <div className="ctitle">👤 بياناتك</div>
+        <div className="ctitle">👤 بيانات المتسابق</div>
         <div className="ig">
           <label className="lbl">اسمك</label>
           <input
@@ -102,7 +115,7 @@ export default function TitlesSetup(props) {
             placeholder={PLAYER_NICK_PLACEHOLDER}
             value={joinNick}
             onChange={(e) => setJoinNick(e.target.value)}
-            disabled={joinInput.length === 4 && joinRoomModeLoading}
+            disabled={joinInput.length === ROOM_CODE_LEN && joinRoomModeLoading}
           />
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
             {isDualMode ? PLAYER_NICK_HINT_FIRST : PLAYER_NICK_HINT_SINGLE}
@@ -132,7 +145,7 @@ export default function TitlesSetup(props) {
             <GameSeatPinField
               value={joinPin}
               onChange={setJoinPin}
-              disabled={joinInput.length === 4 && joinRoomModeLoading}
+              disabled={joinInput.length === ROOM_CODE_LEN && joinRoomModeLoading}
             />
           </div>
         )}
@@ -148,24 +161,24 @@ export default function TitlesSetup(props) {
         >
           💡 اختر {isDualMode ? 'لقبين لا يمتان' : 'لقباً لا يمت'} بصلة لاهتماماتك!
         </div>
-        <div
-          style={{
-            marginTop: 8,
-            background: 'rgba(37,111,168,.08)',
-            border: '1px solid rgba(37,111,168,.22)',
-            borderRadius: 8,
-            padding: '8px 12px',
-            fontSize: 11,
-            color: 'var(--muted)',
-          }}
-        >
-          🔄 إذا خرجت: نفس الرمز والاسم واللقب{isLoggedIn ? '' : ' + رقمك السري'} للعودة
-        </div>
-        {joinErr && <div className="err-msg">⚠️ {joinErr}</div>}
+        {joinErr && <div className="err-msg mt2">⚠️ {joinErr}</div>}
       </div>
-      <button type="button" className="btn bg" onClick={joinRoom} disabled={joinLoading || (joinInput.length === 4 && joinRoomModeLoading)}>
-        {joinLoading ? '⏳ جارٍ الانضمام...' : '🚀 انضمام'}
+      <button type="button" className="btn bg" onClick={joinRoom} disabled={joinLoading || (joinInput.length === ROOM_CODE_LEN && joinRoomModeLoading)}>
+        {joinLoading ? '⏳ جارٍ الانضمام...' : '🚀 انضمام كمتسابق'}
       </button>
+
+      <HostRejoinPanel
+        code={hostRejoinCode}
+        onCodeChange={setHostRejoinCode}
+        hostPin={hostRejoinPin}
+        onHostPinChange={setHostRejoinPin}
+        loading={hostRejoinLoading}
+        error={hostRejoinErr}
+        onRejoin={onRejoinAsHost}
+        isLoggedIn={isLoggedIn}
+        onRegister={onRegister}
+      />
+
       <GameGuideOpenButton onClick={onOpenGuide} />
     </div>
   );

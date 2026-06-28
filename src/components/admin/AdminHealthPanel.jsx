@@ -11,6 +11,8 @@ import {
   purgeRoomList,
 } from '../../core/adminHealthHelpers';
 import { formatPulseDateTime } from '../../core/adminPulseHelpers';
+import AdminSecurityEvents from './AdminSecurityEvents';
+import { ROOM_CODE_LEN } from '../../core/roomCode';
 import {
   subscribePlatformSettings,
   setMaintenanceMode,
@@ -77,7 +79,7 @@ export default function AdminHealthPanel({ notify }) {
 
   const roomActionError = useCallback((action, room, err) => {
     if (isLegacyRoomCode(room.roomCode)) {
-      return `تعذّر ${action}: رمز الغرفة ${room.roomCode} قديم (ليس 4 أرقام). انشر قواعد Firebase المحدّثة ثم أعد المحاولة، أو احذفها من Firebase Console.`;
+      return `تعذّر ${action}: رمز الغرفة ${room.roomCode} قديم (ليس ${ROOM_CODE_LEN} أرقام). انشر قواعد Firebase المحدّثة ثم أعد المحاولة، أو احذفها من Firebase Console.`;
     }
     const denied = `${err?.code || ''} ${err?.message || ''}`.toLowerCase().includes('permission');
     if (denied) {
@@ -200,7 +202,7 @@ export default function AdminHealthPanel({ notify }) {
           </p>
           {legacyStuckCount > 0 ? (
             <p className="admin-pulse-card__hint">
-              {legacyStuckCount} غرفة برمز قديم (غير 4 أرقام) — تحتاج نشر قواعد Firebase أو حذف يدوي
+              {legacyStuckCount} غرفة برمز قديم (غير {ROOM_CODE_LEN} أرقام) — تحتاج نشر قواعد Firebase أو حذف يدوي
             </p>
           ) : null}
         </div>
@@ -353,6 +355,8 @@ export default function AdminHealthPanel({ notify }) {
           </ul>
         </div>
       ) : null}
+
+      <AdminSecurityEvents notify={notify} />
     </div>
   );
 }

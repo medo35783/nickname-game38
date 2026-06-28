@@ -1,9 +1,12 @@
-import { PLATFORM_SITE_URL, BRAND_ICON_PATH } from './constants.js';
+import { PLATFORM_SITE_URL } from './constants.js';
 
 const PWA_ORIGIN = PLATFORM_SITE_URL.replace(/\/$/, '');
 
-/** نفس شعار الموقع (الشريط السفلي) — 512 أصلي + 192 مشتق بجودة عالية */
+/** أيقونات PWA — مُولَّدة بمنطقة أمان (الشعار كامل على الشاشة الرئيسية) */
 export const PWA_ICON_192_PATH = '/brand/la3ibz-pwa-192.png';
+export const PWA_ICON_512_PATH = '/brand/la3ibz-pwa-512.png';
+export const PWA_ICON_MASKABLE_192_PATH = '/brand/la3ibz-pwa-maskable-192.png';
+export const PWA_ICON_MASKABLE_512_PATH = '/brand/la3ibz-pwa-maskable-512.png';
 
 /** إعدادات PWA — manifest مشترك بين Vite والواجهة */
 export const PWA_MANIFEST = {
@@ -29,13 +32,19 @@ export const PWA_MANIFEST = {
       purpose: 'any',
     },
     {
-      src: BRAND_ICON_PATH,
+      src: PWA_ICON_512_PATH,
       sizes: '512x512',
       type: 'image/png',
       purpose: 'any',
     },
     {
-      src: BRAND_ICON_PATH,
+      src: PWA_ICON_MASKABLE_192_PATH,
+      sizes: '192x192',
+      type: 'image/png',
+      purpose: 'maskable',
+    },
+    {
+      src: PWA_ICON_MASKABLE_512_PATH,
       sizes: '512x512',
       type: 'image/png',
       purpose: 'maskable',

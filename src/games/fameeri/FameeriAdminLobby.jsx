@@ -17,6 +17,7 @@ import {
   demoteFameeriLeader,
 } from './fameeriAdminLobbyManage';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import HostSessionReminder from '../../shared/HostSessionReminder';
 
 export default function FameeriAdminLobby({
   qRoom,
@@ -40,6 +41,8 @@ export default function FameeriAdminLobby({
   authUid,
   onGoAccount,
   onOpenGuide,
+  onSaveHostPin,
+  isRegisteredEmail,
 }) {
   const unassigned = qMList.filter((m) => !m.groupId);
   const assistMode = !!qGameState?.assistMode;
@@ -206,6 +209,18 @@ export default function FameeriAdminLobby({
           مشاركة عبر <WhatsAppLogoIcon />
         </button>
       </div>
+
+      <HostSessionReminder
+        gameId="qumairi"
+        roomCode={qRoom}
+        phase={qPhase || 'lobby'}
+        isLoggedIn={!!authUid}
+        isRegisteredEmail={!!isRegisteredEmail}
+        hasHostPin={!!qGameState?.hostPinHash}
+        onSavePin={onSaveHostPin}
+        onRegister={onGoAccount}
+        notify={notify}
+      />
 
       {/* وضع بدون جوالات — بارز */}
       <div className={`fameeri-admin-assist card${assistMode ? ' on' : ''}`}>

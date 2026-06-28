@@ -1,4 +1,6 @@
-export const genCode = (len = 4) => {
+import { ROOM_CODE_LEN } from './roomCode';
+
+export const genCode = (len = ROOM_CODE_LEN) => {
   const chars = '0123456789';
   return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };

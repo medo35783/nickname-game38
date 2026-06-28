@@ -1,25 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  dismissPwaInstallBanner,
+  getPwaBannerVariant,
   isAndroidDevice,
   isIosDevice,
   isMobileDevice,
+  isPwaInstallBannerDismissed,
+  isPwaInstalledPersisted,
   isPwaStandalone,
+  markPwaInstalledPersisted,
 } from '../core/pwaInstall';
 
 export function usePwaInstall() {
   const deferredRef = useRef(null);
   const [canInstall, setCanInstall] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(() => isPwaStandalone());
+  const [isInstalled, setIsInstalled] = useState(
+    () => isPwaStandalone() || isPwaInstalledPersisted(),
+  );
   const [isIos, setIsIos] = useState(() => isIosDevice());
   const [isAndroid, setIsAndroid] = useState(() => isAndroidDevice());
   const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const [installing, setInstalling] = useState(false);
+  const [bannerVariant, setBannerVariant] = useState(() => getPwaBannerVariant());
+  const [bannerDismissed, setBannerDismissed] = useState(() => isPwaInstallBannerDismissed());
 
   useEffect(() => {
     setIsIos(isIosDevice());
     setIsAndroid(isAndroidDevice());
     setIsMobile(isMobileDevice());
-    setIsInstalled(isPwaStandalone());
+    setBannerVariant(getPwaBannerVariant());
+    setIsInstalled(isPwaStandalone() || isPwaInstalledPersisted());
 
     const onBeforeInstall = (event) => {
       event.preventDefault();
@@ -31,10 +41,13 @@ export function usePwaInstall() {
       deferredRef.current = null;
       setCanInstall(false);
       setIsInstalled(true);
+      markPwaInstalledPersisted();
     };
 
     const onDisplayModeChange = () => {
-      setIsInstalled(isPwaStandalone());
+      const standalone = isPwaStandalone();
+      setIsInstalled(standalone || isPwaInstalledPersisted());
+      if (standalone) markPwaInstalledPersisted();
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
@@ -60,7 +73,10 @@ export function usePwaInstall() {
       const { outcome } = await prompt.userChoice;
       deferredRef.current = null;
       setCanInstall(false);
-      if (outcome === 'accepted') setIsInstalled(true);
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+        markPwaInstalledPersisted();
+      }
       return { ok: outcome === 'accepted', reason: outcome };
     } catch {
       return { ok: false, reason: 'error' };
@@ -69,7 +85,17 @@ export function usePwaInstall() {
     }
   }, []);
 
+  const dismissBanner = useCallback(() => {
+    dismissPwaInstallBanner();
+    setBannerDismissed(true);
+  }, []);
+
   const showCard = !isInstalled && isMobile;
+  const showBanner =
+    !isInstalled &&
+    isMobile &&
+    !bannerDismissed &&
+    bannerVariant !== 'other';
 
   return {
     canInstall,
@@ -80,5 +106,8 @@ export function usePwaInstall() {
     installing,
     install,
     showCard,
+    showBanner,
+    bannerVariant,
+    dismissBanner,
   };
 }

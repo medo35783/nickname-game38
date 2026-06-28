@@ -10,7 +10,7 @@ import QuestionContribute from './question-bank/QuestionContribute';
 import { fetchBankStats } from './question-bank/qbank.helpers';
 import './styles/knowledge-chest.css';
 import AdminHub from './components/admin/AdminHub';
-import PlayerAuthScreen from './components/auth/PlayerAuthScreen';
+import PlayerAccessPanel from './components/auth/PlayerAccessPanel';
 import AccountPage from './components/account/AccountPage';
 import { renderPlatformGame, handlePlatformGameBack } from './games/platformGameRouter';
 import './styles/base.css';
@@ -23,8 +23,10 @@ import SubscriptionTimer from './components/codes/SubscriptionTimer';
 import EndGameJoinPrompt from './components/codes/EndGameJoinPrompt';
 import SiteFooter from './components/layout/SiteFooter';
 import ThemeToggle from './components/layout/ThemeToggle';
+import PwaInstallBanner from './components/layout/PwaInstallBanner';
 import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
+import { refreshAdminClaim } from './core/adminAuth';
 import { getEffectivePrice } from './core/subscriptionPackages';
 import { ensureArenaProfile } from './core/arenaProfile';
 import { arenaPointsForRank } from './core/arena.constants';
@@ -38,6 +40,8 @@ import La3ibzBrandMark from './shared/La3ibzBrandMark';
 import La3ibzBrandIcon from './shared/La3ibzBrandIcon';
 import GameTopNav from './shared/GameTopNav';
 import './styles/arena-badge.css';
+import './styles/pwa-install-banner.css';
+import { formatOtherSessionsHint, getAllActiveSessions } from './shared/gameSessionRegistry';
 
 /** عدد النقرات على الشعار لفتح لوحة Admin (مخفية عن الجميع) */
 const ADMIN_LOGO_TAPS = 7;
@@ -82,7 +86,7 @@ export default function App() {
   const [arenaCelebration, setArenaCelebration] = useState(null);
   const [voicePortal, setVoicePortal] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [accountAuthMode, setAccountAuthMode] = useState('login');
+  const [accountAuthMode, setAccountAuthMode] = useState('code');
   const [pendingAuthMode, setPendingAuthMode] = useState(null);
   const [bankTotal, setBankTotal] = useState(null);
   const [contributeOpen, setContributeOpen] = useState(false);
@@ -155,6 +159,7 @@ export default function App() {
         const adm = await adminProfileExistsForUid(user.uid);
         setIsAdmin(adm);
         if (adm) {
+          void refreshAdminClaim();
           localStorage.setItem('pfcc_is_admin', 'true');
           localStorage.setItem('pfcc_admin_uid', user.uid);
         } else {
@@ -212,8 +217,12 @@ export default function App() {
   useEffect(() => {
     const handleOpenPackages = () => setTab('pricing');
     const handleOpenCodeActivation = () => {
+      setAccountMenuOpen(false);
+      setShowCodeActivation(false);
+      setContributeOpen(false);
+      setPendingAuthMode(null);
+      setAccountAuthMode('code');
       setTab('account');
-      setShowCodeActivation(true);
     };
     window.addEventListener('pfcc-open-packages', handleOpenPackages);
     window.addEventListener('pfcc-open-code-activation', handleOpenCodeActivation);
@@ -406,23 +415,20 @@ export default function App() {
   const user = auth.currentUser;
   const isGuest = arena.isGuest;
   const accountDisplayName = isGuest
-    ? 'حسابي والكود'
+    ? null
     : `${arena.avatarIcon} ${arena.displayName}`;
   const accountBtnClass = isGuest
     ? 'hdr-account-btn hdr-account-btn--guest'
     : 'hdr-account-btn hdr-account-btn--arena';
 
-  const openCodeActivation = () => {
+  const openAccountTab = useCallback((mode = 'code') => {
     setAccountMenuOpen(false);
+    setShowCodeActivation(false);
+    setContributeOpen(false);
     setPendingAuthMode(null);
-    setShowCodeActivation(true);
-  };
-
-  const openAccountTab = (mode = 'login') => {
-    setAccountMenuOpen(false);
-    setAccountAuthMode(mode);
+    setAccountAuthMode(mode === 'register' || mode === 'login' ? mode : 'code');
     setTab('account');
-  };
+  }, []);
 
   const finishCodeActivation = useCallback(
     (codeData, authModeAfter = null) => {
@@ -486,7 +492,7 @@ export default function App() {
           <p className="psub" style={{ textAlign: 'center', marginBottom: 12 }}>
             تعذّر الدخول التلقائي — فعّل Anonymous في Firebase أو سجّل بالبريد
           </p>
-          <PlayerAuthScreen notify={notify} />
+          <PlayerAccessPanel notify={notify} initialMode="login" />
         </div>
       </div>
     );
@@ -501,6 +507,12 @@ export default function App() {
         : selectedGame === 'nicknames'
           ? ' app--in-titles'
           : '';
+
+  const activeSessions = getAllActiveSessions().filter((s) => {
+    if (tab !== 'game') return true;
+    const map = { nicknames: 'titles', qumairi: 'fameeri', hesbah: 'hesbah' };
+    return map[selectedGame] !== s.game;
+  });
 
   return(
     <div
@@ -517,9 +529,19 @@ export default function App() {
               type="button"
               className={accountBtnClass}
               onClick={() => setAccountMenuOpen((v) => !v)}
-              title={isGuest ? 'تفعيل الكود · تسجيل دخول · حساب جديد' : `${arena.points} نقطة ساحة`}
+              title={isGuest ? 'تفعيل كود | دخول | تسجيل' : `${arena.points} نقطة ساحة`}
+              aria-label={isGuest ? 'تفعيل كود | دخول | تسجيل' : undefined}
             >
-              {isGuest ? `👤 ${accountDisplayName}` : (
+              {isGuest ? (
+                <span className="hdr-account-guest">
+                  <span className="hdr-account-guest__seg">تفعيل كود</span>
+                  <span className="hdr-account-guest__pipe" aria-hidden>|</span>
+                  <span className="hdr-account-guest__seg">دخول</span>
+                  <span className="hdr-account-guest__pipe" aria-hidden>|</span>
+                  <span className="hdr-account-guest__seg">تسجيل</span>
+                  <span className="hdr-account-guest__chev" aria-hidden>▾</span>
+                </span>
+              ) : (
                 <>
                   {accountDisplayName}
                   {arena.points > 0 ? (
@@ -532,14 +554,14 @@ export default function App() {
               <div className="hdr-account-menu">
                 {isGuest ? (
                   <>
-                    <button type="button" className="hdr-account-item hdr-account-item--primary" onClick={openCodeActivation}>
-                      🔑 تفعيل الكود
+                    <button type="button" className="hdr-account-item hdr-account-item--primary" onClick={() => openAccountTab('code')}>
+                      🔑 تفعيل كود
                     </button>
                     <button type="button" className="hdr-account-item" onClick={() => openAccountTab('login')}>
-                      تسجيل دخول
+                      دخول
                     </button>
                     <button type="button" className="hdr-account-item" onClick={() => openAccountTab('register')}>
-                      تسجيل جديد
+                      تسجيل
                     </button>
                   </>
                 ) : (
@@ -608,6 +630,15 @@ export default function App() {
         </div>
       </div>
 
+      <div className="app-chrome-banners">
+        {activeSessions.length > 0 ? (
+          <div className="game-multi-session-hint app-active-sessions-strip" role="status">
+            جلسة نشطة: {formatOtherSessionsHint(activeSessions)}
+          </div>
+        ) : null}
+        <PwaInstallBanner />
+      </div>
+
       <div className="main">
         {platformSettings?.maintenanceMode && !isAdmin ? (
           <div className="maintenance-banner" role="status">
@@ -657,7 +688,13 @@ export default function App() {
             activeCode={activeCode}
             isCodeValid={isCodeValid}
             isAdmin={isAdmin}
-            onActivateCode={() => setShowCodeActivation(true)}
+            onActivateCode={() => openAccountTab('code')}
+            onCodeActivated={(codeData) => {
+              if (codeData) {
+                setActiveCode(codeData);
+                persistActiveCodeLocal(codeData);
+              }
+            }}
             onGoPricing={() => setTab('pricing')}
             onOpenContribute={() => openContribute('account')}
             theme={theme}

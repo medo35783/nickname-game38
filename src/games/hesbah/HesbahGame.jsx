@@ -6,7 +6,15 @@ import { genCode, playSound } from '../../core/helpers';
 import '../../styles/hesbah.css';
 import { buildGameSessionTracking, recordRoundCompleted, recordSessionEnd } from '../../core/sessionStats';
 import { allocateFreeRoomCode, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
-import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
+import {
+  ROOM_CODE_LEN,
+  normalizeRoomCodeInput,
+  roomCodeValidationMessage,
+} from '../../core/roomCode';
+import HostRejoinPanel from '../../shared/HostRejoinPanel';
+import { verifyHostRejoinAccess } from '../../core/hostPin';
+import { fetchArenaFieldsForJoin, isArenaRegisteredUser } from '../../core/arenaProfile';
+import { resolveActiveHostRoom, resolveActivePlayerRoom, setHostActiveRoom, clearHostActiveRoom } from '../../core/hostActiveRoom';
 import { AV_COLORS } from '../../core/constants';
 import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import { ROOM_CODE_PLACEHOLDER, PLAYER_DISPLAY_NAME_PLACEHOLDER } from '../../core/formLabels';
@@ -113,6 +121,10 @@ const HesbahGame = forwardRef(function HesbahGame(
 ) {
   void onGameEnd;
   const [joinPin, setJoinPin] = useState('');
+  const [hostRejoinCode, setHostRejoinCode] = useState('');
+  const [hostRejoinPin, setHostRejoinPin] = useState('');
+  const [hostRejoinErr, setHostRejoinErr] = useState('');
+  const [hostRejoinLoading, setHostRejoinLoading] = useState(false);
   const [authUid, setAuthUid] = useState(auth.currentUser?.uid || null);
   const [savedSession, setSavedSession] = useState(() => readSavedHesbah());
   const [sessionGate, setSessionGate] = useState(() => (readSavedHesbah().roomCode ? 'checking' : 'ready'));
@@ -413,6 +425,54 @@ const HesbahGame = forwardRef(function HesbahGame(
     return s.includes('permission');
   };
 
+  const enterAsHesbahAdmin = (code) => {
+    const uid = auth.currentUser?.uid;
+    setRoomCode(code);
+    setRole('admin');
+    setMyId(uid);
+    persistHesbahSession({ roomCode: code, role: 'admin', myId: uid });
+    setGameScreen('lobby');
+  };
+
+  const handleHesbahAdminEntry = async () => {
+    if (!canCreateRoom) {
+      onRequestActivation?.();
+      return;
+    }
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActiveHostRoom('hesbah', auth.currentUser);
+      if (active) {
+        enterAsHesbahAdmin(active.roomCode);
+        notify('✅ عدت لغرفتك النشطة', 'gold');
+        return;
+      }
+    } catch {
+      /* continue */
+    } finally {
+      setSessionGate('ready');
+    }
+    setShowOnboarding('admin');
+  };
+
+  const handleHesbahPlayerEntry = async () => {
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActivePlayerRoom('hesbah');
+      if (active?.local?.role === 'player' && active.local.roomCode) {
+        await reconnectToSavedRoom();
+        return;
+      }
+    } catch {
+      /* continue */
+    } finally {
+      setSessionGate('ready');
+    }
+    setShowOnboarding('player');
+  };
+
   const createRoom = async ({ source, pool, totalQ, bankMeta = null }) => {
     if (!canCreateRoom) {
       onRequestActivation?.();
@@ -437,6 +497,13 @@ const HesbahGame = forwardRef(function HesbahGame(
       const hostUid = auth.currentUser?.uid;
       if (!hostUid) {
         notify('لم يكتمل اتصال الحساب بعد. انتظر ثانيتين ثم أعد المحاولة، أو حدّث الصفحة.', 'error');
+        return;
+      }
+
+      const existingHost = await resolveActiveHostRoom('hesbah', auth.currentUser);
+      if (existingHost) {
+        enterAsHesbahAdmin(existingHost.roomCode);
+        notify('✅ لديك غرفة نشطة — عدت إليها', 'gold');
         return;
       }
 
@@ -491,6 +558,9 @@ const HesbahGame = forwardRef(function HesbahGame(
       setMyId(adminPid);
       persistHesbahSession({ roomCode: code, role: 'admin', myId: adminPid });
       setGameScreen('lobby');
+      if (isArenaRegisteredUser(auth.currentUser)) {
+        void setHostActiveRoom(hostUid, 'hesbah', code);
+      }
       notify(`✅ الغرفة: ${code}`, 'gold');
       if (source !== QSOURCE.EXTERNAL && poolSize < totalQ) {
         notify(
@@ -513,11 +583,77 @@ const HesbahGame = forwardRef(function HesbahGame(
     }
   };
 
+  const rejoinAsHesbahHost = async () => {
+    if (hostRejoinLoading) return;
+    setHostRejoinErr('');
+    const code = hostRejoinCode.trim();
+    if (code.length !== ROOM_CODE_LEN) {
+      setHostRejoinErr(roomCodeValidationMessage());
+      return;
+    }
+    setHostRejoinLoading(true);
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const snap = await get(dbRef(db, `srooms/${code}`));
+      if (!snap.exists()) {
+        setHostRejoinErr('الغرفة غير موجودة');
+        return;
+      }
+      const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setHostRejoinErr(subGuard.message);
+        return;
+      }
+      const phase = data.game?.phase || 'lobby';
+      if (phase === 'ended') {
+        setHostRejoinErr('انتهت المسابقة');
+        return;
+      }
+      const uid = auth.currentUser?.uid;
+      if (uid && data.adminId === uid) {
+        setRoomCode(code);
+        setRole('admin');
+        setMyId(uid);
+        persistHesbahSession({ roomCode: code, role: 'admin', myId: uid });
+        setGameScreen('lobby');
+        notify('✅ دخلت كمشرف', 'gold');
+        return;
+      }
+      let hasLocalAdminSession = false;
+      try {
+        const saved = readSavedHesbah();
+        hasLocalAdminSession = saved.roomCode === code && saved.role === 'admin';
+      } catch {
+        hasLocalAdminSession = false;
+      }
+      const access = await verifyHostRejoinAccess(data, code, {
+        uid,
+        hostPin: hostRejoinPin,
+        hasLocalAdminSession,
+      });
+      if (access.ok) {
+        setRoomCode(code);
+        setRole('admin');
+        setMyId(uid || data.adminId);
+        persistHesbahSession({ roomCode: code, role: 'admin', myId: uid || data.adminId });
+        setGameScreen('lobby');
+        notify('✅ دخلت كمشرف', 'gold');
+        return;
+      }
+      setHostRejoinErr(access.reason || 'تعذّر الدخول كمشرف');
+    } catch {
+      setHostRejoinErr('خطأ في الاتصال');
+    } finally {
+      setHostRejoinLoading(false);
+    }
+  };
+
   const joinRoom = async () => {
-    const code = joinInput.replace(/\D/g, '').slice(0, 4);
+    const code = normalizeRoomCodeInput(joinInput);
     const name = joinName.trim();
-    if (code.length !== 4) {
-      setJoinErr('رمز الغرفة 4 أرقام');
+    if (code.length !== ROOM_CODE_LEN) {
+      setJoinErr(roomCodeValidationMessage());
       return;
     }
     setJoinLoading(true);
@@ -1242,6 +1378,9 @@ const HesbahGame = forwardRef(function HesbahGame(
         ...(started ? {} : { closedFromLobby: true }),
       });
       clearHesbahSession();
+      if (auth.currentUser?.uid) {
+        void clearHostActiveRoom(auth.currentUser.uid, 'hesbah');
+      }
       notify(
         started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
         'info'
@@ -1444,16 +1583,11 @@ const HesbahGame = forwardRef(function HesbahGame(
               لديك جلسة نشطة في: {formatOtherSessionsHint(getOtherActiveSessions('hesbah'))}
             </div>
           )}
-          {savedSession.roomCode && !roomCode && (
-            <button type="button" className="btn bo" onClick={() => void reconnectToSavedRoom()}>
-              🔙 العودة للغرفة ({savedSession.roomCode})
-            </button>
-          )}
           <div className="card" style={{ marginTop: 8 }}>
-            <button type="button" className="btn bg" onClick={() => (canCreateRoom ? setShowOnboarding('admin') : onRequestActivation?.())}>
+            <button type="button" className="btn bg" onClick={() => void handleHesbahAdminEntry()}>
               👑 إنشاء غرفة
             </button>
-            <button type="button" className="btn bo mt2" onClick={() => setShowOnboarding('player')}>
+            <button type="button" className="btn bo mt2" onClick={() => void handleHesbahPlayerEntry()}>
               🎮 انضمام برمز الغرفة
             </button>
             <button type="button" className="btn bgh mt2 game-guide-open-btn" onClick={() => setShowGuide(true)}>
@@ -1491,10 +1625,10 @@ const HesbahGame = forwardRef(function HesbahGame(
             <label className="lbl">رمز الغرفة</label>
             <input
               className="inp big"
-              maxLength={4}
+              maxLength={ROOM_CODE_LEN}
               placeholder={ROOM_CODE_PLACEHOLDER}
               value={joinInput}
-              onChange={(e) => { setJoinInput(e.target.value.replace(/\D/g, '')); setJoinErr(''); }}
+              onChange={(e) => { setJoinInput(normalizeRoomCodeInput(e.target.value)); setJoinErr(''); }}
             />
             <label className="lbl">اسمك</label>
             <input className="inp" placeholder={PLAYER_DISPLAY_NAME_PLACEHOLDER} value={joinName} onChange={(e) => setJoinName(e.target.value)} />
@@ -1509,8 +1643,19 @@ const HesbahGame = forwardRef(function HesbahGame(
             )}
             {joinErr && <div className="err-msg">{joinErr}</div>}
             <button type="button" className="btn bg mt2" disabled={joinLoading} onClick={() => void joinRoom()}>
-              {joinLoading ? '⏳' : '🚀 انضمام'}
+              {joinLoading ? '⏳' : '🚀 انضمام كمتسابق'}
             </button>
+            <HostRejoinPanel
+              code={hostRejoinCode}
+              onCodeChange={setHostRejoinCode}
+              hostPin={hostRejoinPin}
+              onHostPinChange={setHostRejoinPin}
+              loading={hostRejoinLoading}
+              error={hostRejoinErr}
+              onRejoin={rejoinAsHesbahHost}
+              isLoggedIn={!!authUid}
+              onRegister={() => setTab?.('account')}
+            />
             <button type="button" className="btn bgh mt2" onClick={() => setShowGuide(true)}>
               📖 كيف تلعب؟
             </button>
@@ -1545,6 +1690,15 @@ const HesbahGame = forwardRef(function HesbahGame(
           onShare={shareRoomInvite}
           onExitRequest={openExitSheet}
           onOpenGuide={() => setShowGuide(true)}
+          notify={notify}
+          gamePhase={game?.phase}
+          hasHostPin={!!game?.hostPinHash}
+          onSaveHostPin={async (hostPinHash) => {
+            await update(dbRef(db, `srooms/${roomCode}/game`), { hostPinHash });
+          }}
+          isLoggedIn={!!authUid}
+          isRegisteredEmail={isArenaRegisteredUser(auth.currentUser)}
+          onRegister={() => setTab?.('account')}
         />
         </>
       );

@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
-import { EmailAuthProvider, linkWithCredential, updateProfile } from 'firebase/auth';
+import { updateProfile, EmailAuthProvider, linkWithCredential, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { ensurePlayerProfile, saveCodePhone, normalizeWhatsappPhone } from '../../firebaseHelpers';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
+import { validateRegisterPassword } from '../../core/authRateLimit';
 
 const SIGNUP_PERKS = [
   { icon: '🔐', text: 'ارجع للعبة بدون كود — اشتراكك محفوظ في حسابك' },
@@ -66,8 +67,9 @@ export default function CodeActivationSignup({
         setError('رقم الجوال مطلوب — مثال: 05xxxxxxxx');
         return;
       }
-      if (!password || password.length < 6) {
-        setError('كلمة المرور مطلوبة (6 أحرف على الأقل)');
+      const passErr = validateRegisterPassword(password);
+      if (passErr) {
+        setError(passErr);
         return;
       }
 
@@ -89,6 +91,12 @@ export default function CodeActivationSignup({
         });
         if (codeId) {
           await saveCodePhone(codeId, phone);
+        }
+        try {
+          await sendEmailVerification(user);
+          notify?.('✉️ أرسلنا رابط تأكيد لبريدك', 'info');
+        } catch {
+          /* optional */
         }
         notify?.(`✅ تم التسجيل — +${ARENA_WELCOME_BONUS} نقطة ترحيب`, 'success');
         finish();
@@ -153,9 +161,6 @@ export default function CodeActivationSignup({
               disabled={loading}
               required
             />
-            <p className="code-act-phone-hint">
-              📱 لتذكيرك قبل انتهاء الاشتراك وبناء قاعدة عملائك
-            </p>
           </div>
 
           <div className="ig" style={{ marginTop: 10 }}>
@@ -199,7 +204,7 @@ export default function CodeActivationSignup({
               }}
               disabled={loading}
               required
-              minLength={6}
+              minLength={8}
             />
           </div>
 

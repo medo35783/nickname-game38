@@ -4,8 +4,15 @@ import { auth } from '../../firebase';
 import { db, ref, set, get, update, onValue, off, push, remove, roomRef, playersRef, attacksRef, gameRef } from '../../core/firebaseHelpers';
 import { recordRoundCompleted, recordSessionEnd, buildGameSessionTracking } from '../../core/sessionStats';
 import { tryReclaimStaleRoom, assertRoomSubscriptionForPlay, hostMustBindSubscription, readHostSubscriptionMeta } from '../../core/roomLifecycle';
-import { fetchArenaFieldsForJoin } from '../../core/arenaProfile';
+import { fetchArenaFieldsForJoin, isArenaRegisteredUser } from '../../core/arenaProfile';
+import { resolveActiveHostRoom, resolveActivePlayerRoom, setHostActiveRoom, clearHostActiveRoom } from '../../core/hostActiveRoom';
 import { genCode, fmtMs, shuffle, mkInitials } from '../../core/helpers';
+import {
+  ROOM_CODE_LEN,
+  isValidRoomCode,
+  roomCodeValidationMessage,
+} from '../../core/roomCode';
+import { verifyHostRejoinAccess } from '../../core/hostPin';
 import { AV_COLORS } from '../../core/constants';
 import Av from '../../shared/Av';
 import TitlesSetup from './TitlesSetup';
@@ -128,16 +135,57 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     notify('✅ تم الرجوع للعبة!', 'success');
   };
 
-  const handleAdminEntry = () => {
+  const handleAdminEntry = async () => {
     if (!canCreateRoom) {
       pendingOnboardingRef.current = 'admin';
       onRequestActivation();
       return;
     }
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActiveHostRoom('titles', auth.currentUser);
+      if (active) {
+        applyTitlesAdminEntry(active.roomCode, active.data?.game?.phase || 'lobby');
+        notify('✅ عدت لغرفتك النشطة', 'gold');
+        return;
+      }
+    } catch {
+      /* continue to onboarding */
+    } finally {
+      setSessionGate('ready');
+    }
     setShowOnboarding('admin');
   };
 
-  const handlePlayerEntry = () => {
+  const handlePlayerEntry = async () => {
+    setSessionGate('checking');
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const active = await resolveActivePlayerRoom('titles');
+      if (active) {
+        const ps = active.local;
+        const seatId = ps.playerId || ps.myId;
+        const seat = seatId ? active.data?.players?.[seatId] : null;
+        const uid = auth.currentUser?.uid;
+        if (
+          seat &&
+          (seat.sessionToken === ps.sessionToken || (uid && seat.ownerUid === uid))
+        ) {
+          await finalizeTitlesPlayerRejoin(
+            active.roomCode,
+            seatId,
+            seat,
+            active.data?.game?.phase || 'lobby'
+          );
+          return;
+        }
+      }
+    } catch {
+      /* continue */
+    } finally {
+      setSessionGate('ready');
+    }
     setShowOnboarding('player');
   };
 
@@ -152,6 +200,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [joinNick, setJoinNick] = useState('');
   const [joinNick2, setJoinNick2] = useState('');
   const [joinPin, setJoinPin] = useState('');
+  const [hostRejoinCode, setHostRejoinCode] = useState('');
+  const [hostRejoinPin, setHostRejoinPin] = useState('');
+  const [hostRejoinErr, setHostRejoinErr] = useState('');
+  const [hostRejoinLoading, setHostRejoinLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinPreviewNickMode, setJoinPreviewNickMode] = useState(1);
   const [joinPreviewLoading, setJoinPreviewLoading] = useState(false);
@@ -439,6 +491,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       });
       localStorage.removeItem('ng_session');
       localStorage.removeItem('ng_admin_session');
+      if (auth.currentUser?.uid) {
+        void clearHostActiveRoom(auth.currentUser.uid, 'titles');
+      }
       notify(
         started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
         'info'
@@ -515,7 +570,16 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
   };
 
-  /* ══ ADMIN: CREATE ROOM ══ */
+  const applyTitlesAdminEntry = (code, gamePhase) => {
+    localStorage.removeItem('ng_session');
+    localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: code }));
+    setRoomCode(code);
+    setRole('admin');
+    setMyId(null);
+    setMyNickLocal('');
+    applyTitlesAdminScreens(gamePhase);
+  };
+
   const createRoom = async () => {
     if (!canCreateRoom) {
       notify(
@@ -530,9 +594,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       onRequestActivation();
       return;
     }
-    // Clear any old session so players aren't stuck in old room
+    // Clear player session only when opening a genuinely new host room
     localStorage.removeItem('ng_session');
-    localStorage.removeItem('ng_admin_session');
     try {
       if (typeof auth.authStateReady === 'function') await auth.authStateReady();
     } catch {
@@ -544,6 +607,15 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       setRoomCode('');
       return;
     }
+
+    const existingHost = await resolveActiveHostRoom('titles', auth.currentUser);
+    if (existingHost) {
+      applyTitlesAdminEntry(existingHost.roomCode, existingHost.data?.game?.phase || 'lobby');
+      notify('✅ لديك غرفة نشطة — عدت إليها', 'gold');
+      return;
+    }
+
+    localStorage.removeItem('ng_admin_session');
 
     const isPermissionErr = (err) => {
       const s = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
@@ -615,6 +687,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     setRoomCode(savedCode);
     setRole('admin');
     setGameScreen('host');
+    if (isArenaRegisteredUser(auth.currentUser)) {
+      void setHostActiveRoom(hostUid, 'titles', savedCode);
+    }
     notify(`✅ الغرفة جاهزة: ${savedCode}`, 'gold');
   };
 
@@ -649,10 +724,83 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     else setGameScreen('host');
   };
 
+  const rejoinAsHost = async () => {
+    if (hostRejoinLoading) return;
+    setHostRejoinErr('');
+    const code = hostRejoinCode.trim();
+    if (code.length !== ROOM_CODE_LEN) {
+      setHostRejoinErr(roomCodeValidationMessage());
+      return;
+    }
+
+    setHostRejoinLoading(true);
+    try {
+      if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const snap = await get(roomRef(code));
+      if (!snap.exists()) {
+        setHostRejoinErr('الغرفة غير موجودة');
+        return;
+      }
+      const data = snap.val();
+      const subGuard = assertRoomSubscriptionForPlay(data);
+      if (!subGuard.ok) {
+        setHostRejoinErr(subGuard.message);
+        return;
+      }
+      const gamePhase = data.game?.phase || 'lobby';
+      if (gamePhase === 'ended') {
+        setHostRejoinErr('انتهت هذه اللعبة');
+        return;
+      }
+
+      const hostUid = auth.currentUser?.uid;
+      if (hostUid && data.adminId === hostUid) {
+        applyTitlesAdminEntry(code, gamePhase);
+        notify('✅ تم الدخول كمشرف — صاحب الغرفة', 'gold');
+        return;
+      }
+
+      let hasLocalAdminSession = false;
+      try {
+        const adminRaw = localStorage.getItem('ng_admin_session');
+        if (adminRaw) {
+          const adminSess = JSON.parse(adminRaw);
+          hasLocalAdminSession = adminSess?.roomCode === code;
+        }
+      } catch {
+        hasLocalAdminSession = false;
+      }
+
+      const access = await verifyHostRejoinAccess(data, code, {
+        uid: hostUid,
+        hostPin: hostRejoinPin,
+        hasLocalAdminSession,
+      });
+
+      if (access.ok) {
+        applyTitlesAdminEntry(code, gamePhase);
+        notify('✅ تم الدخول كمشرف — لوحة التحكم جاهزة', 'gold');
+        return;
+      }
+
+      if (access.reason === 'not_host' && hasLocalAdminSession && !data.game?.hostPinHash && !data.adminId) {
+        applyTitlesAdminEntry(code, gamePhase);
+        notify('✅ تم الدخول كمشرف — لوحة التحكم جاهزة', 'gold');
+        return;
+      }
+
+      setHostRejoinErr(access.reason || 'تعذّر الدخول كمشرف — تحقق من الرمز والرقم السري');
+    } catch {
+      setHostRejoinErr('خطأ في الاتصال');
+    } finally {
+      setHostRejoinLoading(false);
+    }
+  };
+
   const joinRoom = async () => {
     if(joinLoading) return; // منع الضغط المزدوج
     setJoinErr('');
-    if(joinInput.length!==4){setJoinErr('الرمز 4 أرقام');return;}
+    if(joinInput.length !== ROOM_CODE_LEN){setJoinErr(roomCodeValidationMessage());return;}
 
     setJoinLoading(true);
     try {
@@ -675,39 +823,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         localStorage.removeItem('ng_admin_session');
         localStorage.removeItem('ng_session');
         return;
-      }
-
-      /** صاحب الغرفة (مطابق مع قواعد RTDB لـ rooms.adminId) */
-      if (hostUid && data.adminId === hostUid) {
-        localStorage.removeItem('ng_session');
-        localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode: joinInput }));
-        setRoomCode(joinInput);
-        setRole('admin');
-        setMyId(null);
-        setMyNickLocal('');
-        applyTitlesAdminScreens(gamePhase);
-        notify('✅ تم الدخول كمشرف — صاحب الغرفة', 'gold');
-        return;
-      }
-
-      /** غرف قديمة بلا adminId: اعتماد جلسة الجهاز فقط */
-      const adminRaw = localStorage.getItem('ng_admin_session');
-      if (adminRaw) {
-        try {
-          const adminSess = JSON.parse(adminRaw);
-          if (adminSess?.roomCode === joinInput) {
-            localStorage.removeItem('ng_session');
-            setRoomCode(joinInput);
-            setRole('admin');
-            setMyId(null);
-            setMyNickLocal('');
-            applyTitlesAdminScreens(gamePhase);
-            notify('✅ تم الدخول كمشرف — لوحة التحكم جاهزة', 'gold');
-            return;
-          }
-        } catch {
-          /* نكمل كمسار لاعب */
-        }
       }
 
       const existingPlayers = Object.entries(data.players||{});
@@ -1736,9 +1851,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   }, []);
 
   useEffect(() => {
-    if (gameScreen !== 'join' || joinInput.length !== 4) {
+    if (gameScreen !== 'join' || joinInput.length !== ROOM_CODE_LEN) {
       setJoinPreviewLoading(false);
-      if (joinInput.length < 4) {
+      if (joinInput.length < ROOM_CODE_LEN) {
         setJoinPreviewNickMode(1);
       }
       return undefined;
@@ -2583,11 +2698,6 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
               لديك جلسة نشطة في: {formatOtherSessionsHint(getOtherActiveSessions('titles'))}
             </div>
           )}
-          {getSavedRoomForGame('titles') && !roomCode && (
-            <button type="button" className="btn bo" style={{ marginBottom: 8 }} onClick={() => void reconnectToSavedRoom()}>
-              🔙 العودة للغرفة ({getSavedRoomForGame('titles').roomCode})
-            </button>
-          )}
           <div style={{ textAlign: 'center', padding: '10px 0 12px' }}>
             <div style={{ fontSize: 46, marginBottom: 6 }}>🎭</div>
             <div className="ptitle" style={{ fontSize: 22 }}>
@@ -2596,10 +2706,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             <div className="psub">أخفِ هويتك • الكل يهاجم معاً • اكشف الهويات</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button type="button" className="btn bg" onClick={handleAdminEntry}>
+            <button type="button" className="btn bg" onClick={() => void handleAdminEntry()}>
               👑 أنا مشرف — إنشاء غرفة
             </button>
-            <button type="button" className="btn bo" onClick={handlePlayerEntry}>
+            <button type="button" className="btn bo" onClick={() => void handlePlayerEntry()}>
               🎮 انضمام برمز الغرفة
             </button>
           </div>
@@ -2628,7 +2738,15 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           setJoinNick2={setJoinNick2}
           joinPin={joinPin}
           setJoinPin={setJoinPin}
+          hostRejoinCode={hostRejoinCode}
+          setHostRejoinCode={setHostRejoinCode}
+          hostRejoinPin={hostRejoinPin}
+          setHostRejoinPin={setHostRejoinPin}
+          hostRejoinErr={hostRejoinErr}
+          hostRejoinLoading={hostRejoinLoading}
+          onRejoinAsHost={rejoinAsHost}
           isLoggedIn={!!authUid}
+          onRegister={() => setTab?.('account')}
           joinLoading={joinLoading}
           joinRoomNickMode={joinPreviewNickMode}
           joinRoomModeLoading={joinPreviewLoading}
@@ -2753,6 +2871,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             notify={notify}
             myId={myId}
             onOpenGuide={() => setModal({ type: 'guide' })}
+            onSaveHostPin={async (hostPinHash) => {
+              await update(gameRef(roomCode), { hostPinHash });
+            }}
+            isLoggedIn={!!authUid}
+            isRegisteredEmail={isArenaRegisteredUser(auth.currentUser)}
+            onRegister={() => setTab?.('account')}
           />
         </div>
       );

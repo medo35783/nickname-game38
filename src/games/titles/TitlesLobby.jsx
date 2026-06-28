@@ -14,6 +14,7 @@ import { isDecoyRequired } from './titlesRevealHelpers';
 import WhatsAppLogoIcon from '../../components/icons/WhatsAppLogoIcon';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 import { shareRoomInviteMessage } from '../../shared/roomInviteShare';
+import HostSessionReminder from '../../shared/HostSessionReminder';
 
 export default function TitlesLobby(props) {
   const {
@@ -39,6 +40,10 @@ export default function TitlesLobby(props) {
     setForm,
     onAddManualPlayer,
     onOpenGuide,
+    onSaveHostPin,
+    isLoggedIn,
+    isRegisteredEmail,
+    onRegister,
   } = props;
 
   const [decoyInput, setDecoyInput] = useState('');
@@ -204,6 +209,18 @@ export default function TitlesLobby(props) {
           مشاركة رمز الغرفة عبر <WhatsAppLogoIcon />
         </button>
       </div>
+
+      <HostSessionReminder
+        gameId="titles"
+        roomCode={roomCode}
+        phase={gameState?.phase || 'lobby'}
+        isLoggedIn={!!isLoggedIn}
+        isRegisteredEmail={!!isRegisteredEmail}
+        hasHostPin={!!gameState?.hostPinHash}
+        onSavePin={onSaveHostPin}
+        onRegister={onRegister}
+        notify={notify}
+      />
 
       {isAdmin && (
         <div className="card">

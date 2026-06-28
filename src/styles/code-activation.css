@@ -1,10 +1,3 @@
-.code-act-phone-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
 .code-activation-scr .ptitle {
   background: linear-gradient(135deg, var(--brand-blue), var(--brand-orange));
   -webkit-background-clip: text;
@@ -115,6 +108,65 @@
   border-radius: 10px;
   background: rgba(36, 143, 85, 0.1);
   border: 1px solid rgba(36, 143, 85, 0.25);
+}
+
+.player-access-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.player-access-tabs .auth-mode-btn {
+  flex: 1;
+  font-size: 10px;
+  padding: 8px 4px;
+  line-height: 1.35;
+}
+
+.player-access-panel__body {
+  background: var(--card2);
+  border: 1px solid var(--border-faint);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.player-access-form {
+  text-align: right;
+}
+
+.player-access-card .player-access-panel {
+  margin: 0;
+}
+
+.player-access-perks {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-faint);
+}
+
+.player-access-perks__title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.player-access-code-done {
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
+.player-access-code-done__icon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.player-access-code-done__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
 }
 
 .packages-scr .pkg-code-row--top {

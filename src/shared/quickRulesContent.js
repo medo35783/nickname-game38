@@ -2,7 +2,7 @@ import { fameeriWeaponHuntChips, fameeriWeaponStockChips } from './fameeriWeapon
 
 /** قوانين سريعة موحّدة — تُعرض في شاشة الدخول لكل لعبة */
 export const FAMEERI_QUICK_RULES = [
-  { icon: '🔢', text: 'رمز الغرفة 4 أرقام من المشرف' },
+  { icon: '🔢', text: 'رمز الغرفة 6 أرقام من المشرف' },
   { icon: '🦅', text: '100 قميري لكل مجموعة توزّع على 11 شجرة' },
   {
     icon: '⚔️',

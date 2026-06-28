@@ -10,47 +10,7 @@ import GameTopNav from '../../shared/GameTopNav';
 import CodeActivationSignup from './CodeActivationSignup';
 import '../../styles/code-activation.css';
 
-/** بصمة جهاز بسيطة: userAgent + أبعاد الشاشة → base64 (آمن لمسار RTDB) */
-function buildDeviceInfo() {
-  const raw = `${navigator.userAgent}${screen.width}${screen.height}`;
-  let encoded;
-  try {
-    encoded = btoa(raw);
-  } catch {
-    encoded = btoa(raw.replace(/[^\x00-\x7F]/g, '_'));
-  }
-  const fingerprint = encoded.replace(/[.#$\[\]/]/g, '_');
-  return {
-    fingerprint,
-    userAgent: navigator.userAgent,
-    width: screen.width,
-    height: screen.height,
-  };
-}
-
-function mapActivationError(message) {
-  const m = (message || '').trim();
-  if (m.includes('الكود غير صحيح') || m.includes('الكود غير موجود')) {
-    return 'الكود غير صحيح';
-  }
-  if (m.includes('منتهي')) {
-    return 'الكود منتهي الصلاحية';
-  }
-  if (m.includes('الحد الأقصى للأجهزة') || m.includes('تجاوز')) {
-    return 'تم تجاوز الحد الأقصى للأجهزة (2)';
-  }
-  if (m.includes('مُفعّل على حساب آخر')) {
-    return 'الكود مُفعّل على جهاز/حساب آخر';
-  }
-  if (m.includes('صلاحية التفعيل')) {
-    return m;
-  }
-  if (m.includes('تسجيل الدخول')) {
-    return 'جاري الاتصال… أعد المحاولة بعد ثوانٍ';
-  }
-  return 'حدث خطأ، يرجى المحاولة مرة أخرى';
-}
-
+import { buildDeviceInfo, mapActivationError } from '../auth/playerAccessHelpers';
 /**
  * شاشة تفعيل كود الاشتراك — الخطوة الأولى قبل التسجيل أو الدخول.
  */

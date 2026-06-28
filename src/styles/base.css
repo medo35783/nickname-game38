@@ -117,7 +117,7 @@ body{
 @keyframes tw{from{opacity:.04}to{opacity:.5}}
 :root{--app-bnav-h:calc(70px + var(--app-safe-bottom));--app-verdict-dock-h:52px}
 .bnav{position:fixed;bottom:0;left:0;right:0;z-index:80;background:var(--nav-bg);backdrop-filter:blur(16px);border-top:1px solid var(--border);display:flex;align-items:stretch;height:var(--app-bnav-h);padding-bottom:var(--app-safe-bottom);max-width:720px;margin:0 auto;box-sizing:border-box}
-.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;cursor:pointer;transition:all .18s;border:none;background:transparent;padding:5px 2px 4px;color:var(--muted);font-family:'Tajawal',sans-serif;}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:all .18s;border:none;background:transparent;padding:4px 2px;color:var(--muted);font-family:'Tajawal',sans-serif;}
 .bnav-item.active{color:var(--muted)}
 .bnav-item.active[data-nav="game"] .bnav-label{background:linear-gradient(135deg,var(--brand-burgundy-hi) 0%,var(--brand-green) 42%,var(--brand-blue) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;font-weight:800}
 .bnav-item.active[data-nav="voice"]{color:var(--purple)}
@@ -126,7 +126,7 @@ body{
 .bnav-item.active[data-nav="pricing"] .bnav-label{font-weight:800}
 .bnav-item.active[data-nav="codes"]{color:var(--green)}
 .bnav-item.active[data-nav="codes"] .bnav-label{font-weight:800}
-.bnav-icon{font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;min-height:46px;width:100%;overflow:visible}
+.bnav-icon{font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;min-height:40px;width:100%;overflow:visible}
 .bnav-label{font-size:9.5px;font-weight:700;line-height:1.1;padding-bottom:1px}
 .bnav-dot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;animation:pls 2s infinite}
 @keyframes pls{0%,100%{opacity:1}50%{opacity:.4}}
@@ -191,10 +191,10 @@ body{
 [data-theme="dark"] .la3ibz-icon-img{filter:drop-shadow(0 2px 8px rgba(0,0,0,.32)) drop-shadow(0 0 12px rgba(120,180,240,.08))}
 .la3ibz-icon-img--sm{width:24px;height:24px}
 .la3ibz-icon-img--md{width:26px;height:26px}
-.la3ibz-icon-img--nav{width:50px;height:50px;flex-shrink:0;max-width:none;max-height:none}
-.bnav-icon .la3ibz-icon-img{width:50px;height:50px;flex-shrink:0;max-width:none;max-height:none}
+.la3ibz-icon-img--nav{width:40px;height:40px;flex-shrink:0;max-width:none;max-height:none;object-fit:contain}
+.bnav-icon .la3ibz-icon-img{width:40px;height:40px;flex-shrink:0;max-width:none;max-height:none;object-fit:contain}
 .bnav-item.active .la3ibz-icon-img{filter:drop-shadow(0 2px 8px rgba(37,111,168,.32))}
-@media(max-width:390px){.la3ibz-brand__logo-vertical{width:min(280px,90vw)}.la3ibz-brand__logo-header{width:min(228px,calc(100vw - 100px));max-height:44px}.la3ibz-brand__slogan{font-size:13px}.bnav-icon .la3ibz-icon-img{width:46px;height:46px}.la3ibz-icon-img--nav{width:46px;height:46px}}
+@media(max-width:390px){.la3ibz-brand__logo-vertical{width:min(280px,90vw)}.la3ibz-brand__logo-header{width:min(228px,calc(100vw - 100px));max-height:44px}.la3ibz-brand__slogan{font-size:13px}.bnav-icon .la3ibz-icon-img{width:36px;height:36px}.la3ibz-icon-img--nav{width:36px;height:36px}}
 .main{position:relative;z-index:5;flex:1;padding:14px;max-width:580px;margin:0 auto;width:100%}
 @media(max-width:390px){.main{padding:10px}.bgrid{grid-template-columns:repeat(2,1fr)!important}.sg4{grid-template-columns:1fr 1fr!important}}
 @media(min-width:768px){.main{max-width:640px;padding:20px}.card{padding:18px}.bgrid{grid-template-columns:repeat(4,1fr)!important}}
@@ -3711,3 +3711,131 @@ button.player-q-view__opt{cursor:pointer}
 .player-q-view__hint--ok{color:var(--green);font-weight:800}
 .player-q-view__sent{color:var(--green);font-size:11px}
 .player-q-view__draft{color:var(--gold);font-size:11px}
+
+/* ── تنبيه جلسة المشرف + عودة المشرف (الألعاب) ── */
+@keyframes hostSessionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.host-session-toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top, 12px));
+  right: max(12px, env(safe-area-inset-right, 12px));
+  left: max(12px, env(safe-area-inset-left, 12px));
+  z-index: 1100;
+  max-width: 420px;
+  margin-left: auto;
+  padding: 14px 36px 14px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(201, 127, 26, 0.14), rgba(139, 38, 53, 0.1));
+  border: 1px solid rgba(201, 127, 26, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  animation: hostSessionSlideIn 0.45s ease-out;
+}
+
+.host-session-toast__close {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.host-session-toast__title {
+  font-weight: 900;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.host-session-toast__text {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.host-session-toast__code {
+  font-family: monospace;
+  letter-spacing: 2px;
+  color: var(--gold);
+  font-size: 15px;
+}
+
+.host-session-toast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.host-rejoin-panel {
+  margin-top: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-faint);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.host-rejoin-panel__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border: none;
+  background: rgba(201, 127, 26, 0.06);
+  color: var(--gold);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: right;
+}
+
+.host-rejoin-panel__toggle--open {
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.host-rejoin-panel__chev {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.host-rejoin-panel__body {
+  padding: 14px;
+}
+
+.host-rejoin-panel__lead {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.host-rejoin-panel__hint {
+  margin: 0 0 12px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.host-rejoin-panel__link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--gold);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}

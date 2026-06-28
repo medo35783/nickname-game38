@@ -1,6 +1,13 @@
 import { ref, set, get, update, onValue, off, push, remove } from "firebase/database";
-import { db } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from './firebase';
 import { buildActiveCodeSponsorPayload } from './sponsorStatsHelpers';
+import { USE_CLOUD_ACTIVATION } from './securityMode';
+import {
+  assertCodeActivationAllowed,
+  clearCodeActivationAttempts,
+  recordCodeActivationFailure,
+} from './codeActivationRateLimit';
 
 // ── لعبة الألقاب ──
 export const roomRef    = code => ref(db, `rooms/${code}`);
@@ -148,15 +155,65 @@ export async function ensureCodeIndexesFromRows(rows) {
   }
 }
 
+function mapCallableActivationError(err) {
+  const code = String(err?.code || '');
+  const msg = String(err?.message || '').trim();
+
+  if (code.includes('resource-exhausted')) {
+    return msg || 'محاولات كثيرة — انتظر قليلاً';
+  }
+  if (code.includes('permission-denied')) {
+    return msg || 'الكود مُفعّل على حساب آخر';
+  }
+  if (code.includes('failed-precondition')) {
+    return msg || 'الكود غير متاح للتفعيل';
+  }
+  if (code.includes('not-found') || code.includes('invalid-argument')) {
+    return 'الكود غير صحيح';
+  }
+  if (code.includes('unauthenticated')) {
+    return 'جاري الاتصال… أعد المحاولة بعد ثوانٍ';
+  }
+  if (code.includes('unavailable') || code.includes('internal')) {
+    return msg || 'خدمة التفعيل غير متاحة — حاول لاحقاً';
+  }
+  return msg || 'حدث خطأ، يرجى المحاولة مرة أخرى';
+}
+
 /**
- * تفعيل كود للمستخدم
- * @param {string} code - الكود المراد تفعيله
- * @param {string} userId - معرف المستخدم
- * @param {object} deviceInfo - معلومات الجهاز
- * @param {{ phone?: string }} [options] - رقم واتساب اختياري يُحفظ في codes/{codeId}/phone
- * @returns {Promise<object>} بيانات الكود المُفعّل
+ * تفعيل كود — spark: من المتصفح | blaze: Cloud Function (الدرع السحابي)
  */
 export async function activateCode(code, userId, deviceInfo, options = {}) {
+  if (USE_CLOUD_ACTIVATION) {
+    return activateCodeViaCloud(code, userId, deviceInfo, options);
+  }
+  return activateCodeClient(code, userId, deviceInfo, options);
+}
+
+async function activateCodeViaCloud(code, userId, deviceInfo, options = {}) {
+  if (!userId) {
+    throw new Error('الجلسة غير جاهزة — أعد تحميل الصفحة');
+  }
+  if (!deviceInfo?.fingerprint) {
+    throw new Error('معلومات الجهاز ناقصة');
+  }
+
+  try {
+    const fn = httpsCallable(functions, 'activateSubscriptionCode');
+    const { data } = await fn({
+      code: normalizeSubscriptionCode(code),
+      deviceInfo,
+      phone: options.phone || null,
+    });
+    return data;
+  } catch (error) {
+    console.error('خطأ في تفعيل الكود (cloud):', error);
+    throw new Error(mapCallableActivationError(error));
+  }
+}
+
+async function activateCodeClient(code, userId, deviceInfo, options = {}) {
+  assertCodeActivationAllowed(userId);
   const storedCode = normalizeSubscriptionCode(code);
   if (!/^CODE-[A-Z0-9]{6}$/.test(storedCode)) {
     throw new Error('الكود غير صحيح');
@@ -212,7 +269,7 @@ export async function activateCode(code, userId, deviceInfo, options = {}) {
     const devices = { ...(foundCodeData.devices || {}) };
     const deviceCount = Object.keys(devices).length;
     if (deviceCount >= 2 && !devices[deviceInfo.fingerprint]) {
-      throw new Error('تم تجاوز الحد الأقصى للأجهزة');
+      throw new Error('تم تجاوز الحد الأقصى للأجهزة (2)');
     }
 
     const now = Date.now();
@@ -278,6 +335,8 @@ export async function activateCode(code, userId, deviceInfo, options = {}) {
 
     await update(ref(db), updates);
 
+    clearCodeActivationAttempts(userId);
+
     return {
       ...foundCodeData,
       id: foundCodeId,
@@ -293,7 +352,16 @@ export async function activateCode(code, userId, deviceInfo, options = {}) {
   } catch (error) {
     console.error('خطأ في تفعيل الكود:', error);
     if (error?.code === 'PERMISSION_DENIED') {
-      throw new Error('صلاحية التفعيل مرفوضة — انشر قواعد firebase-database-rules.json من Firebase Console');
+      throw new Error('صلاحية التفعيل مرفوضة — انشر قواعد firebase-database-rules.json');
+    }
+    const msg = error?.message || '';
+    if (
+      userId &&
+      !msg.includes('محاولات كثيرة') &&
+      !msg.includes('الجلسة غير جاهزة') &&
+      !msg.includes('معلومات الجهاز')
+    ) {
+      await recordCodeActivationFailure(userId, msg);
     }
     throw error;
   }

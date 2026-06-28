@@ -7,6 +7,7 @@ import HesbahRoomMeta from './HesbahRoomMeta';
 import HesbahTimerPicker from './HesbahTimerPicker';
 import HesbahTopNav from './HesbahTopNav';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
+import HostSessionReminder from '../../shared/HostSessionReminder';
 
 const START_MODE_COPY = {
   participate: {
@@ -36,6 +37,13 @@ export default function HesbahLobby({
   onShare,
   onExitRequest,
   onOpenGuide,
+  notify,
+  onSaveHostPin,
+  isLoggedIn,
+  isRegisteredEmail,
+  onRegister,
+  gamePhase,
+  hasHostPin,
 }) {
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const list = Object.entries(players || {})
@@ -72,6 +80,20 @@ export default function HesbahLobby({
           </button>
         </div>
       </div>
+
+      {isAdmin && (
+        <HostSessionReminder
+          gameId="hesbah"
+          roomCode={roomCode}
+          phase={gamePhase || 'lobby'}
+          isLoggedIn={!!isLoggedIn}
+          isRegisteredEmail={!!isRegisteredEmail}
+          hasHostPin={!!hasHostPin}
+          onSavePin={onSaveHostPin}
+          onRegister={onRegister}
+          notify={notify}
+        />
+      )}
 
       {isAdmin && (
         <div className="card">

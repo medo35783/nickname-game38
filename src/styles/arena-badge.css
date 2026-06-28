@@ -813,7 +813,68 @@
   background: rgba(37, 111, 168, 0.08) !important;
   color: var(--brand-blue) !important;
   font-weight: 800;
-  max-width: 168px;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: nowrap !important;
+  flex-shrink: 0;
+  height: auto;
+  min-height: 30px;
+  padding: 4px 7px;
+}
+
+.hdr-account-wrap:has(.hdr-account-btn--guest) {
+  flex-shrink: 0;
+  max-width: none;
+}
+
+.hdr-account-guest {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  line-height: 1.15;
+  gap: 0;
+}
+
+.hdr-account-guest__seg {
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.hdr-account-guest__pipe {
+  font-size: 8px;
+  font-weight: 500;
+  color: rgba(37, 111, 168, 0.45);
+  padding: 0 2px;
+  user-select: none;
+  line-height: 1;
+}
+
+.hdr-account-guest__chev {
+  font-size: 8px;
+  opacity: 0.5;
+  margin-inline-start: 3px;
+  line-height: 1;
+}
+
+.hdr-account-btn--guest:hover .hdr-account-guest__chev {
+  opacity: 0.85;
+}
+
+@media (min-width: 390px) {
+  .hdr-account-guest__seg {
+    font-size: 10px;
+  }
+
+  .hdr-account-guest__pipe {
+    padding: 0 3px;
+  }
+
+  .hdr-account-btn--guest {
+    padding: 5px 9px;
+  }
 }
 
 .hdr-account-btn--arena .hdr-account-pts {

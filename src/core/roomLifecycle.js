@@ -124,7 +124,7 @@ export async function tryReclaimStaleRoom(root, roomCode, roomData) {
   }
 }
 
-/** يبحث عن رمز 4 أرقام — يعيد استخدام رموز الغرف المنتهية فقط */
+/** يبحث عن رمز 6 أرقام — يعيد استخدام رموز الغرف المنتهية فقط */
 export async function allocateFreeRoomCode(root, maxAttempts = 12) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const code = genCode();

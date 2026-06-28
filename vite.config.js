@@ -13,6 +13,9 @@ export default defineConfig({
         'brand/la3ibz-icon-mark.png',
         'brand/la3ibz-icon-mark-dark.png',
         'brand/la3ibz-pwa-192.png',
+        'brand/la3ibz-pwa-512.png',
+        'brand/la3ibz-pwa-maskable-192.png',
+        'brand/la3ibz-pwa-maskable-512.png',
       ],
       manifest: {
         id: PWA_MANIFEST.scope,

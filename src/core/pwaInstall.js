@@ -36,6 +36,44 @@ export function isAndroidDevice() {
   return false;
 }
 
+export function isSamsungInternetBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  return /SamsungBrowser/i.test(navigator.userAgent);
+}
+
+/** نوع رسالة بانر التثبيت — Samsung أولاً ثم iOS ثم Android */
+export function getPwaBannerVariant() {
+  if (isSamsungInternetBrowser()) return 'samsung';
+  if (isIosDevice()) return 'ios';
+  if (isAndroidDevice()) return 'android';
+  return 'other';
+}
+
+export const PWA_BANNER_SESSION_KEY = 'la3ibz-pwa-banner-dismissed';
+export const PWA_INSTALLED_STORAGE_KEY = 'la3ibz-pwa-installed';
+
+export function isPwaInstallBannerDismissed() {
+  if (typeof sessionStorage === 'undefined') return false;
+  return sessionStorage.getItem(PWA_BANNER_SESSION_KEY) === '1';
+}
+
+export function dismissPwaInstallBanner() {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(PWA_BANNER_SESSION_KEY, '1');
+  }
+}
+
+export function isPwaInstalledPersisted() {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(PWA_INSTALLED_STORAGE_KEY) === '1';
+}
+
+export function markPwaInstalledPersisted() {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, '1');
+  }
+}
+
 export function isMobileDevice() {
   if (isIosDevice() || isAndroidDevice()) return true;
   if (typeof window === 'undefined') return false;

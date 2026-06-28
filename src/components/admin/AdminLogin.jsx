@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { adminProfileExistsForUid } from '../../firebaseHelpers';
+import { refreshAdminClaim } from '../../core/adminAuth';
 
 /**
  * شاشة تسجيل دخول Admin (Email/Password + التحقق من وجود UID تحت admins/ أو admin/)
@@ -27,6 +28,8 @@ export default function AdminLogin({ onLoginSuccess, onCancel, notify }) {
         if (!isAdmin) {
           throw new Error('ليس لديك صلاحية Admin');
         }
+
+        await refreshAdminClaim();
 
         localStorage.setItem('pfcc_is_admin', 'true');
         localStorage.setItem('pfcc_admin_uid', uid);

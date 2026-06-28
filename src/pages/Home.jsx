@@ -1,10 +1,8 @@
 ﻿import '../styles/hesbah.css';
 import '../styles/home-game-icons.css';
-import { formatOtherSessionsHint, getAllActiveSessions } from '../shared/gameSessionRegistry';
 import { setLastPlayedGame } from '../question-bank/qbank.helpers';
 import La3ibzBrandMark from '../shared/La3ibzBrandMark';
 import HomeGameIcon from '../shared/HomeGameIcons';
-import PwaInstallCard from '../components/layout/PwaInstallCard';
 import LobbyPromoStrip from '../shared/LobbyPromoStrip';
 
 const GAME_BANK_TYPE = {
@@ -15,20 +13,11 @@ const GAME_BANK_TYPE = {
 
 /** لعيب زون — الألعاب + بوابة صوتك */
 export default function Home({ setSelectedGame, onOpenVoiceSuggest, notify }) {
-  const activeSessions = getAllActiveSessions();
-
   return (
     <div className="scr">
-      {activeSessions.length > 0 && (
-        <div className="game-multi-session-hint" style={{ marginBottom: 14 }}>
-          جلسات نشطة: {formatOtherSessionsHint(activeSessions)} — افتح اللعبة واضغط «العودة للغرفة»
-        </div>
-      )}
       <div className="home-brand-wrap">
         <La3ibzBrandMark variant="hero" />
       </div>
-
-      <PwaInstallCard notify={notify} compact />
 
       <LobbyPromoStrip />
 
