@@ -20,6 +20,12 @@ import QuickOnboarding from '../../components/onboarding/QuickOnboarding';
 import { ROOM_CODE_PLACEHOLDER, PLAYER_DISPLAY_NAME_PLACEHOLDER } from '../../core/formLabels';
 import HesbahSetup from './HesbahSetup';
 import HesbahLobby from './HesbahLobby';
+import HesbahPendingJoinScreen from './HesbahPendingJoinScreen';
+import {
+  approveHesbahJoinRequest,
+  createHesbahJoinRequest,
+  rejectHesbahJoinRequest,
+} from './hesbahJoinRequests';
 import HesbahPlay from './HesbahPlay';
 import HesbahAdminLive from './HesbahAdminLive';
 import HesbahResults from './HesbahResults';
@@ -44,7 +50,6 @@ import { shareRoomInviteMessage } from '../../shared/roomInviteShare';
 import {
   findSeatByOwnerUid,
   findSeatById,
-  findSeatByName,
   isRegistrationLocked,
   isValidPin,
   buildNewSeatSecurity,
@@ -54,12 +59,12 @@ import {
   SEAT_ERRORS,
 } from '../../core/gameSeat';
 import {
+  findActivePlayerByName,
+  findLeftPlayerByName,
   readSavedHesbah,
   persistHesbahSession,
   clearHesbahSession,
   isActiveHesbahPlayer,
-  findActivePlayerByName,
-  findLeftPlayerByName,
   HESBAH_STORAGE_KEY,
   hesbahPlayerPayload,
   sortedHesbahPlayers,
@@ -140,6 +145,9 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [joinLoading, setJoinLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [totalQSetup, setTotalQSetup] = useState(null);
+  const [joinRequests, setJoinRequests] = useState({});
+  const [pendingJoinReqId, setPendingJoinReqId] = useState(null);
+  const [joinRequestBusy, setJoinRequestBusy] = useState(null);
 
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState({});
@@ -336,6 +344,80 @@ const HesbahGame = forwardRef(function HesbahGame(
   }, [roomCode]);
 
   useEffect(() => {
+    if (!roomCode || role !== 'admin') return;
+    const jrRef = dbRef(db, `srooms/${roomCode}/joinRequests`);
+    const onJr = (snap) => setJoinRequests(snap.val() || {});
+    onValue(jrRef, onJr);
+    return () => off(jrRef, 'value', onJr);
+  }, [roomCode, role]);
+
+  useEffect(() => {
+    if (!roomCode || !pendingJoinReqId) return;
+    const reqRef = dbRef(db, `srooms/${roomCode}/joinRequests/${pendingJoinReqId}`);
+    const onReq = async (snap) => {
+      const req = snap.val();
+      if (req?.status === 'rejected') {
+        setPendingJoinReqId(null);
+        persistHesbahSession({
+          pendingJoinReqId: null,
+          pendingJoinTargetId: null,
+          roomCode: '',
+          role: null,
+        });
+        clearHesbahSession();
+        setSavedSession({});
+        setRoomCode('');
+        setRole(null);
+        setGameScreen('join');
+        notify('رفض المشرف طلب العودة', 'error');
+        return;
+      }
+      if (snap.exists()) return;
+      const saved = readSavedHesbah();
+      const targetId = saved.pendingJoinTargetId;
+      if (!targetId) return;
+      try {
+        const pSnap = await get(dbRef(db, `srooms/${roomCode}/players/${targetId}`));
+        const p = pSnap.val();
+        if (!p || (saved.sessionToken && p.sessionToken !== saved.sessionToken)) return;
+        setMyId(targetId);
+        setPendingJoinReqId(null);
+        persistHesbahPlayerSeat(roomCode, targetId, saved.myName || p.name, p.sessionToken);
+        persistHesbahSession({ pendingJoinReqId: null, pendingJoinTargetId: null });
+        setGameScreen('lobby');
+        notify('✅ قبل المشرف — عدت للعبة', 'success');
+      } catch {
+        notify('تعذّر إكمال الدخول', 'error');
+      }
+    };
+    onValue(reqRef, onReq);
+    return () => off(reqRef, 'value', onReq);
+  }, [roomCode, pendingJoinReqId, notify]);
+
+  const handleApproveJoinRequest = async (reqId, req) => {
+    if (!roomCode || joinRequestBusy) return;
+    setJoinRequestBusy(reqId);
+    try {
+      const ok = await approveHesbahJoinRequest(roomCode, reqId, req);
+      if (ok) notify(`✅ قُبل دخول ${req.name}`, 'success');
+      else notify('تعذّر قبول الطلب', 'error');
+    } finally {
+      setJoinRequestBusy(null);
+    }
+  };
+
+  const handleRejectJoinRequest = async (reqId) => {
+    if (!roomCode || joinRequestBusy) return;
+    setJoinRequestBusy(reqId);
+    try {
+      await rejectHesbahJoinRequest(roomCode, reqId);
+      notify('تم رفض الطلب', 'info');
+    } finally {
+      setJoinRequestBusy(null);
+    }
+  };
+
+  useEffect(() => {
     const inRoom = !!roomCode && gameScreen !== 'setup' && gameScreen !== 'join';
     onHesbahHeaderMeta?.({ inRoom });
     return () => onHesbahHeaderMeta?.({ inRoom: false });
@@ -460,6 +542,14 @@ const HesbahGame = forwardRef(function HesbahGame(
     setSessionGate('checking');
     try {
       if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+      const saved = readSavedHesbah();
+      if (saved.pendingJoinReqId && saved.roomCode) {
+        setRoomCode(saved.roomCode);
+        setPendingJoinReqId(saved.pendingJoinReqId);
+        setRole('player');
+        setGameScreen('join_pending');
+        return;
+      }
       const active = await resolveActivePlayerRoom('hesbah');
       if (active?.local?.role === 'player' && active.local.roomCode) {
         await reconnectToSavedRoom();
@@ -703,20 +793,15 @@ const HesbahGame = forwardRef(function HesbahGame(
       }
 
       if (!pid) {
-        const byName = findSeatByName(playerEntries, name);
-        if (byName) {
-          const [seatId, seat] = byName;
+        const activeByName = findActivePlayerByName(data.players, name);
+        const leftByName = !activeByName ? findLeftPlayerByName(data.players, name) : null;
+        const nameMatch = activeByName || leftByName;
+
+        if (nameMatch) {
+          const [seatId, seat] = nameMatch;
           if (seat.ownerUid && seat.ownerUid !== uid) {
             setJoinErr('هذا المقعد مربوط بحساب آخر — سجّل بنفس البريد');
             return;
-          }
-          if (isLoggedIn && !seat.ownerUid) {
-            try {
-              await update(dbRef(db, `srooms/${code}/players/${seatId}`), { ownerUid: uid });
-              seat.ownerUid = uid;
-            } catch {
-              /* optional */
-            }
           }
           if (!isLoggedIn || !seat.ownerUid) {
             const access = await verifyGuestSeatAccess(seat, seatId, code, {
@@ -728,11 +813,31 @@ const HesbahGame = forwardRef(function HesbahGame(
               return;
             }
           }
-          pid = seatId;
-          isRejoin = true;
-          if (seat.left) {
-            await update(dbRef(db, `srooms/${code}/players/${pid}`), { left: false, leftAt: null });
-          }
+
+          const { reqId, sessionToken } = await createHesbahJoinRequest(code, {
+            name,
+            targetPlayerId: seatId,
+            kind: leftByName ? 'left' : 'active',
+            uid,
+            isGuest: !isLoggedIn,
+            pin: joinPin,
+          });
+          setRoomCode(code);
+          setRole('player');
+          setMyId(null);
+          setPendingJoinReqId(reqId);
+          persistHesbahSession({
+            roomCode: code,
+            role: 'player',
+            pendingJoinReqId: reqId,
+            pendingJoinTargetId: seatId,
+            myName: name,
+            sessionToken,
+          });
+          setSavedSession(readSavedHesbah());
+          setGameScreen('join_pending');
+          notify('⏳ طلبك عند المشرف — انتظر القبول', 'info');
+          return;
         }
       }
 
@@ -795,9 +900,19 @@ const HesbahGame = forwardRef(function HesbahGame(
   const reconnectToSavedRoom = async () => {
     const saved = readSavedHesbah();
     const code = saved.roomCode;
+    if (!code) return;
+
+    if (saved.pendingJoinReqId) {
+      setRoomCode(code);
+      setRole('player');
+      setPendingJoinReqId(saved.pendingJoinReqId);
+      setGameScreen('join_pending');
+      return;
+    }
+
     const pid = saved.myId;
     const savedRole = saved.role;
-    if (!code || !pid || !savedRole) return;
+    if (!pid || !savedRole) return;
 
     try {
       const snap = await get(dbRef(db, `srooms/${code}`));
@@ -1614,6 +1729,23 @@ const HesbahGame = forwardRef(function HesbahGame(
       );
     }
 
+    if (gameScreen === 'join_pending') {
+      const saved = readSavedHesbah();
+      return (
+        <HesbahPendingJoinScreen
+          roomCode={roomCode}
+          playerName={saved.myName || joinName}
+          onBack={() => {
+            setPendingJoinReqId(null);
+            clearHesbahSession();
+            setSavedSession({});
+            resetHesbahRoomState();
+            setGameScreen('home');
+          }}
+        />
+      );
+    }
+
     if (gameScreen === 'join') {
       return (
         <div className="scr hesbah-theme hesbah-setup-screen">
@@ -1699,6 +1831,10 @@ const HesbahGame = forwardRef(function HesbahGame(
           isLoggedIn={!!authUid}
           isRegisteredEmail={isArenaRegisteredUser(auth.currentUser)}
           onRegister={() => setTab?.('account')}
+          joinRequests={joinRequests}
+          onApproveJoinRequest={handleApproveJoinRequest}
+          onRejectJoinRequest={handleRejectJoinRequest}
+          joinRequestBusy={joinRequestBusy}
         />
         </>
       );

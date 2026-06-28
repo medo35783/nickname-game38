@@ -7,7 +7,7 @@ import {
   SUPPORT_EMAIL,
   SUPPORT_WHATSAPP,
 } from './constants';
-import { LEGAL_ORG_SUBTITLE } from './legalContent';
+import { LEGAL_ORG_SUBTITLE, LEGAL_CR_NUMBER, LEGAL_ADDRESS } from './legalContent';
 import { reportPlatformLogoHtml } from '../shared/reportBrandAssets';
 
 const esc = (v) =>
@@ -64,7 +64,7 @@ function buildCertificateHtml(award) {
   <div class="page">
     <header class="head">
       ${reportPlatformLogoHtml({ theme: 'light', maxHeight: 52 })}
-      <div style="font-size:11px;color:#7a6a50;margin-top:10px">${esc(LEGAL_ORG_SUBTITLE)}</div>
+      <div style="font-size:11px;color:#7a6a50;margin-top:10px">${esc(LEGAL_ORG_SUBTITLE)} · ${esc(LEGAL_ADDRESS)} · س.ت ${esc(LEGAL_CR_NUMBER)}</div>
     </header>
     <h1 class="title">🏆 شهادة جائزة الجولة</h1>
     <p class="sub">وثيقة رسمية تُثبت فوز المتسابق في جلسة جماعية على منصة ${esc(PLATFORM_NAME)}</p>

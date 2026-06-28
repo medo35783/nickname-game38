@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { PLATFORM_NAME } from '../../core/constants';
-import { LEGAL_ORG_SUBTITLE } from '../../core/legalContent';
+import { LEGAL_ENTITY } from '../../core/legalContent';
 
 const AUDIENCES = [
   {
@@ -42,7 +42,7 @@ export default function AboutUsModal({ onClose }) {
             <h2 id="about-us-title" className="about-modal-title">
               منصة {PLATFORM_NAME}
             </h2>
-            <p className="about-modal-slogan">{LEGAL_ORG_SUBTITLE}</p>
+            <p className="about-modal-slogan">{LEGAL_ENTITY.name}</p>
           </div>
           <button type="button" className="btn bgh bxs legal-modal-close" onClick={onClose} aria-label="إغلاق">
             ✕
@@ -103,6 +103,31 @@ export default function AboutUsModal({ onClose }) {
                 <div className="about-card-desc">{item.desc}</div>
               </div>
             ))}
+          </div>
+
+          <div className="about-entity" aria-label="بيانات المنشأة">
+            <div className="about-entity-icon" aria-hidden="true">
+              🏛️
+            </div>
+            <div className="about-entity-body">
+              <div className="about-entity-name">{LEGAL_ENTITY.name}</div>
+              <div className="about-entity-address">{LEGAL_ENTITY.address}</div>
+              <div className="about-entity-cr">
+                السجل التجاري:{' '}
+                <span className="about-entity-cr-num" dir="ltr">
+                  {LEGAL_ENTITY.crNumber}
+                </span>
+              </div>
+              {LEGAL_ENTITY.vatNumber ? (
+                <div className="about-entity-vat">
+                  الرقم الضريبي:{' '}
+                  <span className="about-entity-cr-num" dir="ltr">
+                    {LEGAL_ENTITY.vatNumber}
+                  </span>
+                </div>
+              ) : null}
+              <div className="about-entity-tag">منصة سعودية — خدمات رقمية ترفيهية</div>
+            </div>
           </div>
         </div>
 

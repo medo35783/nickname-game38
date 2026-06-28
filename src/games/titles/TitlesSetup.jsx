@@ -61,8 +61,8 @@ export default function TitlesSetup(props) {
       <div className="ptitle">انضمام للعبة</div>
       <div className="psub">
         {isDualMode && roomReady
-          ? 'رمز الغرفة + اسمك + لقبان سريان (وضع اللقبين)'
-          : `رمز الغرفة (${ROOM_CODE_LEN} أرقام) + اسمك ولقبك السري`}
+          ? 'رمز الغرفة + اسمك + لقبان — أو رمز + لقب للعودة من جوال آخر'
+          : `رمز الغرفة + لقبك للعودة — أو اسم ولقب للانضمام الجديد`}
       </div>
       <div className="card">
         <div className="ig">

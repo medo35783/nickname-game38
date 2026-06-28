@@ -6,6 +6,21 @@ import { SUPPORT_WHATSAPP_URL } from './constants';
 
 export const LEGAL_ORG_SUBTITLE = 'مؤسسة لعيب زون للخدمات التجارية';
 
+export const LEGAL_CR_NUMBER = '7054655910';
+
+export const LEGAL_ADDRESS = 'المملكة العربية السعودية — القصيم';
+
+/** @type {string | null} يُضاف عند التسجيل في ضريبة القيمة المضافة */
+export const LEGAL_VAT_NUMBER = null;
+
+/** @type {{ name: string; crNumber: string; address: string; vatNumber: string | null }} */
+export const LEGAL_ENTITY = {
+  name: LEGAL_ORG_SUBTITLE,
+  crNumber: LEGAL_CR_NUMBER,
+  address: LEGAL_ADDRESS,
+  vatNumber: LEGAL_VAT_NUMBER,
+};
+
 /** @type {Record<LegalDocumentId, LegalDocument>} */
 export const LEGAL_DOCUMENTS = {
   terms: {
@@ -18,6 +33,7 @@ export const LEGAL_DOCUMENTS = {
       'الكود للاستخدام الشخصي ولا يُشارك مع أطراف أخرى',
       'تحتفظ المنصة بحق إيقاف أي حساب يُساء استخدامه',
       'الأسعار بالريال السعودي وتشمل ضريبة القيمة المضافة',
+      'نستقبل الشكاوى والاستفسارات عبر واتساب أو صفحة «صوتك» أو البريد، ونرد خلال 24–48 ساعة عمل',
     ],
   },
   privacy: {
@@ -28,7 +44,7 @@ export const LEGAL_DOCUMENTS = {
       'نجمع فقط البيانات الضرورية لتشغيل الخدمة (اسم المستخدم، رقم الجلسة)',
       'لا نشارك بياناتك مع أطراف ثالثة',
       'بيانات الدفع تُعالَج عبر مُيسّر المرخصة من البنك المركزي السعودي ولا تُخزَّن لدينا',
-      'يمكنك طلب حذف بياناتك في أي وقت عبر التواصل معنا',
+      'يمكنك طلب حذف حسابك وبياناتك في أي وقت عبر «حسابي → المزيد → طلب حذف الحساب» أو التواصل معنا',
     ],
   },
   refund: {

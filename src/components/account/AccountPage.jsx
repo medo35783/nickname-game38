@@ -25,6 +25,7 @@ import PwaInstallCard from '../layout/PwaInstallCard';
 import useArenaProfile from '../../hooks/useArenaProfile';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
 import { ARENA_ACHIEVEMENT_LIST } from '../../core/arenaAchievements';
+import { PLATFORM_NAME, SUPPORT_WHATSAPP_URL } from '../../core/constants';
 import '../../styles/knowledge-chest.css';
 import '../../styles/arena-badge.css';
 import '../../styles/account-subscription.css';
@@ -465,6 +466,26 @@ export default function AccountPage({
           </div>
 
           <PwaInstallCard notify={notify} />
+
+          {isRegistered ? (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div className="ctitle">🗑️ حذف الحساب</div>
+              <p className="psub" style={{ fontSize: 11, marginBottom: 10 }}>
+                يمكنك طلب حذف حسابك وبياناتك نهائياً — نعالج الطلب خلال 48 ساعة عمل
+              </p>
+              <a
+                className="btn bo"
+                style={{ fontSize: 12, width: '100%', textAlign: 'center', textDecoration: 'none' }}
+                href={`${SUPPORT_WHATSAPP_URL}?text=${encodeURIComponent(
+                  `أطلب حذف حسابي وبياناتي من منصة ${PLATFORM_NAME}.\n\nالبريد: ${user.email || '—'}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                طلب حذف الحساب
+              </a>
+            </div>
+          ) : null}
 
           <AccountKnowledgeBank onOpenContribute={onOpenContribute} />
 

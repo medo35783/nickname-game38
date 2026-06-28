@@ -272,6 +272,13 @@
         "hostAnswer": {
           ".read": "$roomCode.matches(/^[0-9]{6}$/)",
           ".write": "auth != null && $roomCode.matches(/^[0-9]{6}$/) && ((root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists() || auth.token.admin == true) || root.child('srooms').child($roomCode).child('adminId').val() == auth.uid)"
+        },
+        "joinRequests": {
+          ".read": "$roomCode.matches(/^[0-9]{6}$/)",
+          "$reqId": {
+            ".write": "auth != null && $roomCode.matches(/^[0-9]{6}$/) && ((!data.exists() && newData.child('status').val() == 'pending' && newData.hasChild('name') && newData.hasChild('targetPlayerId') && newData.hasChild('sessionToken')) || (data.exists() && !newData.exists() && root.child('srooms').child($roomCode).child('adminId').val() == auth.uid) || (data.exists() && newData.exists() && root.child('srooms').child($roomCode).child('adminId').val() == auth.uid) || (root.child('admins').child(auth.uid).exists() || root.child('admin').child(auth.uid).exists() || auth.token.admin == true))",
+            ".validate": "!newData.exists() || (newData.hasChild('status') && newData.child('status').isString() && (newData.child('status').val() == 'pending' || newData.child('status').val() == 'rejected'))"
+          }
         }
       }
     },

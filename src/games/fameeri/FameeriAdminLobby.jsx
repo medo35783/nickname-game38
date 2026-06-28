@@ -376,10 +376,12 @@ export default function FameeriAdminLobby({
 
         {unassigned.length > 0 && !assistMode && (
           <div className="fameeri-admin-unassigned">
-            <div className="fameeri-admin-unassigned__title">⏳ بدون مجموعة ({unassigned.length})</div>
+            <div className="fameeri-admin-unassigned__title">
+              👤 بانتظار التوجيه ({unassigned.length})
+            </div>
             {canManageSetup && (
               <div className="fameeri-admin-section__sub" style={{ marginBottom: 8 }}>
-                عيّن كل لاعب لمجموعة — يمكنك تغيير التوزيع أو التراجع قبل بدء المسابقة
+                انضم من جوال آخر أو جديد — ضعه في مجموعته (لا يختار المجموعة بنفسه)
               </div>
             )}
             {unassigned.map((m) => (

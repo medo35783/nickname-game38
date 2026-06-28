@@ -11,7 +11,7 @@ import {
   SUPPORT_EMAIL,
   SUPPORT_WHATSAPP,
 } from './constants';
-import { LEGAL_ORG_SUBTITLE } from './legalContent';
+import { LEGAL_ORG_SUBTITLE, LEGAL_CR_NUMBER, LEGAL_ADDRESS } from './legalContent';
 import { SUBSCRIPTION_PLATFORM_FEATURES } from './subscriptionPackages';
 import { buildMarketingReportModel } from './marketingStatsHelpers';
 import { reportPlatformLogoHtml } from '../shared/reportBrandAssets';
@@ -558,7 +558,7 @@ function buildReportHtml(model) {
         <div class="letterhead__brand">
           ${reportPlatformLogoHtml({ theme: 'light', maxHeight: 56 })}
           <div class="letterhead__org">
-            ${esc(LEGAL_ORG_SUBTITLE)}<br/>
+            ${esc(LEGAL_ORG_SUBTITLE)} · ${esc(LEGAL_ADDRESS)} · س.ت ${esc(LEGAL_CR_NUMBER)}<br/>
             ${esc(PLATFORM_NAME)} — ${esc(PLATFORM_NAME_EN)} · ${esc(PLATFORM_SLOGAN)}
           </div>
         </div>
@@ -732,7 +732,7 @@ function buildReportHtml(model) {
       </div>
 
       <footer class="foot">
-        <strong>${esc(LEGAL_ORG_SUBTITLE)}</strong><br/>
+        <strong>${esc(LEGAL_ORG_SUBTITLE)}</strong> · ${esc(LEGAL_ADDRESS)} · س.ت ${esc(LEGAL_CR_NUMBER)}<br/>
         ${esc(PLATFORM_NAME)} — ${esc(PLATFORM_SITE_URL)} · ${esc(PLATFORM_SITE_HOST)}<br/>
         للتواصل: ${esc(SUPPORT_EMAIL)} · واتساب ${esc(SUPPORT_WHATSAPP)}<br/>
         <span style="opacity:.75">تقرير آلي رقم ${esc(model.reportId)} — يُعتمد على البيانات المسجّلة وقت الإصدار</span>

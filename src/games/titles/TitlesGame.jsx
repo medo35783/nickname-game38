@@ -60,6 +60,7 @@ import {
   findSeatByOwnerUid,
   findSeatById,
   findTitlesSeatByIdentity,
+  findTitlesSeatByNickOnly,
   isRegistrationLocked,
   isValidPin,
   buildNewSeatSecurity,
@@ -188,6 +189,20 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     }
     setShowOnboarding('player');
   };
+
+  useEffect(() => {
+    if (gameScreen !== 'join') return;
+    try {
+      const raw = localStorage.getItem('ng_session');
+      if (!raw) return;
+      const ps = JSON.parse(raw);
+      if (ps?.roomCode && !joinInput) setJoinInput(ps.roomCode);
+      if (ps?.name && !joinName) setJoinName(ps.name);
+      if (ps?.nick && !joinNick) setJoinNick(ps.nick);
+    } catch {
+      /* ignore */
+    }
+  }, [gameScreen]);
 
   const [role, setRole] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -852,12 +867,21 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         }
       }
 
-      if(!joinName.trim()||!joinNick.trim()){setJoinErr('أدخل اسمك ولقبك');return;}
+      if (!joinNick.trim()) {
+        setJoinErr('أدخل لقبك السري');
+        return;
+      }
 
-      // ③ نفس الاسم واللقب — يتطلب PIN للضيف
-      const byIdentity = findTitlesSeatByIdentity(existingPlayers, joinName, joinNick);
+      // ③ نفس الاسم واللقب — أو اللقب فقط إن كان فريداً (جهاز آخر)
+      const byIdentity =
+        (joinName.trim()
+          ? findTitlesSeatByIdentity(existingPlayers, joinName, joinNick)
+          : null) || findTitlesSeatByNickOnly(existingPlayers, joinNick);
       if (byIdentity) {
         const [seatId, seatData] = byIdentity;
+        if (seatData.status === 'withdrawn') {
+          /* finalizeTitlesPlayerRejoin يعيد التفعيل */
+        }
         if (seatData.ownerUid && seatData.ownerUid !== hostUid) {
           setJoinErr('هذا المقعد مربوط بحساب آخر — سجّل بنفس البريد');
           return;
@@ -885,6 +909,10 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       }
 
       // NEW JOIN — player not registered yet
+      if (!joinName.trim()) {
+        setJoinErr('أدخل اسمك');
+        return;
+      }
       if(isRegistrationLocked(gamePhase)){
         setJoinErr(SEAT_ERRORS.registrationClosed);
         return;

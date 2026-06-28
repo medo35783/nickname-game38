@@ -24,11 +24,40 @@ export function findSeatById(entries, seatId) {
   return entries.find(([id]) => id === seatId) || null;
 }
 
+export function normalizeNickIdentity(str) {
+  return String(str || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ة$/g, 'ه')
+    .replace(/أ|إ|آ/g, 'ا')
+    .replace(/ى/g, 'ي');
+}
+
 export function findTitlesSeatByIdentity(entries, name, nick) {
   const n = String(name || '').trim();
-  const k = String(nick || '').trim();
+  const k = normalizeNickIdentity(nick);
   if (!n || !k) return null;
-  return entries.find(([, p]) => p?.name?.trim() === n && p?.nick?.trim() === k) || null;
+  return (
+    entries.find(([, p]) => {
+      if (String(p?.name || '').trim() !== n) return false;
+      const pn = normalizeNickIdentity(p?.nick);
+      const pn2 = normalizeNickIdentity(p?.nick2);
+      return pn === k || pn2 === k;
+    }) || null
+  );
+}
+
+/** عودة باللقب فقط — إذا كان فريداً في الغرفة */
+export function findTitlesSeatByNickOnly(entries, nick) {
+  const k = normalizeNickIdentity(nick);
+  if (!k) return null;
+  const matches = entries.filter(([, p]) => {
+    const pn = normalizeNickIdentity(p?.nick);
+    const pn2 = normalizeNickIdentity(p?.nick2);
+    return pn === k || pn2 === k;
+  });
+  if (matches.length === 1) return matches[0];
+  return null;
 }
 
 export function findSeatByName(entries, name) {

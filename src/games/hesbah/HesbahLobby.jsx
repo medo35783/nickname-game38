@@ -8,6 +8,7 @@ import HesbahTimerPicker from './HesbahTimerPicker';
 import HesbahTopNav from './HesbahTopNav';
 import GameGuideOpenButton from '../../shared/GameGuideOpenButton';
 import HostSessionReminder from '../../shared/HostSessionReminder';
+import HesbahJoinRequestsPanel from './HesbahJoinRequestsPanel';
 
 const START_MODE_COPY = {
   participate: {
@@ -44,6 +45,10 @@ export default function HesbahLobby({
   onRegister,
   gamePhase,
   hasHostPin,
+  joinRequests,
+  onApproveJoinRequest,
+  onRejectJoinRequest,
+  joinRequestBusy,
 }) {
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const list = Object.entries(players || {})
@@ -92,6 +97,15 @@ export default function HesbahLobby({
           onSavePin={onSaveHostPin}
           onRegister={onRegister}
           notify={notify}
+        />
+      )}
+
+      {isAdmin && (
+        <HesbahJoinRequestsPanel
+          requests={joinRequests}
+          onApprove={onApproveJoinRequest}
+          onReject={onRejectJoinRequest}
+          busyId={joinRequestBusy}
         />
       )}
 

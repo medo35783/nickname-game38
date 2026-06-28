@@ -4,6 +4,7 @@ import {
   SUPPORT_EMAIL,
   SUPPORT_WHATSAPP_URL,
 } from '../../core/constants';
+import { LEGAL_CR_NUMBER } from '../../core/legalContent';
 import AboutUsModal from './AboutUsModal';
 
 function IconWhatsApp() {
@@ -40,21 +41,26 @@ export default function SiteFooter() {
     <>
       <footer className="site-footer" role="contentinfo">
         <div className="site-footer-inner">
-          <div className="site-footer-copy-row">
-            <span className="site-footer-copy-text" title={PLATFORM_NAME}>
-              © {year} {PLATFORM_NAME}
+          <div className="site-footer-copy-col">
+            <div className="site-footer-copy-row">
+              <span className="site-footer-copy-text" title={PLATFORM_NAME}>
+                © {year} {PLATFORM_NAME}
+              </span>
+              <span className="site-footer-sep" aria-hidden="true">
+                ·
+              </span>
+              <button
+                type="button"
+                className="site-footer-about"
+                onClick={() => setShowAbout(true)}
+                aria-haspopup="dialog"
+              >
+                من نحن
+              </button>
+            </div>
+            <span className="site-footer-cr" dir="ltr" title="السجل التجاري">
+              س.ت: {LEGAL_CR_NUMBER}
             </span>
-            <span className="site-footer-sep" aria-hidden="true">
-              ·
-            </span>
-            <button
-              type="button"
-              className="site-footer-about"
-              onClick={() => setShowAbout(true)}
-              aria-haspopup="dialog"
-            >
-              من نحن
-            </button>
           </div>
 
           <div className="site-footer-links">

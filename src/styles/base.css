@@ -45,8 +45,10 @@ body{
 .app{min-height:100vh;display:flex;flex-direction:column;padding-bottom:calc(78px + var(--app-safe-bottom))}
 .app.app--with-footer{padding-bottom:calc(120px + var(--app-safe-bottom))}
 .site-footer{position:fixed;bottom:var(--app-bnav-h);left:0;right:0;z-index:79;max-width:720px;margin:0 auto;background:var(--footer-bg);backdrop-filter:blur(12px);border-top:1px solid var(--border-faint);border-bottom:1px solid var(--border)}
-.site-footer-inner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 14px;min-height:36px}
-.site-footer-copy-row{display:flex;align-items:center;gap:6px;min-width:0;flex:1;max-width:58%}
+.site-footer-inner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px 5px;min-height:38px}
+.site-footer-copy-col{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:0;flex:0 1 auto;max-width:58%}
+.site-footer-copy-row{display:flex;align-items:center;gap:6px;min-width:0}
+.site-footer-cr{font-size:7.5px;font-weight:600;color:var(--dim);line-height:1.25;letter-spacing:.01em;white-space:nowrap;margin-top:1px;opacity:.88}
 .site-footer-copy-text{font-size:10.5px;font-weight:700;color:var(--text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 .site-footer-sep{font-size:9px;color:var(--dim);flex-shrink:0}
 .site-footer-about{font-size:10.5px;font-weight:800;color:var(--brand-blue);background:none;border:none;padding:0;cursor:pointer;font-family:inherit;white-space:nowrap;text-decoration:underline;text-underline-offset:2px;flex-shrink:0}
@@ -82,6 +84,15 @@ body{
 [data-theme="dark"] .about-card-title{color:var(--brand-burgundy-light)}
 .about-card-desc{font-family:'Tajawal',sans-serif;font-size:10.5px;font-weight:600;color:var(--text-soft);line-height:1.65;opacity:.95}
 .about-close-btn{width:100%;margin-top:2px}
+.about-entity{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:11px 10px;border-radius:11px;background:linear-gradient(135deg,rgba(37,111,168,.07),rgba(36,143,85,.05));border:1px solid rgba(37,111,168,.16);text-align:right}
+.about-entity-icon{font-size:22px;line-height:1;flex-shrink:0;margin-top:1px;filter:drop-shadow(0 0 5px rgba(37,111,168,.2))}
+.about-entity-body{flex:1;min-width:0}
+.about-entity-name{font-family:'Cairo',sans-serif;font-size:10.5px;font-weight:900;color:var(--text);line-height:1.45;margin-bottom:4px}
+.about-entity-address{font-family:'Tajawal',sans-serif;font-size:9.5px;font-weight:600;color:var(--muted);line-height:1.45;margin-bottom:4px}
+.about-entity-cr,.about-entity-vat{font-family:'Tajawal',sans-serif;font-size:10px;font-weight:700;color:var(--text-soft);line-height:1.5;margin-bottom:2px}
+.about-entity-cr-num{font-family:ui-monospace,'Cairo',monospace;font-weight:800;color:var(--brand-blue);letter-spacing:.04em}
+[data-theme="dark"] .about-entity-cr-num{color:var(--brand-blue-light)}
+.about-entity-tag{font-family:'Tajawal',sans-serif;font-size:9px;font-weight:600;color:var(--muted);line-height:1.45;margin-top:4px;opacity:.92}
 .legal-portal{position:fixed;inset:0;z-index:420;background:var(--overlay);display:flex;align-items:center;justify-content:center;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom));overflow-y:auto;animation:fadeInFull .22s ease}
 .legal-modal{background:radial-gradient(ellipse 110% 65% at 50% -8%,rgba(37,111,168,.14),transparent 58%),radial-gradient(ellipse 75% 55% at 100% 100%,rgba(150,36,56,.09),transparent 52%),radial-gradient(ellipse 65% 45% at 0% 88%,rgba(36,143,85,.08),transparent 48%),var(--card);border:1px solid rgba(37,111,168,.22);border-radius:14px;padding:14px 14px 12px;max-width:360px;width:100%;max-height:min(78vh,520px);overflow-y:auto;text-align:right;animation:fi .25s ease;box-shadow:0 14px 44px rgba(10,22,40,.28)}
 [data-theme="light"] .legal-modal{box-shadow:0 12px 36px rgba(18,42,74,.14)}
@@ -104,7 +115,7 @@ body{
 .legal-contact__wa:hover{transform:scale(1.06);box-shadow:0 6px 18px rgba(36,143,85,.36)}
 .legal-contact__wa:active{transform:scale(.97)}
 .legal-modal-done{margin-top:2px}
-@media(max-width:360px){.site-footer-copy-row{max-width:52%}.site-footer-copy-text,.site-footer-about{font-size:9.5px}.about-card-desc{font-size:11px}.about-grid{grid-template-columns:1fr}}
+@media(max-width:360px){.site-footer-copy-col{max-width:52%}.site-footer-copy-text,.site-footer-about{font-size:9.5px}.site-footer-cr{font-size:7px}.about-card-desc{font-size:11px}.about-grid{grid-template-columns:1fr}}
 .site-footer-links{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .site-footer-link{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--border-subtle);background:var(--surface);color:var(--muted);text-decoration:none;font-size:13px;line-height:1;transition:all .18s}
 .site-footer-link--wa{color:#25d366;border-color:rgba(37,211,102,.25)}
