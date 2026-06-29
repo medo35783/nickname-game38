@@ -6,7 +6,10 @@ import {
 } from '../../core/platformSponsors';
 import { aggregateSponsorImpressions, collectSponsorSessionLog } from '../../core/sponsorStatsHelpers';
 import { openSponsorImpactReport } from '../../core/sponsorImpactReport';
+import { parseCouponCodesText } from '../../core/couponPool';
+import { DEMO_SPONSOR_TEMPLATE } from '../../core/launchContentTemplates';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../../styles/winner-prize-certificate.css';
 
 const EMPTY = {
   name: '',
@@ -16,7 +19,11 @@ const EMPTY = {
   games: ['titles', 'fameeri', 'hesbah'],
   active: true,
   sortOrder: 100,
+  contractPrice: 0,
+  startsAt: '',
   expiresAt: '',
+  couponCodesText: '',
+  autoAwardWinner: true,
 };
 
 async function readImageFile(file) {
@@ -81,7 +88,11 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
       games: item.games,
       active: item.active,
       sortOrder: item.sortOrder || 0,
+      contractPrice: item.contractPrice || 0,
+      startsAt: item.startsAt ? new Date(item.startsAt).toISOString().slice(0, 10) : '',
       expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 10) : '',
+      couponCodesText: (item.couponCodes || []).join('\n'),
+      autoAwardWinner: item.autoAwardWinner !== false,
     });
   };
 
@@ -113,9 +124,19 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
     }
     setSaving(true);
     try {
+      const { couponCodesText, ...formRest } = form;
+      const couponCodes = parseCouponCodesText(couponCodesText);
+      const prevItem = editingId ? items.find((i) => i.id === editingId) : null;
+      const delivered = prevItem?.couponsDelivered || 0;
       await saveSponsorItem(editingId, {
-        ...form,
+        ...formRest,
+        startsAt: form.startsAt ? new Date(form.startsAt).getTime() : null,
         expiresAt: form.expiresAt ? new Date(form.expiresAt).getTime() : null,
+        couponCodes,
+        couponPoolTotal: couponCodes.length + delivered,
+        couponPoolRemaining: couponCodes.length,
+        couponsDelivered: delivered,
+        autoAwardWinner: form.autoAwardWinner !== false,
       });
       notify?.(editingId ? 'تم التحديث' : 'تمت إضافة الراعي', 'success');
       resetForm();
@@ -139,12 +160,36 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
     }
   };
 
+  const applyDemoSponsor = () => {
+    const t = DEMO_SPONSOR_TEMPLATE;
+    setEditingId(null);
+    setForm({
+      ...EMPTY,
+      name: t.name,
+      tagline: t.tagline,
+      prizeOffer: t.prizeOffer,
+      games: t.games,
+      active: t.active,
+      sortOrder: t.sortOrder,
+      contractPrice: t.contractPrice,
+      couponCodesText: t.couponCodesText,
+      autoAwardWinner: t.autoAwardWinner,
+    });
+    notify?.('قالب راعٍ تجريبي — أضف الشعار ثم احفظ', 'success');
+  };
+
   return (
     <div className="admin-content-block">
       <p className="admin-mkt-lead">
-        شعار الراعي يظهر أثناء الجولات في الألعاب المحددة، ويُدرج في تقرير رعاية B2B.
-        اربط الراعي من صفحة <strong>الأكواد → تفاصيل</strong> لكل اشتراك.
+        شعار الراعي يظهر أثناء الجولات (تناوب تلقائي بين الرعاة النشطين) ويُدرج في تقرير B2B.
+        ربط الكود بالراعي اختياري للاتفاقات الحصرية فقط.
       </p>
+
+      <div className="admin-template-chips" style={{ marginBottom: 12 }}>
+        <button type="button" className="btn btn--sm btn--ghost" onClick={applyDemoSponsor}>
+          🧪 راعٍ تجريبي
+        </button>
+      </div>
 
       {sponsorTotals.length > 0 ? (
         <div className="admin-pulse-card admin-pulse-card--live" style={{ marginBottom: 12 }}>
@@ -229,14 +274,41 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
             />
           </label>
           <label className="admin-form-field admin-form-field--full">
-            <span>عرض الجائزة (لتقرير ②)</span>
+            <span>عرض الجائزة (وصف — يظهر مع الكود فقط)</span>
             <input
               className="inp"
               value={form.prizeOffer}
               onChange={(e) => setForm((f) => ({ ...f, prizeOffer: e.target.value }))}
-              placeholder="خصم 20% للفائز — كوبون XYZ"
+              placeholder="خصم 20% للفائز"
             />
           </label>
+          <div className="admin-form-field admin-form-field--full admin-coupon-pool">
+            <span>مخزون أكواد الخصم (سطر لكل كود)</span>
+            <div className="admin-coupon-pool__stats">
+              {editingId ? (
+                <>
+                  <span>متبقي: {items.find((i) => i.id === editingId)?.couponPoolRemaining ?? '—'}</span>
+                  <span>مُسلّم: {items.find((i) => i.id === editingId)?.couponsDelivered ?? 0}</span>
+                </>
+              ) : (
+                <span>أدخل الأكواد ثم احفظ — يُسحب واحد لكل فائز</span>
+              )}
+            </div>
+            <textarea
+              className="inp admin-coupon-import"
+              value={form.couponCodesText}
+              onChange={(e) => setForm((f) => ({ ...f, couponCodesText: e.target.value }))}
+              placeholder={'SAVE20\nWIN30\nGIFT50'}
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, fontWeight: 700 }}>
+              <input
+                type="checkbox"
+                checked={form.autoAwardWinner !== false}
+                onChange={(e) => setForm((f) => ({ ...f, autoAwardWinner: e.target.checked }))}
+              />
+              تسليم تلقائي للفائز عند انتهاء الجلسة المؤهلة
+            </label>
+          </div>
           <div className="admin-form-field admin-form-field--full">
             <span>الألعاب المشمولة</span>
             <div className="admin-filter-chips">
@@ -253,12 +325,32 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
             </div>
           </div>
           <label className="admin-form-field">
+            <span>سعر العقد (ر.س — اختياري)</span>
+            <input
+              className="inp"
+              type="number"
+              min={0}
+              value={form.contractPrice}
+              onChange={(e) => setForm((f) => ({ ...f, contractPrice: Number(e.target.value) || 0 }))}
+              placeholder="0"
+            />
+          </label>
+          <label className="admin-form-field">
             <span>ترتيب</span>
             <input
               className="inp"
               type="number"
               value={form.sortOrder}
               onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) || 0 }))}
+            />
+          </label>
+          <label className="admin-form-field">
+            <span>يبدأ (اختياري)</span>
+            <input
+              className="inp"
+              type="date"
+              value={form.startsAt}
+              onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
             />
           </label>
           <label className="admin-form-field">
@@ -314,6 +406,10 @@ export default function AdminSponsorsManager({ notify, codeRows = [], codeStatsB
                     <div className="admin-sponsor-row__games">
                       {item.games.map((g) => SPONSOR_GAME_OPTIONS.find((o) => o.id === g)?.icon).join(' ')}
                       {item.prizeOffer ? ` · 🎁 ${item.prizeOffer.slice(0, 40)}` : ''}
+                      {item.contractPrice ? ` · 💰 ${item.contractPrice} ر.س` : ''}
+                      {(item.couponPoolTotal || 0) > 0
+                        ? ` · 🎫 ${item.couponPoolRemaining ?? 0}/${item.couponPoolTotal} كود`
+                        : ''}
                     </div>
                   </div>
                   <span className={`admin-hub-badge admin-hub-badge--${item.active ? 'ready' : 'soon'}`}>

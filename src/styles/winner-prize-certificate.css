@@ -1,0 +1,160 @@
+/* شهادة الفائز — شاشة النتائج */
+.winner-prize-card {
+  margin: 16px 0 20px;
+  padding: 20px 18px 18px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.16), rgba(139, 26, 61, 0.1));
+  border: 2px solid rgba(201, 127, 26, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.winner-prize-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.12), transparent 55%);
+  pointer-events: none;
+}
+
+.winner-prize-card--loading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 24px;
+}
+
+.winner-prize-card__spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(201, 127, 26, 0.3);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: winner-prize-spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+@keyframes winner-prize-spin {
+  to { transform: rotate(360deg); }
+}
+
+.winner-prize-card__ribbon {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.winner-prize-card__trophy {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.winner-prize-card__title {
+  font-family: Cairo, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+
+.winner-prize-card__sponsor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.winner-prize-card__sponsor-logo {
+  max-height: 28px;
+  max-width: 80px;
+  object-fit: contain;
+}
+
+.winner-prize-card__coupon {
+  margin: 12px 0 14px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  background: rgba(255, 249, 238, 0.95);
+  border: 2px dashed rgba(201, 127, 26, 0.55);
+}
+
+.winner-prize-card__coupon-label {
+  font-size: 13px;
+  font-weight: 900;
+  color: #8b5a10;
+  margin-bottom: 6px;
+}
+
+.winner-prize-card__coupon-offer {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.winner-prize-card__coupon-code {
+  font-family: 'Courier New', monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #8b1a3d;
+  padding: 8px 16px;
+  background: #fff;
+  border-radius: 10px;
+  display: inline-block;
+  border: 2px solid var(--gold);
+}
+
+.winner-prize-card__hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 12px;
+}
+
+.winner-prize-card__pdf {
+  width: 100%;
+  max-width: 280px;
+}
+
+.admin-coupon-pool {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(201, 127, 26, 0.08);
+  border: 1px solid rgba(201, 127, 26, 0.25);
+}
+
+.admin-coupon-pool__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-coupon-pool__stats span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-coupon-import {
+  width: 100%;
+  min-height: 72px;
+  font-family: inherit;
+  font-size: 11px;
+  resize: vertical;
+}

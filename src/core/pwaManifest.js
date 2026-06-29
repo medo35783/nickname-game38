@@ -14,7 +14,7 @@ export const PWA_MANIFEST = {
   short_name: 'لعيب زون',
   description: 'لعيب زون | جَوّك، جمعتك، وتحديك — ألعاب جماعية تفاعلية للرحلات والاجتماعات والمناسبات',
   theme_color: '#eef3f9',
-  background_color: '#eef3f9',
+  background_color: '#ffffff',
   display: 'standalone',
   display_override: ['standalone', 'browser'],
   orientation: 'portrait',

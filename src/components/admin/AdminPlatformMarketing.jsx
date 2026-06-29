@@ -34,6 +34,45 @@ function mergeByGameStats(a = {}, b = {}) {
   return out;
 }
 
+function buildSyntheticPlatformStats(statsList = []) {
+  if (!statsList.length) return null;
+  return statsList.reduce(
+    (acc, s) => ({
+      totalRealSessions: (acc.totalRealSessions || 0) + (Number(s.totalRealSessions) || 0),
+      totalPlayerCount: (acc.totalPlayerCount || 0) + (Number(s.totalPlayerCount) || 0),
+      totalRounds: (acc.totalRounds || 0) + (Number(s.totalRounds) || 0),
+      totalEngagementMinutes:
+        (acc.totalEngagementMinutes || 0) + (Number(s.totalEngagementMinutes) || 0),
+      roundReach: (acc.roundReach || 0) + (Number(s.roundReach) || 0),
+      completedGames: (acc.completedGames || 0) + (Number(s.completedGames) || 0),
+      abandonedGames: (acc.abandonedGames || 0) + (Number(s.abandonedGames) || 0),
+      totalDurationMinutes:
+        (acc.totalDurationMinutes || 0) + (Number(s.totalDurationMinutes) || 0),
+      peakPlayers: Math.max(acc.peakPlayers || 0, Number(s.peakPlayers) || 0),
+      lastActiveAt: Math.max(acc.lastActiveAt || 0, Number(s.lastActiveAt) || 0),
+      gamesPlayed: {
+        titles: (acc.gamesPlayed?.titles || 0) + (Number(s.gamesPlayed?.titles) || 0),
+        fameeri: (acc.gamesPlayed?.fameeri || 0) + (Number(s.gamesPlayed?.fameeri) || 0),
+        hesbah: (acc.gamesPlayed?.hesbah || 0) + (Number(s.gamesPlayed?.hesbah) || 0),
+      },
+      byGame: mergeByGameStats(acc.byGame, s.byGame),
+      recentSessions: [
+        ...(acc.recentSessions || []),
+        ...(Array.isArray(s.recentSessions) ? s.recentSessions : []),
+      ]
+        .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+        .slice(-20),
+      uniqueParticipantLabels: [
+        ...new Set([
+          ...(acc.uniqueParticipantLabels || []),
+          ...(Array.isArray(s.uniqueParticipantLabels) ? s.uniqueParticipantLabels : []),
+        ]),
+      ].slice(0, 120),
+    }),
+    {}
+  );
+}
+
 /**
  * ملخص الأرقام التسويقية + تقرير B2B
  */
@@ -46,50 +85,20 @@ export default function AdminPlatformMarketing({ notify, codeStatsById }) {
   const platformMarketing = aggregateMarketingMetrics(statsList);
 
   const openPlatformReport = useCallback(() => {
-    const syntheticStats = statsList.length
-      ? {
-          ...statsList.reduce(
-            (acc, s) => ({
-              totalRealSessions: (acc.totalRealSessions || 0) + (Number(s.totalRealSessions) || 0),
-              totalPlayerCount: (acc.totalPlayerCount || 0) + (Number(s.totalPlayerCount) || 0),
-              totalRounds: (acc.totalRounds || 0) + (Number(s.totalRounds) || 0),
-              totalEngagementMinutes:
-                (acc.totalEngagementMinutes || 0) + (Number(s.totalEngagementMinutes) || 0),
-              roundReach: (acc.roundReach || 0) + (Number(s.roundReach) || 0),
-              completedGames: (acc.completedGames || 0) + (Number(s.completedGames) || 0),
-              abandonedGames: (acc.abandonedGames || 0) + (Number(s.abandonedGames) || 0),
-              totalDurationMinutes:
-                (acc.totalDurationMinutes || 0) + (Number(s.totalDurationMinutes) || 0),
-              peakPlayers: Math.max(acc.peakPlayers || 0, Number(s.peakPlayers) || 0),
-              lastActiveAt: Math.max(acc.lastActiveAt || 0, Number(s.lastActiveAt) || 0),
-              gamesPlayed: {
-                titles: (acc.gamesPlayed?.titles || 0) + (Number(s.gamesPlayed?.titles) || 0),
-                fameeri: (acc.gamesPlayed?.fameeri || 0) + (Number(s.gamesPlayed?.fameeri) || 0),
-                hesbah: (acc.gamesPlayed?.hesbah || 0) + (Number(s.gamesPlayed?.hesbah) || 0),
-              },
-              byGame: mergeByGameStats(acc.byGame, s.byGame),
-              recentSessions: [
-                ...(acc.recentSessions || []),
-                ...(Array.isArray(s.recentSessions) ? s.recentSessions : []),
-              ]
-                .sort((a, b) => (a.ts || 0) - (b.ts || 0))
-                .slice(-20),
-              uniqueParticipantLabels: [
-                ...new Set([
-                  ...(acc.uniqueParticipantLabels || []),
-                  ...(Array.isArray(s.uniqueParticipantLabels) ? s.uniqueParticipantLabels : []),
-                ]),
-              ].slice(0, 120),
-            }),
-            {}
-          ),
-        }
-      : null;
-
     setReportDialog({
       reportScope: 'platform',
-      stats: syntheticStats,
+      stats: buildSyntheticPlatformStats(statsList),
       platformAggregate: platformMarketing,
+      initialReportPurpose: 'full',
+    });
+  }, [statsList, platformMarketing]);
+
+  const openPitchReport = useCallback(() => {
+    setReportDialog({
+      reportScope: 'platform',
+      stats: buildSyntheticPlatformStats(statsList),
+      platformAggregate: platformMarketing,
+      initialReportPurpose: 'pitch',
     });
   }, [statsList, platformMarketing]);
 
@@ -135,6 +144,9 @@ export default function AdminPlatformMarketing({ notify, codeStatsById }) {
         {statBox('جلسات جوائز', platformMarketing.couponReadySessions, 'var(--brand-orange)')}
       </div>
       <div className="admin-mkt-actions">
+        <button type="button" className="btn bg" onClick={openPitchReport}>
+          📊 Pitch PDF (راعٍ محتمل)
+        </button>
         <button type="button" className="btn bg" onClick={openPlatformReport}>
           📄 تقرير B2B رسمي (PDF)
         </button>
@@ -149,6 +161,7 @@ export default function AdminPlatformMarketing({ notify, codeStatsById }) {
         stats={reportDialog?.stats}
         reportScope={reportDialog?.reportScope || 'platform'}
         platformAggregate={reportDialog?.platformAggregate}
+        initialReportPurpose={reportDialog?.initialReportPurpose}
         notify={notify}
       />
     </div>

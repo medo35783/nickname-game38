@@ -49,19 +49,7 @@ export function getPwaBannerVariant() {
   return 'other';
 }
 
-export const PWA_BANNER_SESSION_KEY = 'la3ibz-pwa-banner-dismissed';
 export const PWA_INSTALLED_STORAGE_KEY = 'la3ibz-pwa-installed';
-
-export function isPwaInstallBannerDismissed() {
-  if (typeof sessionStorage === 'undefined') return false;
-  return sessionStorage.getItem(PWA_BANNER_SESSION_KEY) === '1';
-}
-
-export function dismissPwaInstallBanner() {
-  if (typeof sessionStorage !== 'undefined') {
-    sessionStorage.setItem(PWA_BANNER_SESSION_KEY, '1');
-  }
-}
 
 export function isPwaInstalledPersisted() {
   if (typeof localStorage === 'undefined') return false;
@@ -88,11 +76,22 @@ export const PWA_IOS_INSTALL_STEPS = [
   'اضغط «إضافة» — يظهر التطبيق بأيقونة لعيب زون',
 ];
 
-export const PWA_ANDROID_INSTALL_STEPS = [
-  'من متصفح Chrome (ليس Samsung Internet أو واتساب)',
-  'اضغط ⋮ ⬅️ «تثبيت التطبيق»',
-  'إن ظهر تحذير Play Protect: التطبيق آمن — اختر «تثبيت على أي حال»',
+export const PWA_CHROME_INSTALL_STEPS = [
+  'اضغط ⋮ (القائمة) أعلى المتصفح',
+  'اختر «إضافة إلى الشاشة الرئيسية»',
+  'اضغط «تثبيت» — يظهر لعيب زون على شاشتك',
 ];
+
+export const PWA_SAMSUNG_INSTALL_STEPS = [
+  'ابحث عن أيقونة التثبيت ⬇️ في شريط العنوان أعلى المتصفح',
+  'اضغط عليها ثم أكّد «إضافة»',
+];
+
+export const PWA_ANDROID_PLAY_PROTECT_NOTE =
+  'إذا ظهر تحذير Play Protect: اختر «تثبيت على أي حال» — التطبيق آمن بالكامل.';
+
+/** @deprecated استخدم PWA_CHROME_INSTALL_STEPS */
+export const PWA_ANDROID_INSTALL_STEPS = PWA_CHROME_INSTALL_STEPS;
 
 /** سطور مختصرة للمشاركة (واتساب / دعوة الغرفة) */
 export function getPwaInstallShareLines() {

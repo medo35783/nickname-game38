@@ -1,16 +1,23 @@
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 import { PWA_MANIFEST } from '../../core/pwaManifest';
-import { PWA_ANDROID_INSTALL_STEPS, PWA_IOS_INSTALL_STEPS } from '../../core/pwaInstall';
+import {
+  PWA_ANDROID_PLAY_PROTECT_NOTE,
+  PWA_CHROME_INSTALL_STEPS,
+  PWA_IOS_INSTALL_STEPS,
+  PWA_SAMSUNG_INSTALL_STEPS,
+  isSamsungInternetBrowser,
+} from '../../core/pwaInstall';
 import PlatformOsIcon from '../../shared/PlatformOsIcon';
 
 export default function PwaInstallCard({ notify, compact = false }) {
   const { canInstall, isIos, isAndroid, installing, install, showCard } = usePwaInstall();
+  const isSamsung = isSamsungInternetBrowser();
 
   if (!showCard) return null;
 
   const handleInstall = async () => {
     if (!canInstall) {
-      notify?.('من Chrome: ⋮ ⬅️ تثبيت التطبيق', 'info');
+      notify?.('من Chrome: ⋮ ⬅️ إضافة للشاشة الرئيسية', 'info');
       return;
     }
 
@@ -23,7 +30,7 @@ export default function PwaInstallCard({ notify, compact = false }) {
       notify?.('ألغيت التثبيت — يمكنك المحاولة لاحقاً', 'info');
       return;
     }
-    notify?.('تعذّر التثبيت — جرّب ⋮ ⬅️ تثبيت التطبيق من Chrome', 'error');
+    notify?.('تعذّر التثبيت — جرّب ⋮ ⬅️ إضافة للشاشة الرئيسية', 'error');
   };
 
   const renderSteps = (os, steps, label) => (
@@ -49,7 +56,7 @@ export default function PwaInstallCard({ notify, compact = false }) {
         لعبك أسرع؟ ثبّت {PWA_MANIFEST.short_name} على شاشتك (مرة واحدة)
       </p>
 
-      {canInstall ? (
+      {canInstall && !isSamsung ? (
         <button
           type="button"
           className="btn btn-arena pwa-install-card__btn"
@@ -62,18 +69,18 @@ export default function PwaInstallCard({ notify, compact = false }) {
 
       {isIos ? renderSteps('apple', PWA_IOS_INSTALL_STEPS, 'iPhone') : null}
 
-      {isAndroid ? (
+      {isAndroid && isSamsung ? renderSteps('android', PWA_SAMSUNG_INSTALL_STEPS, 'Samsung Internet') : null}
+
+      {isAndroid && !isSamsung ? (
         <>
-          <p className="pwa-install-card__trust">
-            تحذير Play Protect يظهر أحياناً لتطبيقات الويب الجديدة — ليس فيروساً. التطبيق يعمل داخل Chrome ولا يصل لبياناتك خارج الموقع.
-          </p>
-          {renderSteps('android', PWA_ANDROID_INSTALL_STEPS, 'Android')}
+          {renderSteps('android', PWA_CHROME_INSTALL_STEPS, 'Google Chrome')}
+          <p className="pwa-install-card__trust">{PWA_ANDROID_PLAY_PROTECT_NOTE}</p>
         </>
       ) : null}
 
       {!isIos && !isAndroid ? (
         <p className="pwa-install-card__hint">
-          من متصفح الجوال: ⋮ ⬅️ تثبيت التطبيق أو إضافة للشاشة الرئيسية
+          من متصفح الجوال: ⋮ ⬅️ إضافة للشاشة الرئيسية
         </p>
       ) : (
         <p className="pwa-install-card__hint">

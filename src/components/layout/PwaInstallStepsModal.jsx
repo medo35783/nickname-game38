@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PWA_ANDROID_INSTALL_STEPS, PWA_IOS_INSTALL_STEPS } from '../../core/pwaInstall';
+import {
+  PWA_ANDROID_PLAY_PROTECT_NOTE,
+  PWA_CHROME_INSTALL_STEPS,
+  PWA_IOS_INSTALL_STEPS,
+  PWA_SAMSUNG_INSTALL_STEPS,
+} from '../../core/pwaInstall';
+import { PWA_ICON_512_PATH } from '../../core/pwaManifest';
 import PlatformOsIcon from '../../shared/PlatformOsIcon';
 
 export default function PwaInstallStepsModal({ open, variant, onClose, onInstall, canInstall, installing }) {
@@ -30,8 +36,10 @@ export default function PwaInstallStepsModal({ open, variant, onClose, onInstall
   if (!open) return null;
 
   const isIos = variant === 'ios';
-  const steps = isIos ? PWA_IOS_INSTALL_STEPS : PWA_ANDROID_INSTALL_STEPS;
-  const title = isIos ? 'تثبيت على iPhone' : 'تثبيت على Android';
+  const isSamsung = variant === 'samsung';
+  const title = isIos ? 'تثبيت على iPhone' : isSamsung ? 'تثبيت Samsung Internet' : 'تثبيت Google Chrome';
+  const steps = isIos ? PWA_IOS_INSTALL_STEPS : isSamsung ? PWA_SAMSUNG_INSTALL_STEPS : PWA_CHROME_INSTALL_STEPS;
+  const browserLabel = isSamsung ? 'Samsung Internet' : 'Google Chrome';
 
   const modal = (
     <div
@@ -48,9 +56,19 @@ export default function PwaInstallStepsModal({ open, variant, onClose, onInstall
           ×
         </button>
 
-        <div className="pwa-install-modal__head">
-          <PlatformOsIcon os={isIos ? 'apple' : 'android'} size={22} />
-          <h2 id="pwa-install-modal-title">{title}</h2>
+        <div className="pwa-install-modal__brand">
+          <img
+            className="pwa-install-modal__icon"
+            src={PWA_ICON_512_PATH}
+            alt=""
+            width={72}
+            height={72}
+            draggable={false}
+          />
+          <div className="pwa-install-modal__brand-text">
+            <PlatformOsIcon os={isIos ? 'apple' : 'android'} size={18} />
+            <h2 id="pwa-install-modal-title">{title}</h2>
+          </div>
         </div>
 
         {isIos ? (
@@ -59,7 +77,7 @@ export default function PwaInstallStepsModal({ open, variant, onClose, onInstall
           </p>
         ) : (
           <>
-            {canInstall ? (
+            {!isSamsung && canInstall ? (
               <button
                 type="button"
                 className="btn btn-arena pwa-install-modal__install-btn"
@@ -69,22 +87,25 @@ export default function PwaInstallStepsModal({ open, variant, onClose, onInstall
                 {installing ? '⏳ جاري التثبيت…' : '📲 تثبيت التطبيق الآن'}
               </button>
             ) : null}
-            <p className="pwa-install-modal__lead">
-              افتح القائمة (⋮) ثم اختر «تثبيت التطبيق».
-            </p>
-            <p className="pwa-install-modal__trust">
-              إذا ظهر تحذير Play Protect روتيني، اختر تثبيت على أي حال — التطبيق آمن بالكامل.
-            </p>
+
+            <p className="pwa-install-modal__browser-tag">{browserLabel}</p>
           </>
         )}
 
         <ol className="pwa-install-steps pwa-install-modal__steps" aria-label={`خطوات ${title}`}>
-          {steps.map((step) => (
+          {steps.map((step, index) => (
             <li key={step} className="pwa-install-steps__item">
-              {step}
+              <span className="pwa-install-steps__num" aria-hidden>
+                {index + 1}
+              </span>
+              <span>{step}</span>
             </li>
           ))}
         </ol>
+
+        {!isIos ? (
+          <p className="pwa-install-modal__trust">{PWA_ANDROID_PLAY_PROTECT_NOTE}</p>
+        ) : null}
       </div>
     </div>
   );

@@ -51,6 +51,51 @@
   margin-bottom: 14px;
 }
 
+.lobby-promo--carousel .lobby-promo__viewport {
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.lobby-promo__card--slide {
+  flex: 1 1 auto;
+  width: 100%;
+  animation: lobby-promo-fade 0.45s ease;
+}
+
+@keyframes lobby-promo-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lobby-promo__dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lobby-promo__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.lobby-promo__dot--on {
+  background: var(--gold);
+  transform: scale(1.2);
+}
+
 .lobby-promo__track {
   display: flex;
   gap: 10px;
@@ -118,6 +163,28 @@
   font-size: 10px;
   font-weight: 900;
   color: var(--gold);
+}
+
+.admin-lobby-ad-row {
+  padding: 10px 0;
+}
+
+.admin-lobby-preview {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-lobby-preview .lobby-promo__card {
+  max-width: 100%;
+}
+
+.admin-template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .admin-sponsor-preview {

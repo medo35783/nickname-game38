@@ -32,6 +32,7 @@ function normalizeAward(id, raw) {
     sponsorName: raw.sponsorName || null,
     sponsorLogoUrl: raw.sponsorLogoUrl || null,
     prizeOffer: raw.prizeOffer || '',
+    couponCode: raw.couponCode || '',
     winnerName: raw.winnerName || '',
     status: raw.status || 'eligible',
     notes: raw.notes || '',
@@ -102,6 +103,12 @@ export async function fetchPrizeAwards() {
     .filter(Boolean);
 }
 
+export async function fetchAwardBySessionKey(sessionKeyValue) {
+  if (!sessionKeyValue) return null;
+  const list = await fetchPrizeAwards();
+  return list.find((a) => a.sessionKey === sessionKeyValue) || null;
+}
+
 export async function registerPrizeSession(sessionRow) {
   const key = sessionRow.sessionKey || sessionKey(sessionRow.codeId, sessionRow.sessionTs);
   const data = {
@@ -118,9 +125,10 @@ export async function registerPrizeSession(sessionRow) {
     sponsorId: sessionRow.sponsorId || null,
     sponsorName: sessionRow.sponsorName || null,
     prizeOffer: sessionRow.prizeOffer || '',
+    couponCode: sessionRow.couponCode || '',
     sponsorLogoUrl: sessionRow.sponsorLogoUrl || null,
-    winnerName: '',
-    status: 'eligible',
+    winnerName: sessionRow.winnerName || '',
+    status: sessionRow.status || 'eligible',
     notes: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -134,6 +142,8 @@ export async function updatePrizeAward(id, patch) {
   if (!id) return;
   const next = { updatedAt: Date.now() };
   if (patch.winnerName !== undefined) next.winnerName = String(patch.winnerName || '').trim().slice(0, 80);
+  if (patch.couponCode !== undefined) next.couponCode = String(patch.couponCode || '').trim().slice(0, 40);
+  if (patch.prizeOffer !== undefined) next.prizeOffer = String(patch.prizeOffer || '').slice(0, 120);
   if (patch.status) next.status = patch.status;
   if (patch.notes !== undefined) next.notes = String(patch.notes || '').slice(0, 300);
   if (patch.status === 'awarded' && patch.winnerName) next.status = 'awarded';

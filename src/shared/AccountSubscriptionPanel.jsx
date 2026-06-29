@@ -1,4 +1,4 @@
-import { formatCodeForDisplay } from '../firebaseHelpers';
+import { formatCodeForDisplay, formatSubscriptionDuration } from '../core/firebaseHelpers';
 import {
   fmt,
   formatAccountDate,
@@ -30,7 +30,8 @@ export default function AccountSubscriptionPanel({
   if (isActive && activeCode) {
     const codeStr = formatCodeForDisplay(activeCode.code) || '—';
     const { days, hours, minutes, urgent } = subscriptionTimeLeft(activeCode.expiresAt);
-    const { pct, usedDays, totalDays } = subscriptionProgress(activeCode);
+    const { pct, usedDays, totalDays, isHourly } = subscriptionProgress(activeCode);
+    const durationLabel = formatSubscriptionDuration(activeCode);
 
     return (
       <section className={`acct-sub acct-sub--active${urgent ? ' acct-sub--urgent' : ''}`}>
@@ -51,18 +52,34 @@ export default function AccountSubscriptionPanel({
         </div>
 
         <div className="acct-sub__countdown">
-          <span className="acct-sub__countdown-num">{fmt(days)}</span>
-          <span className="acct-sub__countdown-unit">يوم متبقي</span>
-          {(hours > 0 || days === 0) && (
-            <span className="acct-sub__countdown-sub">
-              + {fmt(hours)} س · {fmt(minutes)} د
-            </span>
+          {isHourly ? (
+            <>
+              <span className="acct-sub__countdown-num">{fmt(hours + days * 24)}</span>
+              <span className="acct-sub__countdown-unit">ساعة متبقية</span>
+              <span className="acct-sub__countdown-sub">
+                + {fmt(minutes)} د
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="acct-sub__countdown-num">{fmt(days)}</span>
+              <span className="acct-sub__countdown-unit">يوم متبقي</span>
+              {(hours > 0 || days === 0) && (
+                <span className="acct-sub__countdown-sub">
+                  + {fmt(hours)} س · {fmt(minutes)} د
+                </span>
+              )}
+            </>
           )}
         </div>
 
         <div className="acct-sub__progress">
           <div className="acct-sub__progress-labels">
-            <span>استُخدم {fmt(usedDays)} من {fmt(totalDays)} يوم</span>
+            <span>
+              {isHourly
+                ? `استُخدم ${fmt(usedDays)} من ${fmt(totalDays)} ساعة`
+                : `استُخدم ${fmt(usedDays)} من ${fmt(totalDays)} يوم`}
+            </span>
             <span>{fmt(100 - pct)}% متبقي</span>
           </div>
           <div className="acct-sub__progress-track">
@@ -81,7 +98,7 @@ export default function AccountSubscriptionPanel({
           </div>
           <div className="acct-sub__detail">
             <span className="acct-sub__detail-lbl">مدة الباقة</span>
-            <span className="acct-sub__detail-val">{fmt(activeCode.duration)} يوم</span>
+            <span className="acct-sub__detail-val">{durationLabel}</span>
           </div>
           <div className="acct-sub__detail">
             <span className="acct-sub__detail-lbl">سجل التفعيلات</span>

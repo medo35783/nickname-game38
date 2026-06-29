@@ -2984,6 +2984,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           setTab={setTab}
           setSelectedGame={setSelectedGame}
           onCreateAccount={() => setTab('account')}
+          roomCode={roomCode}
+          myId={myId}
+          notify={notify}
         />
       );
     }
@@ -3012,7 +3015,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       />
       {renderOverlays()}
       {roomCode && phase && !['lobby', 'ended', 'cancelled'].includes(phase) ? (
-        <SponsorRoundBadge gameKey="titles" phase={phase} />
+        <SponsorRoundBadge gameKey="titles" phase={phase} roundNumber={roundNum || 1} />
       ) : null}
       {mainEl}
     </div>

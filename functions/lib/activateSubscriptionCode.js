@@ -130,8 +130,11 @@ async function activateSubscriptionCodeHandler(request) {
 
     const now = Date.now();
     const isFirstActivation = foundCodeData.status === 'unused';
+    const durationHours = Number(foundCodeData.durationHours);
     const expiresAt = isFirstActivation
-      ? now + (Number(foundCodeData.duration) || 0) * 24 * 60 * 60 * 1000
+      ? (Number.isFinite(durationHours) && durationHours > 0
+        ? now + durationHours * 60 * 60 * 1000
+        : now + (Number(foundCodeData.duration) || 0) * 24 * 60 * 60 * 1000)
       : foundCodeData.expiresAt;
 
     devices[deviceInfo.fingerprint] = {
@@ -139,12 +142,19 @@ async function activateSubscriptionCodeHandler(request) {
       activatedAt: now,
     };
 
+    const activationMeta = {};
+    if (foundCodeData.source) activationMeta.source = foundCodeData.source;
+    if (Number.isFinite(durationHours) && durationHours > 0) activationMeta.durationHours = durationHours;
+    if (foundCodeData.promoNote) activationMeta.promoNote = foundCodeData.promoNote;
+
     const activeSummary = {
       codeId: foundCodeId,
       code: storedCode,
       activatedAt: isFirstActivation ? now : foundCodeData.activatedAt ?? now,
       expiresAt,
       duration: foundCodeData.duration,
+      price: foundCodeData.price,
+      ...activationMeta,
       ...buildActiveCodeSponsorPayload(foundCodeData),
     };
 
@@ -159,6 +169,7 @@ async function activateSubscriptionCodeHandler(request) {
       expiresAt,
       userId: uid,
       devices,
+      ...activationMeta,
     };
 
     const phone = normalizeWhatsappPhone(phoneOpt);
@@ -183,6 +194,7 @@ async function activateSubscriptionCodeHandler(request) {
         code: formatCodeForDisplay(storedCode),
         codeId: foundCodeId,
         duration: Number(foundCodeData.duration) || 0,
+        ...activationMeta,
         activatedAt: activeSummary.activatedAt,
         expiresAt,
         recordedAt: now,

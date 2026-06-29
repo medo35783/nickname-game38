@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { subscribeActiveSponsors, pickSponsorForGame } from '../core/platformSponsors';
+import {
+  subscribeActiveSponsors,
+  resolveSponsorForRound,
+} from '../core/platformSponsors';
 import { readActiveCodeSponsorFromLocal } from '../core/sponsorStatsHelpers';
 import '../styles/sponsor-promo.css';
 
 /**
- * شارة الراعي أثناء الجولات — كود مرتبط أولاً ثم راعي المنصة
+ * شارة الراعي أثناء الجولات — كود حصري أو تناوب round-robin
  */
-export default function SponsorRoundBadge({ gameKey, phase = null, className = '' }) {
+export default function SponsorRoundBadge({
+  gameKey,
+  phase = null,
+  roundNumber = 1,
+  className = '',
+}) {
   const [platformSponsors, setPlatformSponsors] = useState([]);
   const [codeSponsor, setCodeSponsor] = useState(() => readActiveCodeSponsorFromLocal());
 
@@ -26,10 +34,16 @@ export default function SponsorRoundBadge({ gameKey, phase = null, className = '
     };
   }, []);
 
-  const sponsor = useMemo(() => {
-    if (codeSponsor?.id) return codeSponsor;
-    return pickSponsorForGame(platformSponsors, gameKey);
-  }, [codeSponsor, platformSponsors, gameKey]);
+  const sponsor = useMemo(
+    () =>
+      resolveSponsorForRound({
+        codeSponsor,
+        platformSponsors,
+        gameKey,
+        roundNumber,
+      }),
+    [codeSponsor, platformSponsors, gameKey, roundNumber]
+  );
 
   if (!sponsor) return null;
 

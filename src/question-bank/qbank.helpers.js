@@ -16,7 +16,10 @@ export const QB_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 export const QB_TYPES = ['multiple_choice', 'true_false', 'open_question', 'written_text'];
 
-export const QB_GAME_TYPES = ['qumayri', 'titles', 'hesbah', 'all'];
+export const QB_GAME_TYPES = ['qumayri', 'hesbah', 'all'];
+
+/** ألعاب البنك في الواجهة — بدون الألقاب (لعبة تخمين، لا أسئلة) */
+export const QB_BANK_GAME_TYPES = ['qumayri', 'hesbah', 'all'];
 
 export const QB_AUDIENCES = ['general', 'family', 'kids'];
 
@@ -30,9 +33,15 @@ const QB_GAME_TYPE_ALIASES = {
   'حَسْبة': 'hesbah',
   'حَسبة': 'hesbah',
   'القميري': 'qumayri',
-  'الألقاب': 'titles',
   'كل الألعاب': 'all',
 };
+
+/** أسئلة الألقاب خارج بنك الأسئلة */
+export function isQuestionEligibleForBank(question) {
+  const types = normalizeGameTypes(question?.gameTypes);
+  if (!types.length) return true;
+  return !types.includes('titles');
+}
 
 /** توحيد gameTypes (sniper → hesbah، إلخ) وإزالة التكرار */
 export function normalizeGameTypes(gameTypes) {
@@ -65,6 +74,7 @@ export function assertGameTypesValid(rawGameTypes) {
 
   const normalized = normalizeGameTypes(rawList);
   if (!normalized.length) return 'قيمة اللعبة غير صحيحة';
+  if (normalized.includes('titles')) return 'الألقاب لا تستخدم بنك الأسئلة';
 
   const hasUnknown = rawList.some((raw) => {
     const token = String(raw || '').trim();
@@ -383,7 +393,9 @@ export async function fetchGameQuestionsAdvanced({
   const snapshot = await get(approvedQuestionsQuery);
   const activeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
 
-  const questions = toQuestionsArray(snapshot).filter((question) => {
+  const questions = toQuestionsArray(snapshot)
+    .filter(isQuestionEligibleForBank)
+    .filter((question) => {
     if (difficulty_level && question.difficulty_level !== difficulty_level) return false;
     if (audience && (question.audience || 'general') !== audience) return false;
     if (!questionMatchesGameType(question, gameType)) return false;
@@ -405,6 +417,7 @@ export async function fetchGameAvailableCategories({ gameType, audience } = {}) 
   const categoryCounts = {};
 
   toQuestionsArray(snapshot).forEach((question) => {
+    if (!isQuestionEligibleForBank(question)) return;
     if (!matchesGameFilters(question, { gameType, audience: audience || undefined })) return;
     const cat = question.category;
     if (!cat || !QB_CATEGORIES.includes(cat)) return;

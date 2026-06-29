@@ -39,12 +39,29 @@ export function subscriptionProgress(activeCode) {
   const expiresAt = Number(activeCode?.expiresAt) || 0;
   const activatedAt = Number(activeCode?.activatedAt) || 0;
   const durationMs = expiresAt - activatedAt;
-  if (!durationMs || durationMs <= 0) return { pct: 0, usedDays: 0, totalDays: Number(activeCode?.duration) || 0 };
+  const hoursTotal = Number(activeCode?.durationHours);
+  const isHourly = Number.isFinite(hoursTotal) && hoursTotal > 0;
+
+  if (!durationMs || durationMs <= 0) {
+    return {
+      pct: 0,
+      usedDays: 0,
+      totalDays: isHourly ? hoursTotal : Number(activeCode?.duration) || 0,
+      isHourly,
+    };
+  }
+
   const elapsed = Math.max(0, Date.now() - activatedAt);
   const pct = Math.min(100, Math.max(0, Math.round((elapsed / durationMs) * 100)));
+
+  if (isHourly) {
+    const usedHours = Math.min(hoursTotal, Math.floor(elapsed / 3600000));
+    return { pct, usedDays: usedHours, totalDays: hoursTotal, isHourly: true };
+  }
+
   const totalDays = Number(activeCode?.duration) || Math.ceil(durationMs / 86400000);
   const usedDays = Math.min(totalDays, Math.floor(elapsed / 86400000));
-  return { pct, usedDays, totalDays };
+  return { pct, usedDays, totalDays, isHourly: false };
 }
 
 export function formatRelativeTime(ts) {

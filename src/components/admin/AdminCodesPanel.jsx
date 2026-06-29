@@ -57,6 +57,21 @@ function formatDate(ts) {
   }
 }
 
+function getCodeSource(row) {
+  return row?.source === 'promo' ? 'promo' : 'paid';
+}
+
+function formatCodeDuration(row) {
+  const h = Number(row?.durationHours);
+  if (Number.isFinite(h) && h > 0) return h === 1 ? '1 ساعة' : `${h} ساعات`;
+  const d = Number(row?.duration);
+  return d ? `${d} يوم` : '—';
+}
+
+function sourceLabel(source) {
+  return source === 'promo' ? 'ترويجي' : 'مدفوع';
+}
+
 function mergeByGameStats(a = {}, b = {}) {
   const keys = ['titles', 'fameeri', 'hesbah'];
   const out = { ...a };
@@ -94,6 +109,10 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
   const [selectedPkg, setSelectedPkg] = useState(PACKAGES[0]);
   /** عدد الأكواد المراد توليدها */
   const [countInput, setCountInput] = useState(10);
+  /** ملاحظة ترويج (محل / عائلة) */
+  const [promoNote, setPromoNote] = useState('');
+  /** فلتر مصدر الكود في القائمة */
+  const [sourceFilter, setSourceFilter] = useState('all');
   /** تحميل أثناء التوليد */
   const [generating, setGenerating] = useState(false);
   /** آخر دفعة مولّدة (للعرض والنسخ) */
@@ -294,6 +313,8 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
     let unused = 0;
     let active = 0;
     let expired = 0;
+    let promo = 0;
+    let paid = 0;
     for (const row of rows) {
       total += 1;
       const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
@@ -301,9 +322,19 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
       if (eff === 'unused') unused += 1;
       else if (eff === 'active') active += 1;
       else if (eff === 'expired') expired += 1;
+      if (getCodeSource(merged) === 'promo') promo += 1;
+      else paid += 1;
     }
-    return { total, unused, active, expired };
+    return { total, unused, active, expired, promo, paid };
   }, [rows, indexByCode]);
+
+  const filteredRows = useMemo(() => {
+    if (sourceFilter === 'all') return rows;
+    return rows.filter((row) => {
+      const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
+      return getCodeSource(merged) === sourceFilter;
+    });
+  }, [rows, indexByCode, sourceFilter]);
 
   const platformMarketing = useMemo(() => {
     const statsList = Object.values(codeStatsById)
@@ -317,7 +348,7 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
     return Math.min(100, Math.max(1, x));
   }, []);
 
-  /** توليد دفعة أكواد */
+  /** توليد دفعة أكواد مدفوعة */
   const handleGenerate = async () => {
     const n = clampCount(Number(countInput));
     setCountInput(n);
@@ -327,11 +358,40 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
     const created = [];
     try {
       for (let i = 0; i < n; i += 1) {
-        const rec = await createCode(selectedPkg.duration, selectedPkg.price);
+        const rec = await createCode(selectedPkg.duration, selectedPkg.price, { source: 'paid' });
         created.push(formatCodeForDisplay(rec.code));
       }
       setGeneratedLines(created);
       const msg = `تم توليد ${created.length} كود بنجاح (${selectedPkg.labelShort} / ${selectedPkg.labelPrice})`;
+      setSuccessMsg(msg);
+      notify(msg, 'success');
+    } catch (e) {
+      const errText = e?.message || 'حدث خطأ أثناء توليد الأكواد';
+      notify(errText, 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /** توليد أكواد ترويجية — 6 ساعات، بدون احتساب إيراد */
+  const handleGeneratePromo = async () => {
+    const n = clampCount(Number(countInput));
+    setCountInput(n);
+    setGenerating(true);
+    setSuccessMsg('');
+    setGeneratedLines([]);
+    const created = [];
+    try {
+      for (let i = 0; i < n; i += 1) {
+        const rec = await createCode(0, 0, {
+          source: 'promo',
+          durationHours: 6,
+          promoNote: promoNote.trim() || undefined,
+        });
+        created.push(formatCodeForDisplay(rec.code));
+      }
+      setGeneratedLines(created);
+      const msg = `تم توليد ${created.length} كود ترويجي (6 ساعات)`;
       setSuccessMsg(msg);
       notify(msg, 'success');
     } catch (e) {
@@ -411,13 +471,14 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
       notify('لا توجد بيانات للتصدير', 'info');
       return;
     }
-    const header = ['code', 'status', 'duration_days', 'price_sar', 'created_at'];
+    const header = ['code', 'status', 'source', 'duration_days', 'duration_hours', 'price_sar', 'promo_note', 'created_at'];
     const lines = rows.map((row) => {
       const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
       const eff = getEffectiveStatus(merged);
       const code = String(formatCodeForDisplay(row.code) || '').replace(/"/g, '""');
       const created = row.createdAt ? new Date(row.createdAt).toISOString() : '';
-      return `"${code}","${eff}",${Number(row.duration) || 0},${Number(row.price) || 0},"${created}"`;
+      const note = String(row.promoNote || '').replace(/"/g, '""');
+      return `"${code}","${eff}","${getCodeSource(merged)}",${Number(row.duration) || 0},${Number(row.durationHours) || 0},${Number(row.price) || 0},"${note}","${created}"`;
     });
     const csv = [header.join(','), ...lines].join('\r\n');
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
@@ -537,6 +598,8 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
           {statBox('غير مستخدم', stats.unused, 'var(--blue)')}
           {statBox('مُفعّل', stats.active, 'var(--green)')}
           {statBox('منتهي', stats.expired, 'var(--red)')}
+          {statBox('ترويجي', stats.promo, 'var(--gold)')}
+          {statBox('مدفوع', stats.paid, 'var(--brand-blue)')}
         </div>
       </div>
 
@@ -566,9 +629,9 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
       </div>
       )}
 
-      {/* توليد أكواد */}
+      {/* توليد أكواد مدفوعة */}
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="ctitle">✨ توليد أكواد جديدة</div>
+        <div className="ctitle">✨ توليد أكواد مدفوعة</div>
 
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>اختر الباقة</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
@@ -613,7 +676,7 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
         </div>
 
         <button type="button" className="btn bg mt2" style={{ width: '100%' }} disabled={generating} onClick={handleGenerate}>
-          {generating ? '⏳ جاري التوليد...' : '⚡ توليد الأكواد'}
+          {generating ? '⏳ جاري التوليد...' : '⚡ توليد أكواد مدفوعة'}
         </button>
 
         {successMsg && (
@@ -650,13 +713,66 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
         )}
       </div>
 
+      {/* توليد أكواد ترويجية */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 12,
+          border: '1px solid rgba(212,175,55,.25)',
+          background: 'linear-gradient(135deg, rgba(212,175,55,.06), transparent)',
+        }}
+      >
+        <div className="ctitle">🎁 أكواد ترويجية (6 ساعات)</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.55 }}>
+          للأهل والأصدقاء ومحلات add value — لا تُعدّ باقة رسمية ولا تُحتسب ضمن الإيرادات.
+        </div>
+
+        <div className="ig">
+          <label className="lbl">ملاحظة (اختياري — محل / عائلة)</label>
+          <input
+            className="inp"
+            type="text"
+            maxLength={120}
+            value={promoNote}
+            disabled={generating}
+            placeholder="مثال: مقهى النخيل"
+            onChange={(e) => setPromoNote(e.target.value)}
+          />
+        </div>
+
+        <button
+          type="button"
+          className="btn bgh mt2"
+          style={{ width: '100%', borderColor: 'rgba(212,175,55,.45)', color: 'var(--gold)' }}
+          disabled={generating}
+          onClick={handleGeneratePromo}
+        >
+          {generating ? '⏳ جاري التوليد...' : '🎁 توليد أكواد ترويجية'}
+        </button>
+      </div>
+
       {/* قائمة الأكواد */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
           <div className="ctitle" style={{ marginBottom: 0 }}>
-            📋 جميع الأكواد ({rows.length})
+            📋 جميع الأكواد ({filteredRows.length}{sourceFilter !== 'all' ? ` / ${rows.length}` : ''})
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            {[
+              { id: 'all', label: 'الكل' },
+              { id: 'paid', label: 'مدفوع' },
+              { id: 'promo', label: 'ترويجي' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                className={`btn bgh bxs ${sourceFilter === id ? 'bo' : ''}`}
+                style={{ width: 'auto', fontSize: 10 }}
+                onClick={() => setSourceFilter(id)}
+              >
+                {label}
+              </button>
+            ))}
             <button
               type="button"
               className="btn bgh bsm"
@@ -681,6 +797,7 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
               <tr style={{ color: 'var(--muted)', textAlign: 'right' }}>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>الكود</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>الحالة</th>
+                <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>المصدر</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>المدة</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>السعر</th>
                 <th style={{ padding: '8px 6px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>تاريخ الإنشاء</th>
@@ -688,14 +805,14 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>
-                    لا توجد أكواد بعد
+                  <td colSpan={7} style={{ padding: 16, textAlign: 'center', color: 'var(--muted)' }}>
+                    {rows.length === 0 ? 'لا توجد أكواد بعد' : 'لا توجد أكواد مطابقة للفلتر'}
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                filteredRows.map((row) => {
                   const merged = indexByCode[row.code] ? { ...row, ...indexByCode[row.code] } : row;
                   const eff = getEffectiveStatus(merged);
                   const rowColor =
@@ -757,7 +874,21 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
                           </div>
                         </td>
                         <td style={{ padding: '10px 6px', fontWeight: 800, color: rowColor }}>{statusLabel(eff)}</td>
-                        <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.duration ?? '—'} يوم</td>
+                        <td style={{ padding: '10px 6px' }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: getCodeSource(merged) === 'promo' ? 'rgba(212,175,55,.15)' : 'rgba(37,111,168,.12)',
+                              color: getCodeSource(merged) === 'promo' ? 'var(--gold)' : 'var(--brand-blue)',
+                            }}
+                          >
+                            {sourceLabel(getCodeSource(merged))}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{formatCodeDuration(merged)}</td>
                         <td style={{ padding: '10px 6px', color: 'var(--text)' }}>{row.price ?? '—'} ر.س</td>
                         <td style={{ padding: '10px 6px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(row.createdAt)}</td>
                         <td style={{ padding: '10px 6px', textAlign: 'center' }}>

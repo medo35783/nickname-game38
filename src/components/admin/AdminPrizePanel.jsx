@@ -8,6 +8,7 @@ import {
   PRIZE_STATUS,
 } from '../../core/prizeAwards';
 import { openPrizeCertificateReport } from '../../core/prizeCertificateReport';
+import { claimCouponFromPool, readSponsorCouponMeta } from '../../core/couponPool';
 
 function gameLabel(type) {
   if (type === 'fameeri') return '🦅 القميري';
@@ -56,7 +57,19 @@ export default function AdminPrizePanel({ notify, codeRows = [], codeStatsById =
     }
     setBusy(award.id);
     try {
-      await updatePrizeAward(award.id, { winnerName: name, status: 'awarded' });
+      let couponCode = award.couponCode || '';
+      if (!couponCode && award.sponsorId) {
+        const meta = await readSponsorCouponMeta(award.sponsorId);
+        if ((meta?.couponPoolRemaining || 0) > 0) {
+          couponCode = (await claimCouponFromPool(award.sponsorId)) || '';
+        }
+      }
+      await updatePrizeAward(award.id, {
+        winnerName: name,
+        status: 'awarded',
+        couponCode,
+        prizeOffer: couponCode ? award.prizeOffer || (await readSponsorCouponMeta(award.sponsorId))?.prizeOffer : '',
+      });
       notify?.('تم تحديد الفائز', 'success');
     } catch {
       notify?.('فشل الحفظ', 'error');
@@ -156,6 +169,7 @@ export default function AdminPrizePanel({ notify, codeRows = [], codeStatsById =
                 <div className="admin-prize-eligible__meta">
                   {a.sponsorName ? <span>🤝 {a.sponsorName}</span> : null}
                   {a.prizeOffer ? <span>🎁 {a.prizeOffer}</span> : null}
+                  {a.couponCode ? <span>🎫 {a.couponCode}</span> : null}
                   <span>{a.playerCount} لاعب · {a.totalRounds} جولة</span>
                 </div>
                 <div className="code-admin-note__row" style={{ marginTop: 8 }}>

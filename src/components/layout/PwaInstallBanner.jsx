@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 import PwaInstallStepsModal from './PwaInstallStepsModal';
 
@@ -9,27 +9,11 @@ const BANNER_COPY = {
 };
 
 export default function PwaInstallBanner() {
-  const {
-    showBanner,
-    bannerVariant,
-    dismissBanner,
-    canInstall,
-    install,
-    installing,
-  } = usePwaInstall();
-
+  const { showBanner, bannerVariant, canInstall, install, installing } = usePwaInstall();
   const [modalOpen, setModalOpen] = useState(false);
-  const [hiding, setHiding] = useState(false);
-
-  const handleDismiss = useCallback(() => {
-    setHiding(true);
-    window.setTimeout(() => dismissBanner(), 260);
-  }, [dismissBanner]);
 
   const handleBannerClick = async () => {
-    if (bannerVariant === 'samsung') return;
-
-    if (bannerVariant === 'ios') {
+    if (bannerVariant === 'ios' || bannerVariant === 'samsung') {
       setModalOpen(true);
       return;
     }
@@ -51,35 +35,15 @@ export default function PwaInstallBanner() {
   if (!showBanner) return null;
 
   const text = BANNER_COPY[bannerVariant] || BANNER_COPY.android;
-  const isActionable = bannerVariant !== 'samsung';
 
   return (
     <>
-      <div
-        className={`pwa-install-banner${hiding ? ' pwa-install-banner--hiding' : ''}`}
-        role="region"
-        aria-label="تثبيت التطبيق"
-      >
-        {isActionable ? (
-          <button type="button" className="pwa-install-banner__body" onClick={handleBannerClick}>
-            <span className="pwa-install-banner__text">{text}</span>
-            <span className="pwa-install-banner__chev" aria-hidden>
-              ‹
-            </span>
-          </button>
-        ) : (
-          <div className="pwa-install-banner__body pwa-install-banner__body--static">
-            <span className="pwa-install-banner__text">{text}</span>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="pwa-install-banner__close"
-          onClick={handleDismiss}
-          aria-label="إغلاق"
-        >
-          ×
+      <div className="pwa-install-banner" role="region" aria-label="تثبيت التطبيق">
+        <button type="button" className="pwa-install-banner__body" onClick={handleBannerClick}>
+          <span className="pwa-install-banner__text">{text}</span>
+          <span className="pwa-install-banner__chev" aria-hidden>
+            ‹
+          </span>
         </button>
       </div>
 

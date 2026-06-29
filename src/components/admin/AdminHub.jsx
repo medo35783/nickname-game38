@@ -11,6 +11,8 @@ import AdminContentPanel from './AdminContentPanel';
 import AdminUsersPanel from './AdminUsersPanel';
 import AdminHealthPanel from './AdminHealthPanel';
 import AdminAlertsStrip from './AdminAlertsStrip';
+import AdminOverviewKpi from './AdminOverviewKpi';
+import AdminQuickActions from './AdminQuickActions';
 import { useAdminAlerts } from '../../hooks/useAdminAlerts';
 import { ADMIN_PAGES, getAdminPageMeta } from './adminHubPages';
 import '../../styles/admin-hub.css';
@@ -34,8 +36,8 @@ function AdminPageHeader({ pageId }) {
     marketing: 'ملخص المنصة · تقرير B2B · لوحة الجوائز',
     qbank: 'إدارة الأسئلة المركزية للألعاب',
     content: 'أخبار · رعاة الجولات · إعلانات اللوبي',
-    users: 'المشرفون · الغائبون · الاقتراحات',
-    health: 'مراجعة الغرف اليتيمة · تنظيف Firebase · إعدادات',
+    users: 'المشرفون · بحث · تجديد · الاقتراحات',
+    health: 'صحة المنصة · غرف · أمان · إعدادات',
   };
 
   return (
@@ -105,6 +107,12 @@ export default function AdminHub({ notify, onBack }) {
           <>
             <AdminPageHeader pageId="overview" />
             <AdminAlertsStrip alerts={alerts} onNavigate={setPage} />
+            <AdminOverviewKpi
+              rows={snapshot.rows}
+              indexByCode={snapshot.indexByCode}
+              codeStatsById={snapshot.codeStatsById}
+            />
+            <AdminQuickActions onNavigate={setPage} />
             <AdminPulsePanel codeStatsById={snapshot.codeStatsById} />
           </>
         )}
@@ -151,6 +159,7 @@ export default function AdminHub({ notify, onBack }) {
             notify={notify}
             codeRows={snapshot.rows}
             indexByCode={snapshot.indexByCode}
+            codeStatsById={snapshot.codeStatsById}
           />
         )}
 

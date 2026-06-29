@@ -5,6 +5,8 @@ import { HESBAH_ACCENT_CSS, HESBAH_THEME, sortedHesbahPlayers } from './HesbahHe
 import { downloadHesbahVictoryImage, shareHesbahVictoryImage } from './hesbahVictoryShare';
 import HesbahTopNav from './HesbahTopNav';
 import EndGameJoinSection from '../../components/codes/EndGameJoinSection';
+import useWinnerPrize from '../../hooks/useWinnerPrize';
+import WinnerPrizeCertificate from '../../shared/WinnerPrizeCertificate';
 
 function ConfettiBurst() {
   const [bits] = useState(() =>
@@ -77,6 +79,8 @@ export default function HesbahFinal({
   onExitRequest,
   hideExitBar = false,
   joinCta = null,
+  myId = null,
+  role = 'player',
 }) {
   const list = sortedHesbahPlayers(players);
   const top3 = list.slice(0, 3);
@@ -84,6 +88,23 @@ export default function HesbahFinal({
   const winner = top3[0];
   const [sharing, setSharing] = useState(false);
   const [revealed, setRevealed] = useState(false);
+
+  const participantLabels = list.map((p) => p.name).filter(Boolean);
+  const { award, loading: prizeLoading } = useWinnerPrize({
+    enabled: Boolean(winner?.name),
+    canAward: role === 'admin' || winner?.id === myId,
+    gameType: 'hesbah',
+    roomCode,
+    winnerName: winner?.name,
+    playerCount: list.length,
+    totalRounds: Number(game?.currentQ) || Number(game?.totalRounds) || 0,
+    completed: true,
+    adminName: game?.adminName || '—',
+    participantLabels,
+    sessionTs: game?.sessionEnd || game?.endedAt,
+  });
+
+  const isWinnerView = role === 'admin' || winner?.id === myId;
 
   useEffect(() => {
     playSound('victory');
@@ -151,6 +172,13 @@ export default function HesbahFinal({
           </div>
         )}
       </div>
+
+      <WinnerPrizeCertificate
+        award={award}
+        loading={prizeLoading}
+        isWinnerView={isWinnerView}
+        notify={notify}
+      />
 
       <div className="hesbah-podium hesbah-podium--victory">
         {podiumOrder.map((p) => {

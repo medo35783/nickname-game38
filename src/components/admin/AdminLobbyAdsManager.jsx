@@ -5,6 +5,8 @@ import {
   deleteLobbyAdItem,
   LOBBY_AD_VARIANTS,
 } from '../../core/platformLobbyAds';
+import { LOBBY_AD_TEMPLATES } from '../../core/launchContentTemplates';
+import LobbyAdCard from '../../shared/LobbyAdCard';
 
 const EMPTY = {
   title: '',
@@ -15,6 +17,7 @@ const EMPTY = {
   variant: 'gold',
   active: true,
   sortOrder: 100,
+  startsAt: '',
   expiresAt: '',
 };
 
@@ -71,8 +74,33 @@ export default function AdminLobbyAdsManager({ notify }) {
       variant: item.variant,
       active: item.active,
       sortOrder: item.sortOrder || 0,
+      startsAt: item.startsAt ? new Date(item.startsAt).toISOString().slice(0, 10) : '',
       expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 10) : '',
     });
+  };
+
+  const applyTemplate = (tpl) => {
+    setEditingId(null);
+    setForm({
+      ...EMPTY,
+      title: tpl.title,
+      body: tpl.body,
+      ctaLabel: tpl.ctaLabel || '',
+      linkUrl: tpl.linkUrl || '',
+      variant: tpl.variant || 'gold',
+      sortOrder: tpl.sortOrder || 100,
+      active: tpl.active !== false,
+    });
+    notify?.(`تم تحميل قالب: ${tpl.label}`, 'success');
+  };
+
+  const previewAd = {
+    title: form.title || 'عنوان الإعلان',
+    body: form.body,
+    imageUrl: form.imageUrl,
+    linkUrl: form.linkUrl,
+    ctaLabel: form.ctaLabel,
+    variant: form.variant,
   };
 
   const handleImageFile = async (e) => {
@@ -97,6 +125,7 @@ export default function AdminLobbyAdsManager({ notify }) {
     try {
       await saveLobbyAdItem(editingId, {
         ...form,
+        startsAt: form.startsAt ? new Date(form.startsAt).getTime() : null,
         expiresAt: form.expiresAt ? new Date(form.expiresAt).getTime() : null,
       });
       notify?.(editingId ? 'تم التحديث' : 'تم النشر', 'success');
@@ -124,8 +153,21 @@ export default function AdminLobbyAdsManager({ notify }) {
   return (
     <div className="admin-content-block">
       <p className="admin-mkt-lead">
-        بانرات ترويجية تظهر في الصفحة الرئيسية للمنصة — عروض، رعاة، أو إعلانات موسمية.
+        بانرات ترويجية في الصفحة الرئيسية — كاروسيل تلقائي مع جدولة بداية/نهاية.
       </p>
+
+      <div className="admin-template-chips">
+        {LOBBY_AD_TEMPLATES.map((tpl) => (
+          <button
+            key={tpl.id}
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={() => applyTemplate(tpl)}
+          >
+            {tpl.label}
+          </button>
+        ))}
+      </div>
 
       <div className="admin-pulse-card">
         <div className="admin-pulse-card__head">
@@ -207,6 +249,15 @@ export default function AdminLobbyAdsManager({ notify }) {
             />
           </label>
           <label className="admin-form-field">
+            <span>يبدأ (اختياري)</span>
+            <input
+              className="inp"
+              type="date"
+              value={form.startsAt}
+              onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+            />
+          </label>
+          <label className="admin-form-field">
             <span>ينتهي</span>
             <input
               className="inp"
@@ -224,6 +275,15 @@ export default function AdminLobbyAdsManager({ notify }) {
             <span>نشط</span>
           </label>
         </div>
+
+        {form.title.trim() ? (
+          <div className="admin-lobby-preview admin-form-field--full">
+            <span className="lbl" style={{ display: 'block', marginBottom: 8 }}>
+              معاينة اللوبي
+            </span>
+            <LobbyAdCard ad={previewAd} />
+          </div>
+        ) : null}
 
         <div className="admin-mkt-actions">
           <button type="button" className="btn btn--gold" disabled={saving} onClick={handleSave}>
@@ -254,6 +314,12 @@ export default function AdminLobbyAdsManager({ notify }) {
               <li key={item.id} className="admin-lobby-ad-row">
                 <strong>{item.title}</strong>
                 {item.body ? <p>{item.body.slice(0, 80)}</p> : null}
+                <div className="admin-prize-eligible__meta">
+                  {item.clickCount ? <span>👆 {item.clickCount} نقرة</span> : null}
+                  {item.startsAt ? (
+                    <span>من {new Date(item.startsAt).toLocaleDateString('ar-SA')}</span>
+                  ) : null}
+                </div>
                 <div className="admin-news-row__actions">
                   <span className={`admin-hub-badge admin-hub-badge--${item.active ? 'ready' : 'soon'}`}>
                     {item.active ? 'نشط' : 'موقوف'}

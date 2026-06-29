@@ -12,7 +12,7 @@ import {
   SUPPORT_WHATSAPP,
 } from './constants';
 import { LEGAL_ORG_SUBTITLE, LEGAL_CR_NUMBER, LEGAL_ADDRESS } from './legalContent';
-import { SUBSCRIPTION_PLATFORM_FEATURES } from './subscriptionPackages';
+import { SUBSCRIPTION_PLATFORM_FEATURES, SUBSCRIPTION_PACKAGES, getEffectivePrice } from './subscriptionPackages';
 import { buildMarketingReportModel } from './marketingStatsHelpers';
 import { reportPlatformLogoHtml } from '../shared/reportBrandAssets';
 
@@ -447,6 +447,18 @@ function purposeKpiGrid(model) {
       renderKpi('معدل إكمال', `${m.completionRate}%`, 'green'),
     ].join('');
   }
+  if (purpose === 'pitch') {
+    return [
+      renderKpi('جلسات لعب حقيقية', nf(m.totalRealSessions), 'gold'),
+      renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold'),
+      renderKpi('ذروة حضور', nf(m.peakPlayers), 'purple'),
+      renderKpi('جولات قابلة للرعاية', nf(m.totalRounds), 'blue'),
+      renderKpi('ظهورات محتملة', nf(m.roundReach), 'blue'),
+      renderKpi('دقائق تفاعل', nf(m.totalEngagementMinutes), 'green'),
+      renderKpi('معدل إكمال', `${m.completionRate}%`, 'green'),
+      renderKpi('جلسات مؤهلة للجوائز', nf(model.prizeReadySessions?.length || m.couponReadySessions), 'gold'),
+    ].join('');
+  }
   return [
     renderKpi('جلسات لعب حقيقية', nf(m.totalRealSessions), 'gold'),
     renderKpi('مشاركات المتسابقين', nf(m.totalParticipants), 'gold'),
@@ -482,6 +494,7 @@ function renderGamesTotalsRow(games) {
 }
 
 function renderSponsorBlock(model) {
+  if (model.reportPurpose === 'pitch') return '';
   const s = model.sponsorMeta;
   if (!s?.name) return '';
   const logo = s.logoUrl
@@ -502,6 +515,25 @@ function renderSponsorBlock(model) {
         </div>
         ${prize}
       </div>`;
+}
+
+function renderPitchPackagesSection() {
+  const rows = SUBSCRIPTION_PACKAGES.map((p) => {
+    const price = getEffectivePrice(p);
+    return `<tr>
+      <td><strong>${esc(p.icon)} ${esc(p.name)}</strong><br/><span style="font-size:10px;color:#5c5678">${esc(p.durationSub)}</span></td>
+      <td class="num">${nf(price)} ر.س</td>
+      <td>${esc(p.titlesHighlight || '—')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="sec">
+    <h2 class="sec-title">💳 باقات الاستضافة (للمشرفين)</h2>
+    <p class="sec-lead">أسعار العرض الحالية — للمرجع عند التفاوض على رعاية منفصلة.</p>
+    <table class="data">
+      <thead><tr><th>الباقة</th><th>السعر</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 function buildReportHtml(model) {
@@ -577,6 +609,7 @@ function buildReportHtml(model) {
         من نظام تتبع جلسات ${esc(PLATFORM_NAME)}.
         ${purpose === 'sponsorship' ? 'مخصّصة لإقناع الراعي بقيمة ظهور شعاره في الجولات.' : ''}
         ${purpose === 'prize' ? 'مخصّصة لجهة تقدّم جائزة أو خصماً للفائزين — مع كشف الجلسات المؤهلة.' : ''}
+        ${purpose === 'pitch' ? 'عرض أرقام المنصة الحقيقية لراعٍ محتمل — قبل توقيع العقد وبدون شعار شركة محددة.' : ''}
       </p>
 
       ${purposeBanner}
@@ -588,6 +621,7 @@ function buildReportHtml(model) {
       <div class="kpi-grid">
         ${purposeKpiGrid(model)}
       </div>
+      ${purpose === 'pitch' ? renderPitchPackagesSection() : ''}
     </section>
 
     <section class="page">

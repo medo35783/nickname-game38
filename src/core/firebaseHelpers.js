@@ -88,28 +88,70 @@ export function generateUniqueCode() {
   return formatStoredCode(generateCodeSuffix());
 }
 
+/** مدة انتهاء الكود من لحظة التفعيل */
+export function computeCodeExpiresAt(codeData, now = Date.now()) {
+  const hours = Number(codeData?.durationHours);
+  if (Number.isFinite(hours) && hours > 0) {
+    return now + hours * 60 * 60 * 1000;
+  }
+  const days = Number(codeData?.duration) || 0;
+  return now + days * 24 * 60 * 60 * 1000;
+}
+
+/** عرض مدة الاشتراك (أيام أو ساعات للترويج) */
+export function formatSubscriptionDuration(activeCode) {
+  const hours = Number(activeCode?.durationHours);
+  if (Number.isFinite(hours) && hours > 0) {
+    return hours === 1 ? '1 ساعة' : `${hours} ساعات`;
+  }
+  const days = Number(activeCode?.duration);
+  if (days > 0) {
+    return days === 1 ? '1 يوم' : `${days} أيام`;
+  }
+  return '—';
+}
+
+function buildActivationMetaFields(codeData) {
+  const meta = {};
+  if (codeData?.source) meta.source = codeData.source;
+  const hours = Number(codeData?.durationHours);
+  if (Number.isFinite(hours) && hours > 0) meta.durationHours = hours;
+  if (codeData?.promoNote) meta.promoNote = codeData.promoNote;
+  return meta;
+}
+
 /**
  * إنشاء كود جديد في قاعدة البيانات
- * @param {number} duration - المدة بالأيام (1, 3, 7)
+ * @param {number} duration - المدة بالأيام (1, 3, 7) — 0 للترويج بالساعات
  * @param {number} price - السعر بالريال
+ * @param {{ source?: string, promoNote?: string, durationHours?: number }} [meta]
  * @returns {Promise<object>} الكود المُنشأ
  */
-export async function createCode(duration, price) {
+export async function createCode(duration, price, meta = {}) {
   try {
     const code = generateUniqueCode();
     const codeRef = push(ref(db, 'codes'));
     const codeId = codeRef.key;
+    const source = meta.source === 'promo' ? 'promo' : 'paid';
     const codeData = {
       code,
-      duration,
-      price,
+      duration: Number(duration) || 0,
+      price: Number(price) || 0,
+      source,
       status: 'unused',
       createdAt: Date.now(),
       activatedAt: null,
       expiresAt: null,
       userId: null,
-      devices: {}
+      devices: {},
     };
+
+    if (meta.durationHours) {
+      codeData.durationHours = Number(meta.durationHours);
+    }
+    if (meta.promoNote) {
+      codeData.promoNote = String(meta.promoNote).trim().slice(0, 120);
+    }
 
     const indexPayload = { codeId, ...codeData };
 
@@ -275,7 +317,7 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
     const now = Date.now();
     const isFirstActivation = foundCodeData.status === 'unused';
     const expiresAt = isFirstActivation
-      ? now + (Number(foundCodeData.duration) || 0) * 24 * 60 * 60 * 1000
+      ? computeCodeExpiresAt(foundCodeData, now)
       : foundCodeData.expiresAt;
 
     devices[deviceInfo.fingerprint] = {
@@ -283,12 +325,16 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
       activatedAt: now,
     };
 
+    const activationMeta = buildActivationMetaFields(foundCodeData);
+
     const activeSummary = {
       codeId: foundCodeId,
       code: storedCode,
       activatedAt: isFirstActivation ? now : foundCodeData.activatedAt ?? now,
       expiresAt,
       duration: foundCodeData.duration,
+      price: foundCodeData.price,
+      ...activationMeta,
       ...buildActiveCodeSponsorPayload(foundCodeData),
     };
 
@@ -303,6 +349,7 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
       expiresAt,
       userId,
       devices,
+      ...activationMeta,
     };
 
     const phone = normalizeWhatsappPhone(options.phone);
@@ -327,6 +374,7 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
         code: formatCodeForDisplay(storedCode),
         codeId: foundCodeId,
         duration: Number(foundCodeData.duration) || 0,
+        ...activationMeta,
         activatedAt: activeSummary.activatedAt,
         expiresAt,
         recordedAt: now,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatCodeForDisplay } from '../../firebaseHelpers';
+import { formatCodeForDisplay, formatSubscriptionDuration } from '../../core/firebaseHelpers';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -83,7 +83,7 @@ export default function SubscriptionTimer({ activeCode, onExpired }) {
 
   const urgent = remaining < HOUR_MS;
   const label = formatTimeRemaining(expiresAt);
-  const durationDays = activeCode.duration ?? '—';
+  const durationLabel = formatSubscriptionDuration(activeCode);
   const codeStr = formatCodeForDisplay(activeCode.code) || '—';
 
   const badgeStyle = {
@@ -142,8 +142,8 @@ export default function SubscriptionTimer({ activeCode, onExpired }) {
             </div>
 
             <div className="card2" style={{ marginBottom: 12, textAlign: 'right' }}>
-              <div className="lbl">مدة الباقة (بالأيام)</div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{durationDays}</div>
+              <div className="lbl">مدة الباقة</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{durationLabel}</div>
             </div>
 
             <div className="card2" style={{ marginBottom: 12, textAlign: 'right' }}>

@@ -14,11 +14,21 @@ import {
   QB_CATEGORIES,
   QB_DIFFICULTIES,
   QB_TYPES,
-  QB_GAME_TYPES,
+  QB_BANK_GAME_TYPES,
   QB_AUDIENCES,
   normalizeGameTypes,
   assertGameTypesValid,
+  isQuestionEligibleForBank,
 } from './qbank.helpers';
+
+const PAGE_SIZE_OPTIONS = [20, 30, 50, 100];
+const PAGE_SIZE_STORAGE_KEY = 'qbank_page_size';
+
+function readStoredPageSize() {
+  if (typeof localStorage === 'undefined') return 30;
+  const raw = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+  return PAGE_SIZE_OPTIONS.includes(raw) ? raw : 30;
+}
 
 const EMPTY_FORM = {
   question_text: '',
@@ -69,7 +79,6 @@ const STATUS_LABELS = {
 
 const GAME_TYPE_LABELS = {
   qumayri: 'القميري',
-  titles: 'الألقاب',
   hesbah: 'حَسْبة',
   all: 'كل الألعاب',
 };
@@ -379,6 +388,8 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
   const [allQuestions, setAllQuestions] = useState([]);
   const [pendingQuestions, setPendingQuestions] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [pageSize, setPageSize] = useState(readStoredPageSize);
+  const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -405,11 +416,12 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
         const all = await getAdminQuestions({});
 
         if (isActive) {
-          setAllQuestions(sortQuestions(all));
-          setQuestions(sortQuestions(all.filter((question) =>
+          const bankOnly = sortQuestions(all.filter(isQuestionEligibleForBank));
+          setAllQuestions(bankOnly);
+          setQuestions(sortQuestions(bankOnly.filter((question) =>
             questionMatchesFilters(question, { ...cleanFilters(filters), status: 'approved' })
           )));
-          setPendingQuestions(sortQuestions(all.filter((question) => question.status === 'pending')));
+          setPendingQuestions(sortQuestions(bankOnly.filter((question) => question.status === 'pending')));
         }
       } catch (loadError) {
         if (isActive) {
@@ -439,6 +451,42 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
     () => questions.filter((question) => questionMatchesSearch(question, searchText)),
     [questions, searchText]
   );
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchText, filters.category, filters.difficulty_level, filters.gameType, filters.audience]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleQuestions.length / pageSize) || 1);
+  const safePageIndex = Math.min(pageIndex, totalPages - 1);
+
+  useEffect(() => {
+    if (pageIndex !== safePageIndex) setPageIndex(safePageIndex);
+  }, [pageIndex, safePageIndex]);
+
+  const pagedQuestions = useMemo(() => {
+    const start = safePageIndex * pageSize;
+    return visibleQuestions.slice(start, start + pageSize);
+  }, [visibleQuestions, safePageIndex, pageSize]);
+
+  const pageRangeLabel = useMemo(() => {
+    if (!visibleQuestions.length) return '0';
+    const start = safePageIndex * pageSize + 1;
+    const end = Math.min(visibleQuestions.length, (safePageIndex + 1) * pageSize);
+    const totalAll = allQuestions.filter((q) => q.status === 'approved').length;
+    if (visibleQuestions.length !== questions.length) {
+      return `${start}–${end} من ${visibleQuestions.length} نتيجة (من ${totalAll} إجمالاً)`;
+    }
+    return `${start}–${end} من ${visibleQuestions.length}`;
+  }, [visibleQuestions, questions.length, allQuestions, safePageIndex, pageSize]);
+
+  function changePageSize(next) {
+    const size = PAGE_SIZE_OPTIONS.includes(next) ? next : 30;
+    setPageSize(size);
+    setPageIndex(0);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size));
+    }
+  }
 
   const bankStats = useMemo(() => {
     const approvedQuestions = allQuestions.filter((question) => question.status === 'approved');
@@ -478,11 +526,12 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
 
     try {
       const all = await getAdminQuestions({});
-      setAllQuestions(sortQuestions(all));
-      setQuestions(sortQuestions(all.filter((question) =>
+      const bankOnly = sortQuestions(all.filter(isQuestionEligibleForBank));
+      setAllQuestions(bankOnly);
+      setQuestions(sortQuestions(bankOnly.filter((question) =>
         questionMatchesFilters(question, { ...cleanFilters(filters), status: 'approved' })
       )));
-      setPendingQuestions(sortQuestions(all.filter((question) => question.status === 'pending')));
+      setPendingQuestions(sortQuestions(bankOnly.filter((question) => question.status === 'pending')));
     } catch (reloadError) {
       setError(reloadError);
       showNotice(reloadError?.message || 'تعذر تحميل الأسئلة', 'error');
@@ -982,7 +1031,7 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
               'اللعبة',
               filters.gameType,
               (value) => updateFilter('gameType', value),
-              QB_GAME_TYPES,
+              QB_BANK_GAME_TYPES,
               GAME_TYPE_LABELS
             )}
             {renderSelect(
@@ -996,13 +1045,38 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
         </div>
 
         <div className="card">
-          <div className="ctitle">
-            الأسئلة ({visibleQuestions.length}
-            {visibleQuestions.length !== questions.length ? ` من ${questions.length}` : ''})
+          <div className="ctitle" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>
+              الأسئلة ({pageRangeLabel})
+            </span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}>
+              <span style={{ color: 'var(--muted)' }}>عرض</span>
+              <select
+                className="inp"
+                style={{ width: 72, padding: '4px 8px', minHeight: 0 }}
+                value={pageSize}
+                onChange={(e) => changePageSize(Number(e.target.value))}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
           </div>
           {loading && <div style={styles.emptyState}>جاري تحميل الأسئلة...</div>}
           {!loading && visibleQuestions.length === 0 && <div style={styles.emptyState}>لا توجد أسئلة مطابقة للفلاتر أو البحث</div>}
-          {!loading && visibleQuestions.map(renderQuestionCard)}
+          {!loading && pagedQuestions.map(renderQuestionCard)}
+          {!loading && visibleQuestions.length > pageSize && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 12, alignItems: 'center' }}>
+              <button type="button" className="btn bgh bsm" disabled={safePageIndex <= 0} onClick={() => setPageIndex(0)}>◀◀</button>
+              <button type="button" className="btn bgh bsm" disabled={safePageIndex <= 0} onClick={() => setPageIndex((p) => Math.max(0, p - 1))}>◀</button>
+              <span style={{ fontSize: 12, fontWeight: 800, padding: '0 8px' }}>
+                ص {safePageIndex + 1} / {totalPages}
+              </span>
+              <button type="button" className="btn bgh bsm" disabled={safePageIndex >= totalPages - 1} onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}>▶</button>
+              <button type="button" className="btn bgh bsm" disabled={safePageIndex >= totalPages - 1} onClick={() => setPageIndex(totalPages - 1)}>▶▶</button>
+            </div>
+          )}
         </div>
       </>
     );
@@ -1299,7 +1373,7 @@ export default function QBankManager({ notify, layout = 'standalone' }) {
         <div className="ig">
           <div className="lbl">الألعاب</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-            {QB_GAME_TYPES.map((gameType) => (
+            {QB_BANK_GAME_TYPES.map((gameType) => (
               <label
                 key={gameType}
                 style={{

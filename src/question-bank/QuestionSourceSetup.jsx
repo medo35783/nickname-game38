@@ -15,7 +15,6 @@ import {
   partitionByDifficulty,
   normalizePoolToStructured,
   poolStats,
-  weaponQuotaHint,
 } from '../games/fameeri/fameeriQuestionPool';
 import { FAMEERI_IDEAL_SET_LABEL } from '../games/fameeri/fameeriQuestionSetup';
 import {
@@ -29,6 +28,7 @@ import {
 } from '../games/hesbah/hesbahBankProgress';
 import { hesbahBankFilterKey } from '../games/hesbah/HesbahHelpers';
 import { pickHesbahSessionQuestions } from '../games/hesbah/HesbahQuestions';
+import BankUsageStrip from './BankUsageStrip';
 import CustomQuestionBuilder from './CustomQuestionBuilder';
 import { flattenSessionPool } from './customQuestionPool';
 import ArenaSignupPrompt from '../shared/ArenaSignupPrompt';
@@ -59,9 +59,11 @@ export default function QuestionSourceSetup({
   const [audience, setAudience] = useState('');
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
-  const [bankPreview, setBankPreview] = useState(null);
   const [hesbahReplayMode, setHesbahReplayMode] = useState('new');
+  const [qumairiReplayMode, setQumairiReplayMode] = useState('new');
   const [hesbahBankStats, setHesbahBankStats] = useState(null);
+  const [qumairiBankStats, setQumairiBankStats] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [manualList, setManualList] = useState([]);
   const [manualSelected, setManualSelected] = useState({});
   const [customSessionPool, setCustomSessionPool] = useState(() =>
@@ -158,6 +160,49 @@ export default function QuestionSourceSetup({
     };
   }, [isHesbah, source, gameType, categories, audience, difficulty]);
 
+  useEffect(() => {
+    if (!isQumairi || source !== QSOURCE.BANK) {
+      setQumairiBankStats(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const filterKey = bankFilterKey({ categories, audience });
+
+    void (async () => {
+      try {
+        const fetched = await fetchGameQuestionsAdvanced({
+          gameType,
+          categories,
+          audience: audience || undefined,
+          count: 500,
+        });
+        if (cancelled) return;
+        const pool = normalizeBankPool(fetched);
+        const usedIds = await loadUsedQuestionIds(filterKey);
+        if (cancelled) return;
+        const buckets = partitionByDifficulty(pool, usedIds);
+        const setCount = countCompleteBankSets(buckets);
+        setQumairiBankStats({
+          filterKey,
+          usedCount: usedIds.length,
+          freshCount: setCount,
+          totalMatching: pool.length,
+          setCount,
+        });
+        if (setsToTake > setCount && setCount > 0) {
+          setSetsToTake((prev) => (prev > setCount ? Math.max(1, setCount) : prev));
+        }
+      } catch {
+        if (!cancelled) setQumairiBankStats(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isQumairi, source, gameType, categories, audience]);
+
   const registered = isRegisteredHost();
   const perSetTotal = QUMAIRI_SET_QUOTAS.hard + QUMAIRI_SET_QUOTAS.medium + QUMAIRI_SET_QUOTAS.easy;
 
@@ -181,34 +226,6 @@ export default function QuestionSourceSetup({
     return normalizeBankPool(fetched);
   };
 
-  const previewBankSets = async () => {
-    if (!isQumairi) return;
-    setLoading(true);
-    try {
-      const pool = await fetchBankQuestions();
-      const filterKey = bankFilterKey({ categories, audience });
-      const usedIds = await loadUsedQuestionIds(filterKey);
-      const buckets = partitionByDifficulty(pool, usedIds);
-      const setCount = countCompleteBankSets(buckets);
-      setBankPreview({
-        filterKey,
-        setCount,
-        usedCount: usedIds.length,
-        hard: buckets.hard.length,
-        medium: buckets.medium.length,
-        easy: buckets.easy.length,
-      });
-      if (setsToTake > setCount) setSetsToTake(Math.max(1, setCount));
-      if (!setCount) {
-        notifyMsg('لا توجد مجموعة كاملة جديدة — أضف أسئلة أو امسح سجل الاستخدام', 'error');
-      }
-    } catch {
-      notifyMsg('تعذر معاينة البنك', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadBank = async ({ forManual = false } = {}) => {
     setLoading(true);
     try {
@@ -225,7 +242,8 @@ export default function QuestionSourceSetup({
 
       if (isQumairi) {
         const filterKey = bankFilterKey({ categories, audience });
-        const usedIds = await loadUsedQuestionIds(filterKey);
+        const usedIds =
+          qumairiReplayMode === 'repeat' ? [] : await loadUsedQuestionIds(filterKey);
         const take = Math.max(1, parseInt(setsToTake, 10) || 1);
         const built = buildSessionPoolFromBank(pool, { usedIds, setsToTake: take });
         if (!built.setsTaken) {
@@ -233,20 +251,24 @@ export default function QuestionSourceSetup({
             `لا توجد مجموعة جديدة كاملة (تحتاج ${QUMAIRI_SET_QUOTAS.hard} صعب + ${QUMAIRI_SET_QUOTAS.medium} متوسط + ${QUMAIRI_SET_QUOTAS.easy} سهل)`,
             'error'
           );
-          setBankPreview({
+          setQumairiBankStats({
             filterKey,
-            setCount: built.setCount,
             usedCount: usedIds.length,
-            hard: built.shortages?.hard,
-            medium: built.shortages?.medium,
-            easy: built.shortages?.easy,
+            freshCount: built.setCount,
+            totalMatching: pool.length,
+            setCount: built.setCount,
           });
           return;
         }
         onApply({
           source: QSOURCE.BANK,
           poolStructured: built.poolStructured,
-          bankMeta: { filterKey, setCount: built.setCount, setsTaken: built.setsTaken },
+          bankMeta: {
+            filterKey,
+            setCount: built.setCount,
+            setsTaken: built.setsTaken,
+            replayMode: qumairiReplayMode,
+          },
         });
         const qTotal = built.setsTaken * perSetTotal;
         notifyMsg(
@@ -412,6 +434,40 @@ export default function QuestionSourceSetup({
     </button>
   );
 
+  if (gameType === 'titles') {
+    return (
+      <div className="card" style={{ border: `1.5px solid ${accent}` }}>
+        <div className="ctitle">🎭 الألقاب</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+          لعبة الألقاب لا تستخدم بنك الأسئلة — تابع من اللوبي مباشرة.
+        </div>
+        {onClose && (
+          <button type="button" className="btn bgh mt2" style={{ width: '100%' }} onClick={onClose}>
+            إغلاق
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const qumairiStartLabel = setsToTake > 1 ? `▶ ${setsToTake} مجموعات` : '▶ ابدأ';
+
+  const hesbahWarning =
+    isHesbah &&
+    hesbahReplayMode === 'new' &&
+    hesbahBankStats &&
+    hesbahBankStats.freshCount < parseInt(count, 10)
+      ? `⚠️ جديد متاح (${hesbahBankStats.freshCount}) أقل من المطلوب (${count})`
+      : null;
+
+  const qumairiWarning =
+    isQumairi &&
+    qumairiReplayMode === 'new' &&
+    qumairiBankStats &&
+    qumairiBankStats.setCount === 0
+      ? '⚠️ لا توجد مجموعة جديدة — جرّب «إعادة» أو «مسح السجل»'
+      : null;
+
   return (
     <div className="card" style={{ border: `1.5px solid ${accent}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -423,7 +479,7 @@ export default function QuestionSourceSetup({
         )}
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', margin: '4px 0 10px', lineHeight: 1.55 }}>
-        اختر مصدر الأسئلة لهذه الجلسة. تُحسم الإجابة من المشرف، والإجابة الصحيحة تبقى عندك فقط.
+        اختر المصدر — البنك يتجنّب تكرار ما ظهر سابقاً.
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
@@ -435,18 +491,9 @@ export default function QuestionSourceSetup({
       {source === QSOURCE.BANK && (
         <div>
           {isQumairi && (
-            <div
-              className="card2"
-              style={{ marginBottom: 10, padding: 10, fontSize: 11, lineHeight: 1.6, color: 'var(--muted)' }}
-            >
-              <strong style={{ color: 'var(--text)' }}>مجموعة المسابقة الواحدة:</strong>{' '}
-              {QUMAIRI_SET_QUOTAS.hard} صعب (شوزل) + {QUMAIRI_SET_QUOTAS.medium} متوسط (أم صتمة) +{' '}
-              {QUMAIRI_SET_QUOTAS.easy} سهل (نبيطة) = {perSetTotal} سؤالاً.
-              <br />
-              يُسجَّل السؤال في سجلك <strong>عند عرضه فقط</strong> — إذا توقفت قبل النهاية، الأسئلة التي لم تظهر
-              تبقى متاحة في مسابقة لاحقة.
-              <br />
-              <span style={{ fontSize: 10 }}>{weaponQuotaHint()}</span>
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.5 }}>
+              مجموعة واحدة = {perSetTotal} سؤال ({QUMAIRI_SET_QUOTAS.hard} صعب + {QUMAIRI_SET_QUOTAS.medium} متوسط +{' '}
+              {QUMAIRI_SET_QUOTAS.easy} سهل)
             </div>
           )}
 
@@ -460,43 +507,6 @@ export default function QuestionSourceSetup({
               />
             </div>
           )}
-
-          {isQumairi && registered && authUid && (
-            <div
-              className="card2"
-              style={{ marginBottom: 10, padding: 8, fontSize: 10, color: 'var(--muted)', lineHeight: 1.55 }}
-            >
-              ✅ سجل الأسئلة ومخزون الجلسة (الأسئلة المتبقية وموقع التوقف) مربوطان بحسابك — يمكنك
-              استكمال نفس الغرفة من جوال أو لابتوب بعد تسجيل الدخول.
-            </div>
-          )}
-          {isHesbah && registered && authUid && (
-            <div
-              className="card2"
-              style={{ marginBottom: 10, padding: 8, fontSize: 10, color: 'var(--muted)', lineHeight: 1.55 }}
-            >
-              ✅ سجل أسئلتك مربوط بحسابك — نتجنّب تكرار ما ظهر سابقاً في جلساتك.
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            <button
-              type="button"
-              className={`btn ${bankMode === 'auto' ? 'bg' : 'bgh'} bsm`}
-              style={{ flex: 1 }}
-              onClick={() => setBankMode('auto')}
-            >
-              تلقائي حسب التصنيف
-            </button>
-            <button
-              type="button"
-              className={`btn ${bankMode === 'manual' ? 'bg' : 'bgh'} bsm`}
-              style={{ flex: 1 }}
-              onClick={() => setBankMode('manual')}
-            >
-              يدوي — أختار بنفسي
-            </button>
-          </div>
 
           <div className="ig">
             <label className="lbl">التصنيفات (اتركها فارغة = كل تصنيفات هذه اللعبة)</label>
@@ -570,111 +580,20 @@ export default function QuestionSourceSetup({
           </div>
 
           {isHesbah && bankMode === 'auto' && (
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.55 }}>
-              سيتم تجهيز <strong style={{ color: 'var(--text)' }}>{count} سؤالاً فريداً</strong> — حسب العدد
-              الذي اخترته في الخطوة الأولى (لا يمكن تغييره من هنا).
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+              العدد: <strong style={{ color: 'var(--text)' }}>{count} سؤال</strong>
             </div>
           )}
 
-          {isHesbah && bankMode === 'auto' && hesbahBankStats && (
-            <div className="card2" style={{ marginTop: 10, padding: 10, fontSize: 11 }}>
-              <div style={{ fontWeight: 800, color: accent, marginBottom: 6 }}>📊 بنك الأسئلة — اختر روح المسابقة</div>
-              <div style={{ color: 'var(--muted)', lineHeight: 1.6, marginBottom: 8 }}>
-                {hesbahBankStats.usedCount > 0 ? (
-                  <>
-                    ظهرت سابقاً: {hesbahBankStats.usedCount} · جديدة متاحة: {hesbahBankStats.freshCount} ·
-                    الإجمالي في البنك: {hesbahBankStats.totalMatching}
-                  </>
-                ) : (
-                  <>
-                    🆕 كل الأسئلة ({hesbahBankStats.totalMatching}) جديدة — لم تُستخدم بعد في هذا التصنيف
-                  </>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className={`btn ${hesbahReplayMode === 'new' ? 'bg' : 'bgh'} bsm`}
-                  style={{ flex: 1, minWidth: 130 }}
-                  onClick={() => setHesbahReplayMode('new')}
-                >
-                  🆕 أسئلة جديدة
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${hesbahReplayMode === 'repeat' ? 'bg' : 'bgh'} bsm`}
-                  style={{ flex: 1, minWidth: 130 }}
-                  onClick={() => setHesbahReplayMode('repeat')}
-                >
-                  🔁 إعادة السابقة
-                </button>
-              </div>
-              {hesbahReplayMode === 'repeat' && (
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, lineHeight: 1.55 }}>
-                  💡 قد يتذكر اللاعبون الأسئلة — استخدم هذا إذا أردتم نفس المجموعة أو نفدت الأسئلة الجديدة.
-                </div>
-              )}
-              {hesbahReplayMode === 'new' && hesbahBankStats.freshCount < parseInt(count, 10) && (
-                <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 8, lineHeight: 1.55 }}>
-                  ⚠️ الأسئلة الجديدة ({hesbahBankStats.freshCount}) أقل من العدد المطلوب ({count}) — سيُستخدم
-                  المتاح أو امسح السجل لإعادة الكل.
-                </div>
-              )}
-              <button
-                type="button"
-                className="btn br bsm mt2"
-                style={{ width: '100%' }}
-                onClick={() => {
-                  const key = hesbahBankStats.filterKey;
-                  void clearUsedHesbahQuestionIds(key).then(() => {
-                    setHesbahReplayMode('new');
-                    setHesbahBankStats((prev) =>
-                      prev
-                        ? { ...prev, usedCount: 0, freshCount: prev.totalMatching }
-                        : null
-                    );
-                    notifyMsg('♻️ تم مسح السجل — كل الأسئلة متاحة من جديد', 'gold');
-                  });
-                }}
+          {isQumairi && bankMode === 'auto' && qumairiBankStats && qumairiBankStats.setCount > 0 && (
+            <label className="ig" style={{ marginTop: 8, marginBottom: 0 }}>
+              <span className="lbl">عدد المجموعات ({perSetTotal} سؤال لكل مجموعة)</span>
+              <select
+                className="inp"
+                value={Math.min(setsToTake, qumairiBankStats.setCount)}
+                onChange={(e) => setSetsToTake(parseInt(e.target.value, 10) || 1)}
               >
-                ♻️ مسح السجل وإعادة كل الأسئلة
-              </button>
-            </div>
-          )}
-
-          {isQumairi && bankPreview && (
-            <div className="card2" style={{ marginTop: 8, padding: 10, fontSize: 11 }}>
-              <div style={{ fontWeight: 800, color: 'var(--gold)' }}>
-                📊 البنك: {bankPreview.setCount} مجموعة جديدة متاحة
-              </div>
-              <div style={{ color: 'var(--muted)', marginTop: 4 }}>
-                غير مستخدمة: صعب {bankPreview.hard} · متوسط {bankPreview.medium} · سهل {bankPreview.easy}
-                {bankPreview.usedCount > 0 && ` · ظهرت سابقاً: ${bankPreview.usedCount} سؤال`}
-              </div>
-              {bankPreview.setCount > 0 && (
-                <label className="ig" style={{ marginTop: 8, marginBottom: 0 }}>
-                  <span className="lbl">عدد المجموعات للسحب ({perSetTotal} سؤال لكل مجموعة)</span>
-                  <select
-                    className="inp"
-                    value={Math.min(setsToTake, bankPreview.setCount)}
-                    onChange={(e) => setSetsToTake(parseInt(e.target.value, 10) || 1)}
-                  >
-                    {Array.from({ length: Math.min(bankPreview.setCount, 10) }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? 'مجموعة' : 'مجموعات'} ({n * perSetTotal} سؤال)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          )}
-
-          {isQumairi && !bankPreview && bankMode === 'auto' && (
-            <label className="ig" style={{ marginTop: 8 }}>
-              <span className="lbl">عدد المجموعات (افتراضي 1 — {perSetTotal} سؤال)</span>
-              <select className="inp" value={setsToTake} onChange={(e) => setSetsToTake(parseInt(e.target.value, 10) || 1)}>
-                {[1, 2, 3, 4, 5].map((n) => (
+                {Array.from({ length: Math.min(qumairiBankStats.setCount, 10) }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
                     {n} {n === 1 ? 'مجموعة' : 'مجموعات'}
                   </option>
@@ -683,46 +602,102 @@ export default function QuestionSourceSetup({
             </label>
           )}
 
-          {bankMode === 'auto' ? (
-            <>
-              {isQumairi && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn bgh bsm"
-                    style={{ flex: 1, minWidth: 120 }}
-                    disabled={loading}
-                    onClick={() => void previewBankSets()}
-                  >
-                    {loading ? '⏳…' : '🔎 معاينة البنك'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn br bsm"
-                    style={{ flex: 1, minWidth: 120 }}
-                    onClick={() => {
-                      const key = bankFilterKey({ categories, audience });
-                      void clearUsedQuestionIds(key).then(() => {
-                        setBankPreview(null);
-                        notifyMsg('♻️ تم مسح سجل الأسئلة الظاهرة — يمكن إعادة المجموعات', 'gold');
-                      });
-                    }}
-                  >
-                    ♻️ مسح السجل
-                  </button>
-                </div>
-              )}
-              <button type="button" className="btn bg mt2" disabled={loading} onClick={() => void loadBank()}>
-                {loading
-                  ? '⏳ جاري التحميل…'
-                  : isQumairi
-                    ? setsToTake > 1
-                      ? `🏆 تجهيز ${setsToTake} مجموعات`
-                      : '🏆 تجهيز مجموعة مسابقة جديدة'
-                    : '🏦 تجهيز الأسئلة من البنك'}
-              </button>
-            </>
-          ) : (
+          {bankMode === 'auto' && isHesbah && hesbahBankStats && (
+            <BankUsageStrip
+              accent={accent}
+              usedCount={hesbahBankStats.usedCount}
+              freshCount={hesbahBankStats.freshCount}
+              totalMatching={hesbahBankStats.totalMatching}
+              replayMode={hesbahReplayMode}
+              onReplayModeChange={setHesbahReplayMode}
+              onClear={() => {
+                const key = hesbahBankStats.filterKey;
+                void clearUsedHesbahQuestionIds(key).then(() => {
+                  setHesbahReplayMode('new');
+                  setHesbahBankStats((prev) =>
+                    prev ? { ...prev, usedCount: 0, freshCount: prev.totalMatching } : null
+                  );
+                  notifyMsg('♻️ تم مسح السجل', 'gold');
+                });
+              }}
+              onStart={() => void loadBank()}
+              loading={loading}
+              startLabel="▶ ابدأ"
+              warning={hesbahWarning}
+            />
+          )}
+
+          {bankMode === 'auto' && isQumairi && qumairiBankStats && (
+            <BankUsageStrip
+              accent={accent}
+              usedCount={qumairiBankStats.usedCount}
+              freshCount={qumairiBankStats.freshCount}
+              totalMatching={qumairiBankStats.totalMatching}
+              replayMode={qumairiReplayMode}
+              onReplayModeChange={setQumairiReplayMode}
+              onClear={() => {
+                const key = qumairiBankStats.filterKey;
+                void clearUsedQuestionIds(key).then(async () => {
+                  setQumairiReplayMode('new');
+                  try {
+                    const pool = await fetchBankQuestions();
+                    const buckets = partitionByDifficulty(pool, []);
+                    const setCount = countCompleteBankSets(buckets);
+                    setQumairiBankStats({
+                      filterKey: key,
+                      usedCount: 0,
+                      freshCount: setCount,
+                      totalMatching: pool.length,
+                      setCount,
+                    });
+                  } catch {
+                    setQumairiBankStats((prev) =>
+                      prev ? { ...prev, usedCount: 0, freshCount: prev.setCount } : null
+                    );
+                  }
+                  notifyMsg('♻️ تم مسح السجل', 'gold');
+                });
+              }}
+              onStart={() => void loadBank()}
+              loading={loading}
+              startLabel={qumairiStartLabel}
+              warning={qumairiWarning}
+            />
+          )}
+
+          <button
+            type="button"
+            className="btn bgh bxs mt2"
+            style={{ width: '100%' }}
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            {showAdvanced ? '▲ إخفاء خيارات متقدمة' : '⚙️ خيارات متقدمة (اختيار يدوي)'}
+          </button>
+
+          {showAdvanced && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className={`btn ${bankMode === 'auto' ? 'bg' : 'bgh'} bsm`}
+                  style={{ flex: 1 }}
+                  onClick={() => setBankMode('auto')}
+                >
+                  تلقائي
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${bankMode === 'manual' ? 'bg' : 'bgh'} bsm`}
+                  style={{ flex: 1 }}
+                  onClick={() => setBankMode('manual')}
+                >
+                  يدوي
+                </button>
+              </div>
+            </div>
+          )}
+
+          {bankMode === 'manual' && showAdvanced && (
             <>
               <button type="button" className="btn bb mt2" disabled={loading} onClick={() => void loadBank({ forManual: true })}>
                 {loading ? '⏳ جاري التحميل…' : '🔎 جلب الأسئلة المطابقة'}

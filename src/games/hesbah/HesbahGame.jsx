@@ -2002,6 +2002,8 @@ const HesbahGame = forwardRef(function HesbahGame(
             notify={notify}
             hideExitBar
             onHome={leaveToArena}
+            myId={myId}
+            role={role}
             joinCta={
               endGameJoin
                 ? {
@@ -2032,6 +2034,8 @@ const HesbahGame = forwardRef(function HesbahGame(
             notify={notify}
             hideExitBar
             onHome={leaveToArena}
+            myId={myId}
+            role={role}
           />
         </div>
       );
@@ -2043,7 +2047,11 @@ const HesbahGame = forwardRef(function HesbahGame(
   return (
     <>
       {roomCode && phase && !['lobby', 'ended', 'cancelled'].includes(phase) ? (
-        <SponsorRoundBadge gameKey="hesbah" phase={phase} />
+        <SponsorRoundBadge
+          gameKey="hesbah"
+          phase={phase}
+          roundNumber={Math.max(1, Number(game?.currentQ) || 1)}
+        />
       ) : null}
       {renderMain()}
       <HesbahConfirmModal

@@ -3,36 +3,51 @@
  */
 import { openMarketingImpactReport } from './marketingImpactReport';
 
-function gameKey(type) {
-  if (type === 'sniper') return 'hesbah';
-  return type;
-}
-
-/** يبني stats مصفّاة لراعٍ واحد من أكواد المنصة */
+/** يبني stats مصفّاة لراعٍ واحد — من sponsorImpressions + الأكواد المربوطة */
 export function buildSponsorFilteredStats(codeRows = [], codeStatsById = {}, sponsorId) {
   if (!sponsorId) return null;
 
   const linkedCodes = codeRows.filter((r) => r.sponsorId === sponsorId);
-  if (!linkedCodes.length) return null;
+  const linkedCodeIds = new Set(linkedCodes.map((r) => r.id));
+  const allCodeIds = new Set([
+    ...Object.keys(codeStatsById || {}),
+    ...codeRows.map((r) => r.id),
+  ]);
 
   let merged = null;
+  let bucketTotals = { sessions: 0, rounds: 0, roundReach: 0 };
 
-  linkedCodes.forEach((row) => {
-    const stats = codeStatsById[row.id]?.data;
+  allCodeIds.forEach((codeId) => {
+    const stats = codeStatsById[codeId]?.data;
     if (!stats) return;
 
+    const bucket = stats.sponsorImpressions?.[sponsorId];
+    if (bucket) {
+      bucketTotals.sessions += Number(bucket.sessions) || 0;
+      bucketTotals.rounds += Number(bucket.rounds) || 0;
+      bucketTotals.roundReach += Number(bucket.roundReach) || 0;
+    }
+
+    const isLinked = linkedCodeIds.has(codeId);
     const recent = (Array.isArray(stats.recentSessions) ? stats.recentSessions : []).filter(
-      (s) => !s.sponsorId || s.sponsorId === sponsorId
+      (s) =>
+        s.sponsorId === sponsorId ||
+        isLinked ||
+        (bucket && (Number(s.sponsorImpressions) > 0 || Number(s.roundReach) > 0))
     );
+
+    if (!recent.length && !bucket && !isLinked) return;
 
     const slice = {
       ...stats,
-      recentSessions: recent,
-      uniqueParticipantLabels: recent.flatMap((s) => s.participantLabels || []).filter((v, i, a) => a.indexOf(v) === i),
+      recentSessions: recent.map((s) => ({ ...s, codeId })),
+      uniqueParticipantLabels: recent
+        .flatMap((s) => s.participantLabels || [])
+        .filter((v, i, a) => a.indexOf(v) === i),
     };
 
     if (!merged) {
-      merged = { ...slice, recentSessions: [...recent] };
+      merged = { ...slice, recentSessions: [...slice.recentSessions] };
       return;
     }
 
@@ -53,7 +68,7 @@ export function buildSponsorFilteredStats(codeRows = [], codeStatsById = {}, spo
         merged.firstSessionAt || Infinity,
         Number(stats.firstSessionAt) || Infinity
       ),
-      recentSessions: [...(merged.recentSessions || []), ...recent]
+      recentSessions: [...(merged.recentSessions || []), ...slice.recentSessions]
         .sort((a, b) => (a.ts || 0) - (b.ts || 0))
         .slice(-24),
       uniqueParticipantLabels: [
@@ -69,7 +84,41 @@ export function buildSponsorFilteredStats(codeRows = [], codeStatsById = {}, spo
     };
   });
 
-  if (!merged) return null;
+  if (!merged && !bucketTotals.sessions && !bucketTotals.rounds) return null;
+
+  if (!merged) {
+    merged = {
+      totalRealSessions: 0,
+      totalPlayerCount: 0,
+      totalRounds: 0,
+      totalEngagementMinutes: 0,
+      roundReach: 0,
+      completedGames: 0,
+      abandonedGames: 0,
+      totalSponsorImpressions: 0,
+      peakPlayers: 0,
+      recentSessions: [],
+      uniqueParticipantLabels: [],
+      sponsorImpressions: { [sponsorId]: bucketTotals },
+    };
+  }
+
+  if (bucketTotals.rounds || bucketTotals.roundReach) {
+    merged.totalRounds = Math.max(merged.totalRounds || 0, bucketTotals.rounds);
+    merged.roundReach = Math.max(merged.roundReach || 0, bucketTotals.roundReach);
+    merged.totalSponsorImpressions = Math.max(
+      merged.totalSponsorImpressions || 0,
+      bucketTotals.roundReach
+    );
+    merged.sponsorImpressions = {
+      ...(merged.sponsorImpressions || {}),
+      [sponsorId]: {
+        ...(merged.sponsorImpressions?.[sponsorId] || {}),
+        ...bucketTotals,
+      },
+    };
+  }
+
   if (merged.firstSessionAt === Infinity) merged.firstSessionAt = null;
   return merged;
 }

@@ -113,20 +113,32 @@ export function aggregateSponsorImpressions(codeRows = [], codeStatsById = {}) {
 /** جلسات راعٍ من recentSessions عبر الأكواد */
 export function collectSponsorSessionLog(codeRows = [], codeStatsById = {}, sponsorId = null) {
   const log = [];
-  codeRows.forEach((row) => {
-    if (sponsorId && row.sponsorId !== sponsorId) return;
-    const stats = codeStatsById[row.id]?.data;
+  const codeById = Object.fromEntries(codeRows.map((r) => [r.id, r]));
+
+  Object.entries(codeStatsById || {}).forEach(([codeId, entry]) => {
+    const row = codeById[codeId] || { id: codeId };
+    const stats = entry?.data;
     const recent = Array.isArray(stats?.recentSessions) ? stats.recentSessions : [];
+    const bucket = sponsorId ? stats?.sponsorImpressions?.[sponsorId] : null;
+
     recent.forEach((s) => {
-      if (sponsorId && s.sponsorId && s.sponsorId !== sponsorId) return;
-      if (!sponsorId && !s.sponsorId && !row.sponsorId) return;
+      if (sponsorId) {
+        const matches =
+          s.sponsorId === sponsorId ||
+          row.sponsorId === sponsorId ||
+          Boolean(bucket);
+        if (!matches) return;
+      } else if (!s.sponsorId && !row.sponsorId) {
+        return;
+      }
       log.push({
         ...s,
-        code: row.code,
+        code: row.code || s.code,
         sponsorName: s.sponsorName || row.sponsorName || '—',
         sponsorImpressions: s.sponsorImpressions ?? s.roundReach ?? 0,
       });
     });
   });
+
   return log.sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 30);
 }

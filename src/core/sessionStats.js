@@ -4,6 +4,10 @@ import { rewardHostIfRegistered } from './arenaRewards';
 import { emitArenaCelebration } from './arenaEvents';
 import { mergeSponsorStats, readActiveCodeSponsorFromLocal } from './sponsorStatsHelpers';
 import { readHostSubscriptionMeta } from './roomLifecycle';
+import {
+  fetchActiveSponsorsOnce,
+  resolveSponsorForRound,
+} from './platformSponsors';
 
 const MAX_RECENT_SESSIONS = 20;
 const MAX_ROSTER_LABELS = 40;
@@ -268,9 +272,9 @@ async function writeStatsSummary(statsPath, sessionData) {
 }
 
 /**
- * يُستدعى عند انتهاء كل جولة — يزيد game/totalRounds بمقدار 1.
+ * يُستدعى عند انتهاء كل جولة — يزيد game/totalRounds ويسجّل ظهور الراعي.
  */
-export async function recordRoundCompleted(gameType, roomCode) {
+export async function recordRoundCompleted(gameType, roomCode, roundNumberOverride = null) {
   const type = normalizeGameType(gameType);
   if (type !== 'titles' && type !== 'fameeri' && type !== 'hesbah') return;
   try {
@@ -279,6 +283,55 @@ export async function recordRoundCompleted(gameType, roomCode) {
     const game = snap.val() || {};
     const current = Number(game.totalRounds) || 0;
     await update(ref(db, path), { totalRounds: current + 1 });
+
+    const base = roomBase(type, roomCode);
+    const [playersSnap, platformSponsors] = await Promise.all([
+      get(ref(db, playersPath(type, roomCode))),
+      fetchActiveSponsorsOnce(),
+    ]);
+    const players = playersSnap.val() || {};
+    const playerCount = Object.keys(players).length;
+    if (!playerCount) return;
+
+    const roundNum =
+      roundNumberOverride != null
+        ? Number(roundNumberOverride)
+        : Number(game.roundNum) || current + 1;
+
+    const codeSponsor =
+      game.sponsorId
+        ? {
+            id: game.sponsorId,
+            name: game.sponsorName || 'الراعي',
+            logoUrl: game.sponsorLogoUrl || '',
+            tagline: game.sponsorTagline || '',
+          }
+        : readActiveCodeSponsorFromLocal();
+
+    const sponsor = resolveSponsorForRound({
+      codeSponsor,
+      platformSponsors,
+      gameKey: type,
+      roundNumber: roundNum,
+    });
+
+    if (!sponsor?.id) return;
+
+    const adminId = game.adminId || resolveUserId();
+    const codeId = game.adminCode || resolveCodeId();
+    await updateCodeStats(adminId, codeId, {
+      gameType: type,
+      totalRounds: 1,
+      completed: false,
+      playerCount,
+      durationMinutes: 0,
+      roomCode,
+      timestamp: Date.now(),
+      sponsorId: sponsor.id,
+      sponsorName: sponsor.name,
+      roundReach: playerCount,
+      sponsorImpressions: playerCount,
+    });
   } catch (err) {
     console.error('[stats]', err);
   }
@@ -312,8 +365,6 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
     const adminId = game.adminId || roomData.adminId || resolveUserId();
     const adminName = await resolveAdminDisplayName(adminId, players);
     const participantLabels = extractParticipantLabels(type, players);
-    const sponsorId = game.sponsorId || null;
-    const sponsorName = game.sponsorName || null;
     const totalRounds = Number(game.totalRounds) || 0;
     const roundReach = totalRounds * playerCount;
 
@@ -327,10 +378,10 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
       timestamp: sessionEnd,
       adminName,
       participantLabels,
-      sponsorId,
-      sponsorName,
       roundReach,
-      sponsorImpressions: sponsorId ? roundReach : 0,
+      sponsorId: null,
+      sponsorName: null,
+      sponsorImpressions: 0,
     };
     await updateCodeStats(adminId, game.adminCode || resolveCodeId(), sessionData);
 

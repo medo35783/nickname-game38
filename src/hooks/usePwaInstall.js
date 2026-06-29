@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  dismissPwaInstallBanner,
   getPwaBannerVariant,
   isAndroidDevice,
   isIosDevice,
   isMobileDevice,
-  isPwaInstallBannerDismissed,
   isPwaInstalledPersisted,
   isPwaStandalone,
   markPwaInstalledPersisted,
@@ -22,7 +20,6 @@ export function usePwaInstall() {
   const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const [installing, setInstalling] = useState(false);
   const [bannerVariant, setBannerVariant] = useState(() => getPwaBannerVariant());
-  const [bannerDismissed, setBannerDismissed] = useState(() => isPwaInstallBannerDismissed());
 
   useEffect(() => {
     setIsIos(isIosDevice());
@@ -45,9 +42,10 @@ export function usePwaInstall() {
     };
 
     const onDisplayModeChange = () => {
-      const standalone = isPwaStandalone();
-      setIsInstalled(standalone || isPwaInstalledPersisted());
-      if (standalone) markPwaInstalledPersisted();
+      if (isPwaStandalone()) {
+        setIsInstalled(true);
+        markPwaInstalledPersisted();
+      }
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
@@ -85,16 +83,10 @@ export function usePwaInstall() {
     }
   }, []);
 
-  const dismissBanner = useCallback(() => {
-    dismissPwaInstallBanner();
-    setBannerDismissed(true);
-  }, []);
-
   const showCard = !isInstalled && isMobile;
   const showBanner =
     !isInstalled &&
     isMobile &&
-    !bannerDismissed &&
     bannerVariant !== 'other';
 
   return {
@@ -108,6 +100,5 @@ export function usePwaInstall() {
     showCard,
     showBanner,
     bannerVariant,
-    dismissBanner,
   };
 }

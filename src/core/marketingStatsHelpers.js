@@ -181,6 +181,13 @@ export const REPORT_PURPOSES = {
     titleSuffix: 'تقرير شراكة B2B',
     docTitle: 'تقرير تأثير الفعاليات والتفاعل الجماعي',
   },
+  pitch: {
+    id: 'pitch',
+    label: 'Pitch للراعي المحتمل',
+    subtitle: 'أرقام المنصة قبل الاشتراك — بدون شعار شركة',
+    titleSuffix: 'عرض أرقام المنصة',
+    docTitle: 'Pitch — فرصة رعاية وفعاليات جماعية',
+  },
 };
 
 /** جلسات مؤهلة للجوائز من السجل الأخير */

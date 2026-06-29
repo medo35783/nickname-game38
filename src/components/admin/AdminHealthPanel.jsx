@@ -3,24 +3,29 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { db, ref, onValue, update, remove } from '../../core/firebaseHelpers';
 import {
+  collectOpenRooms,
   collectStuckRooms,
   collectEndedRooms,
   countRoomRoots,
-  formatRoomAge,
   isLegacyRoomCode,
   purgeRoomList,
+  estimateRtdbFootprint,
+  deriveHealthStatus,
 } from '../../core/adminHealthHelpers';
-import { formatPulseDateTime } from '../../core/adminPulseHelpers';
-import AdminSecurityEvents from './AdminSecurityEvents';
 import { ROOM_CODE_LEN } from '../../core/roomCode';
 import {
   subscribePlatformSettings,
   setMaintenanceMode,
   updatePlatformSettings,
 } from '../../core/platformSettings';
+import { useSecurityEvents } from '../../hooks/useSecurityEvents';
+import AdminHealthKpi from './AdminHealthKpi';
+import AdminCollapsibleSection from './AdminCollapsibleSection';
+import AdminSecurityEvents from './AdminSecurityEvents';
+import AdminHealthRoomRow from './AdminHealthRoomRow';
 
 /**
- * المرحلة 5 — الصحة التقنية
+ * لوحة الصحة — KPI بصري · أقسام قابلة للطي · تصدير أمان
  */
 export default function AdminHealthPanel({ notify }) {
   const [roomSnaps, setRoomSnaps] = useState({ rooms: {}, qrooms: {}, srooms: {} });
@@ -29,6 +34,9 @@ export default function AdminHealthPanel({ notify }) {
   const [busyId, setBusyId] = useState(null);
   const [bulkBusy, setBulkBusy] = useState(null);
   const [maintMsg, setMaintMsg] = useState('');
+  const [maxPlayersInput, setMaxPlayersInput] = useState(0);
+
+  const { stats: securityStats } = useSecurityEvents(notify);
 
   useEffect(() => {
     let alive = true;
@@ -58,6 +66,7 @@ export default function AdminHealthPanel({ notify }) {
       if (!alive) return;
       setSettings(val);
       setMaintMsg(val.maintenanceMessage || '');
+      setMaxPlayersInput(Number(val.maxPlayersPerRoom) || 0);
     });
     unsubs.push(settingsUnsub);
 
@@ -68,14 +77,50 @@ export default function AdminHealthPanel({ notify }) {
     };
   }, []);
 
+  const openRooms = useMemo(() => collectOpenRooms(roomSnaps), [roomSnaps]);
   const stuckRooms = useMemo(() => collectStuckRooms(roomSnaps), [roomSnaps]);
   const endedRooms = useMemo(() => collectEndedRooms(roomSnaps), [roomSnaps]);
   const rootCounts = useMemo(() => countRoomRoots(roomSnaps), [roomSnaps]);
+  const rtdbFootprint = useMemo(() => estimateRtdbFootprint(roomSnaps), [roomSnaps]);
+
+  const healthStatus = useMemo(
+    () =>
+      deriveHealthStatus({
+        maintenanceMode: settings?.maintenanceMode,
+        stuckCount: stuckRooms.length,
+        security24h: securityStats.last24h,
+      }),
+    [settings?.maintenanceMode, stuckRooms.length, securityStats.last24h]
+  );
 
   const legacyStuckCount = useMemo(
     () => stuckRooms.filter((room) => room.legacyCode).length,
     [stuckRooms]
   );
+
+  const deleteAllOpen = useCallback(async () => {
+    if (!openRooms.length) return;
+    if (
+      !window.confirm(
+        `حذف ${openRooms.length} غرفة مفتوحة نهائياً من Firebase؟\n\nاستخدم «إنهاء» إن أردت إغلاق المسابقة مع الإبقاء على السجل.`
+      )
+    ) {
+      return;
+    }
+    setBulkBusy('open');
+    try {
+      const { deleted, failed } = await purgeRoomList(openRooms);
+      if (failed) {
+        notify?.(`تم حذف ${deleted} — فشل ${failed}`, 'error');
+      } else {
+        notify?.(`تم حذف ${deleted} غرفة`, 'success');
+      }
+    } catch {
+      notify?.('تعذّر الحذف الجماعي', 'error');
+    } finally {
+      setBulkBusy(null);
+    }
+  }, [notify, openRooms]);
 
   const roomActionError = useCallback((action, room, err) => {
     if (isLegacyRoomCode(room.roomCode)) {
@@ -177,10 +222,11 @@ export default function AdminHealthPanel({ notify }) {
   };
 
   const saveSettings = async () => {
+    const maxPlayers = Math.min(500, Math.max(0, Math.floor(Number(maxPlayersInput) || 0)));
     try {
       await updatePlatformSettings({
         maintenanceMessage: maintMsg,
-        maxPlayersPerRoom: settings?.maxPlayersPerRoom || 0,
+        maxPlayersPerRoom: maxPlayers,
       });
       notify?.('تم حفظ الإعدادات', 'success');
     } catch {
@@ -190,50 +236,70 @@ export default function AdminHealthPanel({ notify }) {
 
   return (
     <div className="admin-health-panel">
-      <div className="admin-pulse-grid admin-pulse-grid--3">
-        <div className="admin-pulse-card admin-pulse-card--warn">
-          <div className="admin-pulse-card__head">
-            <span aria-hidden>⚠️</span>
-            <strong>غرف للمراجعة</strong>
-            <span className="admin-pulse-card__count">{stuckRooms.length}</span>
-          </div>
-          <p className="admin-pulse-card__hint">
-            بعد انتهاء الاشتراك + 24 ساعة — لا إغلاق تلقائي
-          </p>
-          {legacyStuckCount > 0 ? (
-            <p className="admin-pulse-card__hint">
-              {legacyStuckCount} غرفة برمز قديم (غير {ROOM_CODE_LEN} أرقام) — تحتاج نشر قواعد Firebase أو حذف يدوي
-            </p>
-          ) : null}
-        </div>
-        <div className="admin-pulse-card">
-          <div className="admin-pulse-card__head">
-            <span aria-hidden>🗄️</span>
-            <strong>إجمالي الغرف</strong>
-            <span className="admin-pulse-card__count">{rootCounts.total}</span>
-          </div>
-          <div className="admin-pulse-breakdown">
-            <span className="admin-pulse-chip">🎭 {rootCounts.rooms}</span>
-            <span className="admin-pulse-chip">🦅 {rootCounts.qrooms}</span>
-            <span className="admin-pulse-chip">🎯 {rootCounts.srooms}</span>
-          </div>
-        </div>
-        <div className="admin-pulse-card">
-          <div className="admin-pulse-card__head">
-            <span aria-hidden>🛠️</span>
-            <strong>وضع الصيانة</strong>
-          </div>
-          <p className="admin-pulse-card__hint">
-            {settings?.maintenanceMode ? 'مفعّل — المستخدمون يرون تنبيهاً' : 'معطّل'}
-          </p>
-        </div>
+      <AdminHealthKpi
+        healthStatus={healthStatus}
+        openCount={openRooms.length}
+        orphanCount={stuckRooms.length}
+        endedCount={endedRooms.length}
+        security24h={securityStats.last24h}
+        maintenanceMode={!!settings?.maintenanceMode}
+        rtdbLabel={rtdbFootprint.label}
+        roomTotal={rootCounts.total}
+        maxPlayersPerRoom={Number(settings?.maxPlayersPerRoom) || 0}
+      />
+
+      <div className="admin-pulse-breakdown admin-health-game-counts">
+        <span className="admin-pulse-chip">🎭 ألقاب: {rootCounts.rooms}</span>
+        <span className="admin-pulse-chip">🦅 قميري: {rootCounts.qrooms}</span>
+        <span className="admin-pulse-chip">🎯 حسبة: {rootCounts.srooms}</span>
       </div>
 
-      <div className="admin-pulse-card" style={{ marginTop: 12 }}>
-        <div className="admin-pulse-card__head">
-          <span aria-hidden>🛠️</span>
-          <strong>إعدادات المنصة</strong>
-        </div>
+      <AdminCollapsibleSection
+        title="غرف مفتوحة الآن"
+        icon="🎮"
+        badge={openRooms.length}
+        tone={openRooms.length > 0 ? 'warn' : ''}
+        defaultOpen={openRooms.length > 0}
+        hint="كل غرفة لم تُنهَ بعد — أغلقها من هنا (مشرف منصة بدون كود يظهر هنا مباشرة)"
+        actions={
+          openRooms.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn--sm btn--danger"
+              disabled={!!bulkBusy || !!busyId}
+              onClick={() => void deleteAllOpen()}
+            >
+              {bulkBusy === 'open' ? '…' : 'حذف الكل'}
+            </button>
+          ) : null
+        }
+      >
+        {loading ? (
+          <p className="admin-pulse-empty">جاري الفحص…</p>
+        ) : !openRooms.length ? (
+          <p className="admin-pulse-empty">لا غرف مفتوحة — القاعدة نظيفة.</p>
+        ) : (
+          <ul className="admin-pulse-list">
+            {openRooms.map((room) => (
+              <AdminHealthRoomRow
+                key={room.id}
+                room={room}
+                busyId={busyId}
+                onEnd={endRoom}
+                onDelete={deleteRoom}
+                showHostBadge
+              />
+            ))}
+          </ul>
+        )}
+      </AdminCollapsibleSection>
+
+      <AdminCollapsibleSection
+        title="إعدادات المنصة"
+        icon="🛠️"
+        defaultOpen
+        hint="الصيانة وحد اللاعبين لكل غرفة"
+      >
         <label className="admin-form-field admin-form-field--full">
           <span>رسالة الصيانة</span>
           <input
@@ -241,6 +307,17 @@ export default function AdminHealthPanel({ notify }) {
             value={maintMsg}
             onChange={(e) => setMaintMsg(e.target.value)}
             maxLength={300}
+          />
+        </label>
+        <label className="admin-form-field admin-form-field--full">
+          <span>حد اللاعبين للغرفة (0 = بدون حد)</span>
+          <input
+            className="inp"
+            type="number"
+            min={0}
+            max={500}
+            value={maxPlayersInput}
+            onChange={(e) => setMaxPlayersInput(e.target.value === '' ? 0 : Number(e.target.value))}
           />
         </label>
         <div className="admin-mkt-actions">
@@ -252,92 +329,75 @@ export default function AdminHealthPanel({ notify }) {
             {settings?.maintenanceMode ? 'إيقاف الصيانة' : 'تفعيل الصيانة'}
           </button>
           <button type="button" className="btn btn--gold" onClick={saveSettings}>
-            حفظ الرسالة
+            حفظ الإعدادات
           </button>
         </div>
-      </div>
+      </AdminCollapsibleSection>
 
-      <div className="admin-pulse-card admin-pulse-card--warn" style={{ marginTop: 12 }}>
-        <div className="admin-pulse-card__head">
-          <span aria-hidden>🔥</span>
-          <strong>غرف للمراجعة (اشتراك منتهٍ)</strong>
-          {stuckRooms.length > 0 ? (
+      <AdminCollapsibleSection
+        title="غرف يتيمة (اشتراك منتهٍ)"
+        icon="⚠️"
+        badge={stuckRooms.length}
+        tone="warn"
+        defaultOpen={false}
+        hint="فقط غرف انتهى اشتراكها منذ +24 ساعة، أو غرف قديمة بلا كود أقدم من 8 أيام — ليست غرف الأدمن الحالية"
+        actions={
+          stuckRooms.length > 0 ? (
             <button
               type="button"
               className="btn btn--sm btn--danger"
               disabled={!!bulkBusy || !!busyId}
               onClick={() => void deleteAllStuck()}
             >
-              {bulkBusy === 'stuck' ? 'جاري الحذف…' : `حذف الكل (${stuckRooms.length})`}
+              {bulkBusy === 'stuck' ? '…' : `حذف الكل`}
             </button>
-          ) : null}
-        </div>
-        <p className="admin-pulse-card__hint">
-          تظهر فقط بعد انتهاء اشتراك المشرف + 24 ساعة. لا يُغلق شيء تلقائياً على المسابقات الجارية.
-        </p>
-
-        {loading ? (
-          <p className="admin-pulse-empty">جاري الفحص…</p>
-        ) : !stuckRooms.length ? (
-          <p className="admin-pulse-empty">لا توجد غرف للمراجعة — ممتاز!</p>
+          ) : null
+        }
+      >
+        {legacyStuckCount > 0 ? (
+          <p className="admin-pulse-card__hint">
+            {legacyStuckCount} غرفة برمز قديم — انشر قواعد Firebase أو احذف يدوياً
+          </p>
+        ) : null}
+        {!stuckRooms.length ? (
+          <p className="admin-pulse-empty">
+            لا غرف يتيمة — غرفك كمشرف منصة تُدار من «غرف مفتوحة الآن» أعلاه.
+          </p>
         ) : (
           <ul className="admin-pulse-list">
             {stuckRooms.map((room) => (
-              <li key={room.id} className="admin-health-room">
-                <div className="admin-health-room__main">
-                  <span>
-                    {room.gameIcon} {room.gameLabel} · <code>{room.roomCode}</code>
-                    {room.legacyCode ? (
-                      <span className="admin-pulse-chip admin-pulse-chip--warn">رمز قديم</span>
-                    ) : null}
-                  </span>
-                  <span className="admin-health-room__age">{formatRoomAge(room.ageHours)}</span>
-                </div>
-                <div className="admin-health-room__meta">
-                  {room.phaseLabel}
-                  {room.sessionStart ? ` · بدأت ${formatPulseDateTime(room.sessionStart)}` : ''}
-                </div>
-                <div className="admin-health-room__actions">
-                  <button
-                    type="button"
-                    className="btn btn--sm btn--gold"
-                    disabled={busyId === room.id}
-                    onClick={() => endRoom(room)}
-                  >
-                    إنهاء
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--sm btn--danger"
-                    disabled={busyId === room.id}
-                    onClick={() => deleteRoom(room)}
-                  >
-                    حذف
-                  </button>
-                </div>
-              </li>
+              <AdminHealthRoomRow
+                key={room.id}
+                room={room}
+                busyId={busyId}
+                onEnd={endRoom}
+                onDelete={deleteRoom}
+              />
             ))}
           </ul>
         )}
-      </div>
+      </AdminCollapsibleSection>
 
       {endedRooms.length > 0 ? (
-        <div className="admin-pulse-card" style={{ marginTop: 12 }}>
-          <div className="admin-pulse-card__head">
-            <span aria-hidden>🧹</span>
-            <strong>غرف منتهية ({endedRooms.length})</strong>
+        <AdminCollapsibleSection
+          title="غرف منتهية"
+          icon="🧹"
+          badge={endedRooms.length}
+          defaultOpen={false}
+          hint="يمكن حذفها لتنظيف قاعدة البيانات"
+          actions={
             <button
               type="button"
               className="btn btn--sm btn--ghost"
               disabled={!!bulkBusy || !!busyId}
               onClick={() => void deleteAllEnded()}
             >
-              {bulkBusy === 'ended' ? 'جاري الحذف…' : `حذف الكل (${endedRooms.length})`}
+              {bulkBusy === 'ended' ? '…' : 'حذف الكل'}
             </button>
-          </div>
-          <p className="admin-pulse-card__hint">يمكن حذفها لتنظيف قاعدة البيانات</p>
-          <ul className="admin-pulse-list" style={{ maxHeight: 160 }}>
-            {endedRooms.slice(0, 8).map((room) => (
+          }
+        >
+          <ul className="admin-pulse-list admin-pulse-list--compact">
+            {endedRooms.map((room) => (
               <li key={room.id} className="admin-health-room admin-health-room--compact">
                 <span>
                   {room.gameIcon} {room.roomCode}
@@ -353,10 +413,19 @@ export default function AdminHealthPanel({ notify }) {
               </li>
             ))}
           </ul>
-        </div>
+        </AdminCollapsibleSection>
       ) : null}
 
-      <AdminSecurityEvents notify={notify} />
+      <AdminCollapsibleSection
+        title="مراقبة الأمان"
+        icon="🛡️"
+        badge={securityStats.last24h}
+        tone={securityStats.last24h >= 5 ? 'warn' : ''}
+        defaultOpen={securityStats.last24h > 0}
+        hint={`آخر 80 حدث — ${securityStats.codeFails} فشل أكواد · ${securityStats.lockouts} حظر`}
+      >
+        <AdminSecurityEvents notify={notify} embedded />
+      </AdminCollapsibleSection>
     </div>
   );
 }

@@ -11,6 +11,7 @@ const RECIPIENT_TYPES = [
 ];
 
 const PURPOSE_OPTIONS = [
+  REPORT_PURPOSES.pitch,
   REPORT_PURPOSES.sponsorship,
   REPORT_PURPOSES.prize,
   REPORT_PURPOSES.full,
@@ -29,6 +30,7 @@ export default function MarketingReportDialog({
   platformAggregate = null,
   notify,
   initialSponsorId = null,
+  initialReportPurpose = null,
 }) {
   const [recipientName, setRecipientName] = useState('');
   const [recipientType, setRecipientType] = useState('company');
@@ -42,8 +44,8 @@ export default function MarketingReportDialog({
     setRecipientName('');
     setRecipientType(reportScope === 'school' ? 'school' : 'sponsor');
     setCustomNote('');
-    setReportPurpose('full');
-    setSponsorId(initialSponsorId || '');
+    setReportPurpose(initialReportPurpose || 'full');
+    setSponsorId(initialReportPurpose === 'pitch' ? '' : initialSponsorId || '');
     fetchSponsorsAdmin()
       .then((list) => {
         const active = list.filter((s) => s.active !== false);
@@ -55,7 +57,7 @@ export default function MarketingReportDialog({
         }
       })
       .catch(() => setSponsors([]));
-  }, [open, reportScope, codeLabel, initialSponsorId]);
+  }, [open, reportScope, codeLabel, initialSponsorId, initialReportPurpose]);
 
   const selectedSponsor = useMemo(
     () => sponsors.find((s) => s.id === sponsorId) || null,
@@ -173,7 +175,7 @@ export default function MarketingReportDialog({
           </div>
         </div>
 
-        {sponsors.length > 0 ? (
+        {sponsors.length > 0 && reportPurpose !== 'pitch' ? (
           <div className="ig" style={{ marginBottom: 10 }}>
             <label className="lbl">الراعي (شعار يظهر في التقرير)</label>
             <select

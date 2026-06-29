@@ -1,6 +1,9 @@
 /**
  * ملخص نهاية المسابقة — موحّد للمشرف والمتسابق (سجل كامل + رسوم ثم مسار).
  */
+import useWinnerPrize from '../../hooks/useWinnerPrize';
+import WinnerPrizeCertificate from '../../shared/WinnerPrizeCertificate';
+
 export default function TitlesGameSummary({
   role,
   players,
@@ -11,10 +14,32 @@ export default function TitlesGameSummary({
   setTab,
   setSelectedGame,
   onCreateAccount,
+  roomCode,
+  myId,
+  notify,
 }) {
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
+  const primaryWinner = activePlayers[0];
   const roundNum = gameState?.roundNum || 0;
+
+  const adminEntry = playersList.find((p) => p.role === 'admin' || p.isAdmin);
+  const { award, loading: prizeLoading } = useWinnerPrize({
+    enabled: Boolean(primaryWinner?.name),
+    canAward: role === 'admin' || primaryWinner?.id === myId,
+    gameType: 'titles',
+    roomCode: roomCode || gameState?.roomCode,
+    winnerName: primaryWinner?.name,
+    playerCount: playersList.length,
+    totalRounds: roundNum,
+    completed: true,
+    adminName: adminEntry?.name || '—',
+    participantLabels: playersList.map((p) => p.name || p.nick).filter(Boolean),
+    sessionTs: gameState?.sessionEnd || gameState?.endedAt,
+  });
+
+  const isWinnerView =
+    role === 'admin' || activePlayers.some((p) => p.id === myId);
   const allRoundsList = Object.values(allRoundsData || {}).sort((a, b) => a.round - b.round);
   const allAttacksFlat = allRoundsList.flatMap((r) => Object.values(r.attacks || {}));
   const totalCorrect = allAttacksFlat.filter((a) => a.correct).length;
@@ -79,6 +104,13 @@ export default function TitlesGameSummary({
           </div>
         </div>
       ))}
+
+      <WinnerPrizeCertificate
+        award={award}
+        loading={prizeLoading}
+        isWinnerView={isWinnerView}
+        notify={notify}
+      />
 
       <div className="summary-overview-grid">
         <div className="summary-ov-cell">
