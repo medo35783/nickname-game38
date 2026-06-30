@@ -46,15 +46,10 @@ export const PLATFORM_SITE_HOST = 'www.la3ibz.com';
 export const BRAND_ICON_SRC = '/brand/la3ibz-icon-mark.png?v=16';
 export const BRAND_ICON_PATH = '/brand/la3ibz-icon-mark.png';
 export const BRAND_ICON_DARK_SRC = '/brand/la3ibz-icon-mark-dark.png?v=16';
-export const BRAND_ICON_FOOTER_SRC = '/brand/la3ibz-icon-footer.png?v=16';
-export const BRAND_THREE_SRC = '/brand/la3ibz-three-mark.png?v=16';
-export const BRAND_LOGO_SRC = '/brand/la3ibz-logo-full.png?v=16';
-export const BRAND_FAVICON_SRC = '/brand/la3ibz-favicon.png?v=16';
 export const BRAND_LOGO_VERTICAL_SRC = '/brand/la3ibz-logo-vertical.png?v=16';
 export const BRAND_LOGO_VERTICAL_DARK_SRC = '/brand/la3ibz-logo-vertical-dark.png?v=16';
 export const BRAND_LOGO_HEADER_SRC = '/brand/la3ibz-logo-header.png?v=16';
 export const BRAND_LOGO_HEADER_DARK_SRC = '/brand/la3ibz-logo-header-dark.png?v=16';
-export const BRAND_WORDMARK_EN_SRC = '/brand/la3ibz-wordmark-en.png?v=16';
 
 /** مصطلح موحّد — زر الرجوع من الألعاب أو بنك الأسئلة */
 export const ARENA_BACK_LABEL = 'الرجوع لساحة الألعاب';

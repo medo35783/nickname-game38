@@ -1,12 +1,15 @@
 import sharp from 'sharp';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const brandDir = path.resolve('public/brand');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const brandDir = path.join(root, 'public', 'brand');
+const sourcesDir = path.join(root, 'brand-sources');
 
 const sources = {
-  icon: path.join(brandDir, 'la3ibz-icon-source.png'),
-  vertical: path.join(brandDir, 'la3ibz-logo-vertical-source.png'),
-  header: path.join(brandDir, 'la3ibz-logo-header-source.png'),
+  icon: path.join(sourcesDir, 'la3ibz-icon-source.png'),
+  vertical: path.join(sourcesDir, 'la3ibz-logo-vertical-source.png'),
+  header: path.join(sourcesDir, 'la3ibz-logo-header-source.png'),
 };
 
 function isNearWhite(r, g, b, threshold = 238) {
@@ -77,7 +80,5 @@ const icon512 = await sharp(cleanedIcon, { raw: { width, height, channels: 4 } }
   .toBuffer();
 
 await sharp(icon512).toFile(path.join(brandDir, 'la3ibz-icon-mark.png'));
-await sharp(icon512).resize(192, 192).toFile(path.join(brandDir, 'la3ibz-favicon.png'));
-await sharp(icon512).resize(256, 256).toFile(path.join(brandDir, 'la3ibz-icon-footer.png'));
 
 console.log('Brand assets updated (HQ sources)');

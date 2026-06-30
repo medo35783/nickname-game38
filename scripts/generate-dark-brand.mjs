@@ -1,7 +1,9 @@
 import sharp from 'sharp';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const brandDir = path.resolve('public/brand');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const brandDir = path.join(root, 'public', 'brand');
 
 /** يفتح البكسلات الداكنة (نص الشعار) للوضع الليلي */
 function adaptForDarkTheme(data) {

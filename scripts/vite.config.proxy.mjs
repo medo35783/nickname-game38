@@ -37,7 +37,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
-        'brand/la3ibz-favicon.png',
         'brand/la3ibz-icon-mark.png',
         'brand/la3ibz-icon-mark-dark.png',
         'brand/la3ibz-pwa-192.png',

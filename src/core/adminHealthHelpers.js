@@ -7,7 +7,9 @@ import {
 
 export { purgeRoomList } from './roomLifecycle';
 
-export { isLegacyRoomCode } from './roomCode';
+import { isLegacyRoomCode } from './roomCode';
+
+export { isLegacyRoomCode };
 
 function countPlayers(roomData, playersKey) {
   const bucket = roomData?.[playersKey];

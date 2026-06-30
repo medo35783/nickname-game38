@@ -10,3 +10,6 @@ export const SECURITY_MODE = import.meta.env.VITE_SECURITY_MODE === 'blaze' ? 'b
 
 /** true = activateSubscriptionCode Cloud Function */
 export const USE_CLOUD_ACTIVATION = SECURITY_MODE === 'blaze';
+
+/** true = syncAdminClaim Cloud Function (مزامنة Custom Claim) */
+export const USE_CLOUD_ADMIN_CLAIM = SECURITY_MODE === 'blaze';

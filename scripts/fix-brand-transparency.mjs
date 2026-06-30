@@ -1,8 +1,11 @@
 import sharp from 'sharp';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const brandDir = path.resolve('public/brand');
-const verticalSource = path.join(brandDir, 'la3ibz-logo-vertical-source.png');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const brandDir = path.join(root, 'public', 'brand');
+const sourcesDir = path.join(root, 'brand-sources');
+const verticalSource = path.join(sourcesDir, 'la3ibz-logo-vertical-source.png');
 
 function stripCheckerboard(data, width, height) {
   const out = Buffer.from(data);
@@ -46,7 +49,6 @@ const iconBuffer = await sharp(cleaned, { raw: { width, height, channels: 4 } })
   .toBuffer();
 
 await sharp(iconBuffer).toFile(path.join(brandDir, 'la3ibz-icon-mark.png'));
-await sharp(iconBuffer).resize(192, 192).toFile(path.join(brandDir, 'la3ibz-favicon.png'));
 
 await sharp(cleaned, { raw: { width, height, channels: 4 } })
   .resize(640, null, { fit: 'inside' })
