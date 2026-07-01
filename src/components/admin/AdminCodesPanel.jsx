@@ -22,6 +22,8 @@ import CodeSponsorLink from './CodeSponsorLink';
 import { formatCodeMiniStats, getCodeActivityInfo } from './codeActivityHelpers';
 import { aggregateMarketingMetrics, formatEngagementMinutes } from '../../core/marketingStatsHelpers';
 import MarketingReportDialog from './MarketingReportDialog';
+import PromoCodeTicket from './PromoCodeTicket';
+import '../../styles/promo-code-ticket.css';
 
 /** باقات التوليد: مدة بالأيام + سعر بالريال */
 const PACKAGES = ADMIN_PACKAGE_OPTIONS;
@@ -107,8 +109,10 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
   const [internalIndexByCode, setInternalIndexByCode] = useState({});
   /** الباقة المختارة للتوليد */
   const [selectedPkg, setSelectedPkg] = useState(PACKAGES[0]);
-  /** عدد الأكواد المراد توليدها */
+  /** عدد الأكواد المراد توليدها (مدفوعة) */
   const [countInput, setCountInput] = useState(10);
+  /** عدد الأكواد الترويجية */
+  const [promoCountInput, setPromoCountInput] = useState(5);
   /** ملاحظة ترويج (محل / عائلة) */
   const [promoNote, setPromoNote] = useState('');
   /** فلتر مصدر الكود في القائمة */
@@ -117,6 +121,8 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
   const [generating, setGenerating] = useState(false);
   /** آخر دفعة مولّدة (للعرض والنسخ) */
   const [generatedLines, setGeneratedLines] = useState([]);
+  /** آخر دفعة ترويجية — تذاكر */
+  const [promoTickets, setPromoTickets] = useState([]);
   /** رسالة نجاح بعد التوليد */
   const [successMsg, setSuccessMsg] = useState('');
   /** كود مُوسَّع لعرض إحصائيات الجلسات */
@@ -355,6 +361,8 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
     setGenerating(true);
     setSuccessMsg('');
     setGeneratedLines([]);
+    setPromoTickets([]);
+    setPromoTickets([]);
     const created = [];
     try {
       for (let i = 0; i < n; i += 1) {
@@ -375,10 +383,11 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
 
   /** توليد أكواد ترويجية — 6 ساعات، بدون احتساب إيراد */
   const handleGeneratePromo = async () => {
-    const n = clampCount(Number(countInput));
-    setCountInput(n);
+    const n = clampCount(Number(promoCountInput));
+    setPromoCountInput(n);
     setGenerating(true);
     setSuccessMsg('');
+    setPromoTickets([]);
     setGeneratedLines([]);
     const created = [];
     try {
@@ -390,7 +399,7 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
         });
         created.push(formatCodeForDisplay(rec.code));
       }
-      setGeneratedLines(created);
+      setPromoTickets(created);
       const msg = `تم توليد ${created.length} كود ترويجي (6 ساعات)`;
       setSuccessMsg(msg);
       notify(msg, 'success');
@@ -399,6 +408,15 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
       notify(errText, 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleCopyOneCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      notify(`تم نسخ ${code}`, 'success');
+    } catch {
+      notify('تعذّر النسخ', 'error');
     }
   };
 
@@ -740,6 +758,23 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
           />
         </div>
 
+        <div className="ig">
+          <label className="lbl">عدد الأكواد الترويجية (1 — 100)</label>
+          <input
+            className="inp"
+            type="number"
+            min={1}
+            max={100}
+            value={promoCountInput}
+            disabled={generating}
+            onChange={(e) => {
+              const v = e.target.value === '' ? '' : clampCount(Number(e.target.value));
+              setPromoCountInput(v === '' ? '' : v);
+            }}
+            onBlur={() => setPromoCountInput((c) => clampCount(Number(c === '' ? 1 : c)))}
+          />
+        </div>
+
         <button
           type="button"
           className="btn bgh mt2"
@@ -749,6 +784,20 @@ export default function AdminCodesPanel({ notify, layout = 'standalone', sharedS
         >
           {generating ? '⏳ جاري التوليد...' : '🎁 توليد أكواد ترويجية'}
         </button>
+
+        {promoTickets.length > 0 ? (
+          <div className="promo-tickets-grid">
+            {promoTickets.map((code) => (
+              <PromoCodeTicket
+                key={code}
+                code={code}
+                durationHours={6}
+                promoNote={promoNote.trim()}
+                onCopy={handleCopyOneCode}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* قائمة الأكواد */}

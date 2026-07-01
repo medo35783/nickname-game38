@@ -26,8 +26,8 @@ export function buildDeviceInfo() {
 
 export function mapActivationError(message) {
   const m = (message || '').trim();
-  if (m.includes('PERMISSION_DENIED') || m.includes('permission')) {
-    return 'تعذّر حفظ التفعيل — تحقق من اتصال Firebase';
+  if (m.includes('PERMISSION_DENIED') || m.includes('permission') || m.includes('صلاحية')) {
+    return 'تعذّر التفعيل — انشر قواعد Firebase المحدّثة ثم أعد المحاولة';
   }
   if (m.includes('الكود غير صحيح') || m.includes('الكود غير موجود')) {
     return 'الكود غير صحيح';

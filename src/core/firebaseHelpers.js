@@ -196,9 +196,13 @@ function buildActivationMetaFields(codeData) {
  */
 export async function createCode(duration, price, meta = {}) {
   try {
-    const code = generateUniqueCode();
-    const codeRef = push(ref(db, 'codes'));
-    const codeId = codeRef.key;
+    let code = generateUniqueCode();
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const exists = await get(ref(db, `codes/${code}`));
+      if (!exists.exists()) break;
+      code = generateUniqueCode();
+    }
+
     const source = meta.source === 'promo' ? 'promo' : 'paid';
     const codeData = {
       code,
@@ -220,15 +224,15 @@ export async function createCode(duration, price, meta = {}) {
       codeData.promoNote = String(meta.promoNote).trim().slice(0, 120);
     }
 
-    const indexPayload = { codeId, ...codeData };
+    const indexPayload = { codeId: code, ...codeData };
 
-    await set(codeRef, codeData);
     await update(ref(db), {
+      [`codes/${code}`]: codeData,
       [`codeIndex/${code}`]: indexPayload,
       [`adminCodeIndex/${code}`]: true,
     });
 
-    return { id: codeId, ...codeData };
+    return { id: code, ...codeData };
   } catch (error) {
     console.error('خطأ في إنشاء الكود:', error);
     throw error;

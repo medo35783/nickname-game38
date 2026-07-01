@@ -1,0 +1,167 @@
+.promo-ticket {
+  position: relative;
+  border-radius: 18px;
+  padding: 2px;
+  background: linear-gradient(145deg, rgba(201, 127, 26, 0.85), rgba(37, 111, 168, 0.5), rgba(201, 127, 26, 0.65));
+  box-shadow: 0 12px 32px rgba(10, 22, 40, 0.35);
+}
+
+.promo-ticket__glow {
+  position: absolute;
+  inset: 8px;
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 0%, rgba(201, 127, 26, 0.18), transparent 55%);
+  pointer-events: none;
+}
+
+.promo-ticket__inner {
+  position: relative;
+  border-radius: 16px;
+  padding: 18px 16px 16px;
+  background:
+    linear-gradient(165deg, rgba(18, 42, 74, 0.98) 0%, rgba(10, 22, 40, 0.99) 55%, rgba(26, 56, 96, 0.95) 100%);
+  border: 1px solid rgba(201, 127, 26, 0.22);
+  text-align: center;
+  overflow: hidden;
+}
+
+.promo-ticket__inner::before,
+.promo-ticket__inner::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--bg, #0a1628);
+  border: 1px solid rgba(201, 127, 26, 0.25);
+}
+
+.promo-ticket__inner::before { left: -8px; }
+.promo-ticket__inner::after { right: -8px; }
+
+.promo-ticket__head {
+  margin-bottom: 10px;
+}
+
+.promo-ticket__logo {
+  display: block;
+  width: min(148px, 72%);
+  height: auto;
+  margin: 0 auto 10px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
+}
+
+.promo-ticket__eyebrow {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(201, 127, 26, 0.95);
+  text-transform: uppercase;
+}
+
+.promo-ticket__title {
+  margin: 0;
+  font-family: 'Cairo', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  color: #f5e6c8;
+  line-height: 1.35;
+}
+
+.promo-ticket__badge {
+  display: inline-block;
+  margin: 10px 0 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(201, 127, 26, 0.25), rgba(201, 127, 26, 0.08));
+  border: 1px solid rgba(201, 127, 26, 0.45);
+  color: #f0d090;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.promo-ticket__code {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 14px 10px;
+  border: 2px dashed rgba(201, 127, 26, 0.55);
+  border-radius: 12px;
+  background: rgba(201, 127, 26, 0.08);
+  color: #fff;
+  font-family: ui-monospace, 'Cairo', monospace;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.promo-ticket__code:hover {
+  transform: scale(1.01);
+  border-color: rgba(201, 127, 26, 0.85);
+}
+
+.promo-ticket__warn {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.55;
+  color: #f5c4c4;
+}
+
+.promo-ticket__note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted, #7a94b0);
+}
+
+.promo-ticket__site {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(201, 127, 26, 0.9);
+  letter-spacing: 0.04em;
+}
+
+.promo-ticket__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.promo-ticket__wa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  text-decoration: none;
+  border: none;
+}
+
+.promo-ticket__copy {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 800;
+  border-color: rgba(201, 127, 26, 0.45);
+  color: #f0d090;
+}
+
+.promo-tickets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
