@@ -27,7 +27,7 @@ import PwaInstallBanner from './components/layout/PwaInstallBanner';
 import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal, readLocalSubscription } from './firebaseHelpers';
 import { refreshAdminClaim } from './core/adminAuth';
-import { MOYASAR_STORAGE } from './core/moyasarPayment';
+import { MOYASAR_STORAGE, shouldAutoOpenPackages } from './core/moyasarPayment';
 import { ensureArenaProfile } from './core/arenaProfile';
 import { arenaPointsForRank } from './core/arena.constants';
 import { rewardCurrentPlayerIfRegistered } from './core/arenaRewards';
@@ -64,10 +64,7 @@ export default function App() {
   /* ── NAV ── */
   const [tab, setTab]           = useState(() => {
     try {
-      if (
-        sessionStorage.getItem(MOYASAR_STORAGE.returnId)
-        || sessionStorage.getItem(MOYASAR_STORAGE.openPackages)
-      ) {
+      if (shouldAutoOpenPackages()) {
         return 'pricing';
       }
     } catch { /* ignore */ }

@@ -5,21 +5,41 @@ import PackagePlanCard from '../components/codes/PackagePlanCard';
 import PackageCheckout from '../components/codes/PackageCheckout';
 import PackagePaySuccess from '../components/codes/PackagePaySuccess';
 import PackagesLegalNotice from '../components/codes/PackagesLegalNotice';
+import PackagePaymentSupport from '../components/codes/PackagePaymentSupport';
+import LegalModal from '../components/layout/LegalModal';
 import { SUBSCRIPTION_FEATURES } from '../core/subscriptionPackages';
 import { persistActiveCodeLocal } from '../core/firebaseHelpers';
 import {
   MOYASAR_STORAGE,
   buildMoyasarCallbackUrl,
   clearMoyasarPaymentStorage,
+  getPendingReturnId,
+  markReturnFailed,
   readStoredPlanDays,
   storePlanDays,
+  storePaymentReturn,
 } from '../core/moyasarPayment';
 
 const MOYASAR_JS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
 const MOYASAR_CSS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.css';
-const SUPPORT_EMAIL = 'play@la3ibz.com';
 const ACTIVATE_RETRIES = 8;
 const ACTIVATE_RETRY_MS = 2000;
+
+function mapActivateError(err) {
+  const code = err?.code || err?.message || '';
+  if (code === 'api_unavailable') {
+    return import.meta.env.DEV
+      ? 'الدفع نجح — لكن السيرفر المحلي لا يولّد الأكواد. شغّل: npx vercel dev — أو جرّب على رابط Vercel.'
+      : 'تعذّر الاتصال بسيرفر التفعيل — حدّث الصفحة أو جرّب لاحقاً.';
+  }
+  if (err?.status === 402 || code === 'invalid_payment') {
+    return 'تعذّر تأكيد الدفع من ميسر — انتظر دقيقة وأعد فتح الباقات (نفس العملية).';
+  }
+  if (err?.status === 500 || code === 'server_error' || code === 'missing_firebase_config') {
+    return 'خطأ إعداد السيرفر (Firebase) — تحقق من FIREBASE_SERVICE_ACCOUNT_JSON على Vercel ثم Redeploy.';
+  }
+  return null;
+}
 
 export const PAYMENT_PLANS = [
   { id: '1d', icon: '⚡', name: 'لمسة سريعة', durationSub: '1 يوم', days: 1, planDays: 1, price: 9, amountHalalas: 900, planClass: 'plan-burgundy', badge: 'تجربة سريعة', badgeSide: true },
@@ -71,15 +91,16 @@ export default function Packages({
   const [payError, setPayError] = useState('');
   const [loadingPay, setLoadingPay] = useState(false);
   const [phase, setPhase] = useState(() => (
-    sessionStorage.getItem(MOYASAR_STORAGE.returnId) ? 'processing' : 'browse'
+    getPendingReturnId() ? 'processing' : 'browse'
   ));
   const [successData, setSuccessData] = useState(null);
   const [pendingMsg, setPendingMsg] = useState(() => (
-    sessionStorage.getItem(MOYASAR_STORAGE.returnId)
+    getPendingReturnId()
       ? 'تم الدفع بنجاح — جاري تجهيز كودك...'
       : ''
   ));
-  const [globalError, setGlobalError] = useState('');
+  const [globalError, setGlobalError] = useState(null);
+  const [refundOpen, setRefundOpen] = useState(false);
 
   const openCodes = () => window.dispatchEvent(new CustomEvent('pfcc-open-code-activation'));
 
@@ -89,15 +110,34 @@ export default function Packages({
       idToken = await auth.currentUser?.getIdToken();
     } catch { /* ignore */ }
 
-    const res = await fetch('/api/activateCode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentId, planDays: planDays || undefined, idToken }),
-    });
-    const data = await res.json().catch(() => ({}));
+    let res;
+    try {
+      res = await fetch('/api/activateCode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId, planDays: planDays || undefined, idToken }),
+      });
+    } catch {
+      const err = new Error('api_unavailable');
+      err.code = 'api_unavailable';
+      throw err;
+    }
+
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      const err = new Error('api_unavailable');
+      err.code = 'api_unavailable';
+      err.status = res.status;
+      throw err;
+    }
+
     if (!res.ok || !data.success) {
       const err = new Error(data.error || 'activate_failed');
       err.status = res.status;
+      err.code = data.error;
       throw err;
     }
     return data;
@@ -109,10 +149,11 @@ export default function Packages({
 
     setPhase('processing');
     setPayError('');
-    setGlobalError('');
+    setGlobalError(null);
     setPendingMsg('تم الدفع بنجاح — جاري تجهيز كودك...');
     scrollToTop();
 
+    let lastErr = null;
     for (let attempt = 0; attempt < ACTIVATE_RETRIES; attempt += 1) {
       try {
         if (attempt > 0) {
@@ -140,14 +181,21 @@ export default function Packages({
         scrollToTop();
         return;
       } catch (err) {
+        lastErr = err;
         if (err?.status === 409) continue;
         if (attempt === ACTIVATE_RETRIES - 1) break;
       }
     }
 
     activatingRef.current = false;
+    markReturnFailed(paymentId);
+    clearMoyasarPaymentStorage();
     setPendingMsg('');
-    setGlobalError(`تواصل معنا على ${SUPPORT_EMAIL} مع رقم العملية: ${paymentId}`);
+    const hint = mapActivateError(lastErr);
+    setGlobalError({
+      message: hint || 'تم الدفع — لكن تعذّر تجهيز الكود تلقائياً. تواصل معنا فوراً.',
+      paymentId,
+    });
     setPhase('browse');
   }, [activateOnServer, onSubscriptionActivated]);
 
@@ -176,7 +224,7 @@ export default function Packages({
           if (payment?.status === 'paid' && payment?.id) {
             await handlePaymentSuccess(payment.id, plan.planDays);
           } else if (payment?.id) {
-            sessionStorage.setItem(MOYASAR_STORAGE.returnId, payment.id);
+            storePaymentReturn(payment.id);
           }
         },
         on_failure: () => setPayError('فشل الدفع — تحقق من بيانات البطاقة أو جرّب بطاقة أخرى.'),
@@ -190,7 +238,7 @@ export default function Packages({
 
   const handleSubscribe = useCallback(async (plan) => {
     setHighlightId(plan.id);
-    setGlobalError('');
+    setGlobalError(null);
     setTimeout(async () => {
       setSelectedPlan(plan);
       setPhase('checkout');
@@ -209,7 +257,7 @@ export default function Packages({
   }, []);
 
   useEffect(() => {
-    const returnId = sessionStorage.getItem(MOYASAR_STORAGE.returnId);
+    const returnId = getPendingReturnId();
     if (!returnId) return;
 
     const planDays = readStoredPlanDays();
@@ -283,7 +331,15 @@ export default function Packages({
         ))}
       </div>
 
-      {globalError ? <p className="pkg-moyasar-error" role="alert">{globalError}</p> : null}
+      {globalError ? (
+        <PackagePaymentSupport
+          message={globalError.message}
+          paymentId={globalError.paymentId}
+          onOpenRefund={() => setRefundOpen(true)}
+        />
+      ) : null}
+
+      {refundOpen ? <LegalModal documentId="refund" onClose={() => setRefundOpen(false)} /> : null}
 
       <p className="pkg-tiers-label">اختر مدة الاشتراك</p>
 

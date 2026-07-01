@@ -6,6 +6,7 @@
   "scripts": {
     "setup-deps": "powershell -ExecutionPolicy Bypass -File scripts/setup-deps.ps1",
     "dev": "node scripts/dev-win.mjs",
+    "dev:api": "vercel dev",
     "build": "node scripts/generate-pwa-icons.mjs && node scripts/dev-win.mjs build",
     "preview": "node scripts/dev-win.mjs preview",
     "generate-pwa-icons": "node scripts/generate-pwa-icons.mjs"

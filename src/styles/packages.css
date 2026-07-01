@@ -681,6 +681,76 @@
   text-align: center;
 }
 
+/* ── دعم ما بعد الدفع ── */
+.pkg-pay-support {
+  margin: 10px 0 14px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(184, 37, 56, 0.35);
+  background: linear-gradient(165deg, rgba(184, 37, 56, 0.1), rgba(37, 111, 168, 0.05));
+  text-align: center;
+}
+
+.pkg-pay-support__msg {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.pkg-pay-support__id {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pkg-pay-support__id-btn {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(37, 111, 168, 0.12);
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--brand-blue);
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.pkg-pay-support__phone {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pkg-pay-support__phone a {
+  color: var(--brand-blue);
+  text-decoration: none;
+}
+
+.pkg-pay-support__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.pkg-pay-support__wa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #fff;
+}
+
+.pkg-pay-support__refund {
+  width: 100%;
+}
+
 .pkg-moyasar-cancel {
   width: 100%;
   margin-top: 8px;
