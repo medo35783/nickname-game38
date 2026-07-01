@@ -738,6 +738,10 @@
   align-items: stretch;
 }
 
+.pkg-pay-support__retry {
+  width: 100%;
+}
+
 .pkg-pay-support__wa {
   display: inline-flex;
   align-items: center;

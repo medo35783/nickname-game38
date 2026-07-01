@@ -17,7 +17,7 @@ import {
   saveCodePhone,
   sanitizeSubscriptionCodeInput,
   isValidSubscriptionCodeInput,
-  isPlayCodeInput,
+  SUBSCRIPTION_CODE_LEN,
 } from '../../firebaseHelpers';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
 import {
@@ -134,7 +134,7 @@ export default function PlayerAccessPanel({
     setCodeError('');
 
     if (!isValidSubscriptionCodeInput(codeInput)) {
-      setCodeError('أدخل كوداً صالحاً: 6 أحرف أو PLAY-XXXX-XXXX');
+      setCodeError(`أدخل ${SUBSCRIPTION_CODE_LEN} أحرف أو أرقام`);
       return;
     }
 
@@ -155,7 +155,6 @@ export default function PlayerAccessPanel({
     } catch (e) {
       const msg = mapActivationError(e?.message);
       setCodeError(msg);
-      notify?.(msg, 'error');
     } finally {
       setCodeLoading(false);
     }
@@ -362,16 +361,16 @@ export default function PlayerAccessPanel({
             <>
               <div className="ig">
                 <label className="lbl" htmlFor="pap-code-inp">
-                  كود الاشتراك
+                  كود الاشتراك ({SUBSCRIPTION_CODE_LEN} أحرف)
                 </label>
                 <input
                   id="pap-code-inp"
-                  className={`inp big${isPlayCodeInput(codeInput) ? ' inp-code-play' : ''}${codeError ? ' err-b' : ''}`}
-                  placeholder="KYEFA8 أو PLAY-XXXX-XXXX"
+                  className={`inp inp-code-sub${codeError ? ' err-b' : ''}`}
+                  placeholder="مثال: WAU4LFGA"
                   autoComplete="off"
                   autoCapitalize="characters"
                   spellCheck={false}
-                  maxLength={isPlayCodeInput(codeInput) ? 14 : 6}
+                  maxLength={SUBSCRIPTION_CODE_LEN}
                   value={codeInput}
                   onChange={(e) => {
                     setCodeInput(sanitizeSubscriptionCodeInput(e.target.value));

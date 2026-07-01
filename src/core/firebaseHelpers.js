@@ -38,73 +38,102 @@ export {
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // بدون O,0,I,1
 
-/** يولّد 6 أحرف/أرقام فقط */
-export function generateCodeSuffix() {
+/** طول كود الاشتراك الموحّد — 8 أحرف/أرقام بدون فواصل */
+export const SUBSCRIPTION_CODE_LEN = 8;
+
+function compactAlphanumeric(raw) {
+  return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** يولّد 8 أحرف/أرقام */
+export function generateCodeSuffix(len = SUBSCRIPTION_CODE_LEN) {
   let suffix = '';
-  for (let i = 0; i < 6; i += 1) {
+  for (let i = 0; i < len; i += 1) {
     suffix += CODE_CHARS.charAt(Math.floor(Math.random() * CODE_CHARS.length));
   }
   return suffix;
 }
 
-/** تنسيق كامل للتخزين في قاعدة البيانات */
+/** تنسيق قديم للأكواد الإدارية 6 أحرف */
 export function formatStoredCode(suffix) {
   return `CODE-${suffix}`;
 }
 
-/** عرض للمستخدم: 6 أحرف فقط */
+/** عرض للمستخدم — 8 أحرف بدون فواصل */
 export function formatCodeForDisplay(code) {
   if (!code) return '';
+  const compact = compactAlphanumeric(code);
+  if (compact.startsWith('PLAY') && compact.length === 12) return compact.slice(4);
+  if (/^[A-Z0-9]{8}$/.test(compact)) return compact;
   const t = String(code).trim().toUpperCase();
   if (t.startsWith('CODE-')) return t.slice(5);
-  return t;
+  return compact.slice(0, SUBSCRIPTION_CODE_LEN);
+}
+
+/** مفاتيح Firebase المحتملة — يدعم 8 أحرف + PLAY قديم + CODE-6 */
+export function resolveCodeLookupKeys(raw) {
+  const spaced = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  const compact = compactAlphanumeric(raw);
+  const keys = [];
+
+  if (/^[A-Z0-9]{8}$/.test(compact)) {
+    keys.push(compact);
+    keys.push(`PLAY-${compact.slice(0, 4)}-${compact.slice(4)}`);
+  }
+  if (/^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(spaced)) {
+    keys.push(spaced);
+    keys.push(compact.startsWith('PLAY') ? compact.slice(4) : compact);
+  }
+  if (/^[A-Z0-9]{6}$/.test(compact)) {
+    keys.push(formatStoredCode(compact));
+  }
+  if (/^CODE-[A-Z0-9]{6}$/.test(spaced)) {
+    keys.push(spaced);
+  }
+
+  return [...new Set(keys.filter(Boolean))];
 }
 
 /**
- * يقبل KYEFA8 أو CODE-KYEFA8 ويرجع CODE-KYEFA8 للبحث في DB
+ * يُطبّع الإدخال إلى 8 أحرف (أو CODE-XXXXXX للقديم)
  */
 export function normalizeSubscriptionCode(raw) {
-  const t = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
-  if (/^[A-Z0-9]{6}$/.test(t)) return formatStoredCode(t);
-  if (/^CODE-[A-Z0-9]{6}$/.test(t)) return t;
-  if (/^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(t)) return t;
-  return t;
+  const spaced = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  const compact = compactAlphanumeric(raw);
+
+  if (/^[A-Z0-9]{8}$/.test(compact)) return compact;
+  if (/^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(spaced)) return spaced;
+  if (/^[A-Z0-9]{6}$/.test(compact)) return formatStoredCode(compact);
+  if (/^CODE-[A-Z0-9]{6}$/.test(spaced)) return spaced;
+  return compact.slice(0, SUBSCRIPTION_CODE_LEN);
 }
 
-const PLAY_CODE_RE = /^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
-
-export const PLAY_CODE_INPUT_MAX = 14;
-
-/** تنسيق الإدخال: KYEFA8 أو PLAY-XXXX-XXXX */
+/** إدخال الحقل — 8 أحرف فقط، يزيل PLAY والشرطات تلقائياً */
 export function sanitizeSubscriptionCodeInput(raw) {
-  let t = String(raw || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
-  const compact = t.replace(/-/g, '');
-
+  let compact = compactAlphanumeric(raw);
   if (compact.startsWith('PLAY') && compact.length > 4) {
-    const rest = compact.slice(4);
-    if (rest.length <= 4) return `PLAY-${rest}`;
-    return `PLAY-${rest.slice(0, 4)}-${rest.slice(4, 8)}`;
+    compact = compact.slice(4);
   }
-
-  if (t.includes('-') || t.startsWith('PLAY')) {
-    return t.slice(0, PLAY_CODE_INPUT_MAX);
-  }
-
-  return compact.slice(0, 6);
-}
-
-export function isPlayCodeInput(raw) {
-  const t = String(raw || '').trim().toUpperCase();
-  return t.startsWith('PLAY') || t.includes('-') || t.length > 6;
+  return compact.slice(0, SUBSCRIPTION_CODE_LEN);
 }
 
 export function isValidSubscriptionCodeInput(raw) {
-  const normalized = normalizeSubscriptionCode(raw);
-  return /^CODE-[A-Z0-9]{6}$/.test(normalized) || PLAY_CODE_RE.test(normalized);
+  const compact = compactAlphanumeric(raw);
+  const spaced = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (/^[A-Z0-9]{8}$/.test(compact)) return true;
+  if (/^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(spaced)) return true;
+  if (/^[A-Z0-9]{6}$/.test(compact)) return true;
+  return false;
 }
 
 export function isPlaySubscriptionCode(code) {
-  return PLAY_CODE_RE.test(String(code || '').trim().toUpperCase());
+  const t = String(code || '').trim().toUpperCase();
+  return /^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(t);
+}
+
+export function isMoyasarStyleCode(codeOrKey) {
+  const t = String(codeOrKey || '').trim().toUpperCase();
+  return /^[A-Z0-9]{8}$/.test(t) || isPlaySubscriptionCode(t);
 }
 
 /** يُحوّل رقم واتساب محلي (05…) إلى صيغة wa.me (966…) */
@@ -123,7 +152,7 @@ export function normalizeWhatsappPhone(raw) {
  * @returns {string} كود بصيغة CODE-XXXXXX
  */
 export function generateUniqueCode() {
-  return formatStoredCode(generateCodeSuffix());
+  return generateCodeSuffix(SUBSCRIPTION_CODE_LEN);
 }
 
 /** مدة انتهاء الكود من لحظة التفعيل */
@@ -294,9 +323,9 @@ async function activateCodeViaCloud(code, userId, deviceInfo, options = {}) {
 
 async function activateCodeClient(code, userId, deviceInfo, options = {}) {
   assertCodeActivationAllowed(userId);
+  const lookupKeys = resolveCodeLookupKeys(code);
   const storedCode = normalizeSubscriptionCode(code);
-  const isPlayCode = isPlaySubscriptionCode(storedCode);
-  if (!/^CODE-[A-Z0-9]{6}$/.test(storedCode) && !isPlayCode) {
+  if (!lookupKeys.length) {
     throw new Error('الكود غير صحيح');
   }
   if (!userId) {
@@ -310,19 +339,28 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
     let foundCodeId = null;
     let foundCodeData = null;
 
-    if (isPlayCode) {
-      const playSnap = await get(ref(db, `codes/${storedCode}`));
-      if (playSnap.exists()) {
-        foundCodeId = storedCode;
-        foundCodeData = { ...playSnap.val(), id: storedCode };
+    for (const key of lookupKeys) {
+      if (key.startsWith('CODE-')) {
+        const indexSnap = await get(ref(db, `codeIndex/${key}`));
+        if (indexSnap.exists()) {
+          const idx = indexSnap.val();
+          foundCodeId = idx.codeId;
+          foundCodeData = { ...idx, id: foundCodeId };
+          break;
+        }
+        continue;
       }
-    } else {
-      const indexSnap = await get(ref(db, `codeIndex/${storedCode}`));
-      if (indexSnap.exists()) {
-        const idx = indexSnap.val();
-        foundCodeId = idx.codeId;
-        foundCodeData = { ...idx, id: foundCodeId };
-      } else {
+
+      const directSnap = await get(ref(db, `codes/${key}`));
+      if (directSnap.exists()) {
+        foundCodeId = key;
+        foundCodeData = { ...directSnap.val(), id: key };
+        break;
+      }
+    }
+
+    if (!foundCodeId || !foundCodeData) {
+      if (storedCode.startsWith('CODE-')) {
         const codesSnap = await get(ref(db, 'codes'));
         if (codesSnap.exists()) {
           codesSnap.forEach((child) => {
@@ -344,7 +382,7 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
     }
 
     const codeStatus = foundCodeData.status || (foundCodeData.active ? 'active' : 'unused');
-    const isMoyasarPurchase = foundCodeData.source === 'moyasar' || isPlayCode;
+    const isMoyasarPurchase = foundCodeData.source === 'moyasar' || isMoyasarStyleCode(foundCodeId);
 
     if (codeStatus === 'expired') {
       throw new Error('الكود منتهي الصلاحية');
@@ -378,7 +416,7 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
     }
 
     const activationMeta = buildActivationMetaFields(foundCodeData);
-    const displayCode = isPlayCode ? foundCodeId : storedCode;
+    const displayCode = formatCodeForDisplay(foundCodeId);
 
     const activeSummary = {
       codeId: foundCodeId,

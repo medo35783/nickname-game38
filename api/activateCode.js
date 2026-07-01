@@ -47,9 +47,10 @@ function getAdminAuth() {
 }
 
 function generateCodeId() {
-  const block = (len) =>
-    Array.from({ length: len }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-  return `PLAY-${block(4)}-${block(4)}`;
+  return Array.from(
+    { length: 8 },
+    () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
+  ).join('');
 }
 
 async function verifyUserToken(idToken) {

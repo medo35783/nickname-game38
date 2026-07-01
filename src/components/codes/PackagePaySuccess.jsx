@@ -1,3 +1,5 @@
+import { formatCodeForDisplay } from '../../core/firebaseHelpers';
+
 function formatArabicDate(ts) {
   return new Intl.DateTimeFormat('ar-SA', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(ts));
 }
@@ -20,7 +22,7 @@ export default function PackagePaySuccess({
         <h2 className="pkg-pay-success__title">تم الاشتراك بنجاح!</h2>
         <p className="pkg-pay-success__label">كودك — انقر للنسخ</p>
         <button type="button" className="pkg-pay-success__code" onClick={onCopy}>
-          {code}
+          {formatCodeForDisplay(code)}
         </button>
         <p className="pkg-pay-success__exp">صالح حتى: {formatArabicDate(expiresAt)}</p>
         <p className="pkg-pay-success__hint">

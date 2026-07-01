@@ -14,7 +14,7 @@ function IconWhatsApp() {
 /**
  * بانر دعم بعد مشكلة دفع — جوال + واتساب + سياسة استرجاع
  */
-export default function PackagePaymentSupport({ message, paymentId, onOpenRefund }) {
+export default function PackagePaymentSupport({ message, paymentId, onOpenRefund, onRetry }) {
   const waText = encodeURIComponent(
     `مرحباً، واجهت مشكلة بعد الدفع في ${window.location.hostname}.\nرقم العملية: ${paymentId || '—'}`,
   );
@@ -38,6 +38,11 @@ export default function PackagePaymentSupport({ message, paymentId, onOpenRefund
         </p>
       ) : null}
       <div className="pkg-pay-support__actions">
+        {typeof onRetry === 'function' ? (
+          <button type="button" className="btn btn-bbrand pkg-pay-support__retry" onClick={onRetry}>
+            🔄 إعادة تفعيل الكود
+          </button>
+        ) : null}
         <a
           className="pkg-pay-support__wa btn bg"
           href={waHref}

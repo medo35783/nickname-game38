@@ -4,7 +4,8 @@ import {
   normalizeSubscriptionCode,
   sanitizeSubscriptionCodeInput,
   isValidSubscriptionCodeInput,
-  isPlayCodeInput,
+  SUBSCRIPTION_CODE_LEN,
+  formatCodeForDisplay,
 } from '../../firebaseHelpers';
 import { auth } from '../../firebase';
 import { PLATFORM_NAME, ARENA_BACK_LABEL } from '../../core/constants';
@@ -14,7 +15,7 @@ import '../../styles/code-activation.css';
 
 import { buildDeviceInfo, mapActivationError } from '../auth/playerAccessHelpers';
 /**
- * شاشة تفعيل كود الاشتراك — الخطوة الأولى قبل التسجيل أو الدخول.
+ * شاشة تفعيل كود الاشتراك — 8 أحرف بدون فواصل
  */
 export default function CodeActivation({
   onActivationSuccess,
@@ -53,15 +54,13 @@ export default function CodeActivation({
     setError('');
 
     if (!isValidSubscriptionCodeInput(codeInput)) {
-      setError('أدخل كوداً صالحاً: 6 أحرف أو PLAY-XXXX-XXXX');
+      setError(`أدخل ${SUBSCRIPTION_CODE_LEN} أحرف أو أرقام`);
       return;
     }
 
     const user = auth.currentUser;
     if (!user) {
-      const msg = 'جاري الاتصال… أعد المحاولة بعد ثوانٍ';
-      setError(msg);
-      notify(msg, 'error');
+      setError('جاري الاتصال… أعد المحاولة بعد ثوانٍ');
       return;
     }
 
@@ -73,15 +72,14 @@ export default function CodeActivation({
         setActivatedData(codeData);
       } else {
         onActivationSuccess(codeData, pendingAuthMode);
+        notify?.('✅ تم تفعيل الكود', 'success');
       }
     } catch (e) {
-      const msg = mapActivationError(e?.message);
-      setError(msg);
-      notify(msg, 'error');
+      setError(mapActivationError(e?.message));
     } finally {
       setLoading(false);
     }
-  }, [loading, normalizedCode, deviceInfo, notify, onActivationSuccess, pendingAuthMode]);
+  }, [loading, codeInput, normalizedCode, deviceInfo, notify, onActivationSuccess, pendingAuthMode]);
 
   const goPackages = useCallback(() => {
     window.dispatchEvent(new CustomEvent('pfcc-open-packages'));
@@ -93,7 +91,7 @@ export default function CodeActivation({
       <div className="scr code-activation-scr">
         {onBack ? <GameTopNav onBack={() => finishActivation()} variant="arena" label={backLabel} /> : null}
         <CodeActivationSignup
-          codeId={activatedData.id}
+          codeId={formatCodeForDisplay(activatedData.id || activatedData.codeId)}
           notify={notify}
           onDone={() => finishActivation()}
           onRequestLogin={handleLoginRequest}
@@ -117,16 +115,16 @@ export default function CodeActivation({
       <div className="card">
         <div className="ig">
           <label className="lbl" htmlFor="pfcc-code-inp">
-            كود الاشتراك
+            كود الاشتراك ({SUBSCRIPTION_CODE_LEN} أحرف)
           </label>
           <input
             id="pfcc-code-inp"
-            className={`inp big${isPlayCodeInput(codeInput) ? ' inp-code-play' : ''}${error ? ' err-b' : ''}`}
-            placeholder="KYEFA8 أو PLAY-XXXX-XXXX"
+            className={`inp inp-code-sub${error ? ' err-b' : ''}`}
+            placeholder="مثال: WAU4LFGA"
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
-            maxLength={isPlayCodeInput(codeInput) ? 14 : 6}
+            maxLength={SUBSCRIPTION_CODE_LEN}
             value={codeInput}
             onChange={(e) => {
               setCodeInput(sanitizeSubscriptionCodeInput(e.target.value));

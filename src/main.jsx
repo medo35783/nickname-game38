@@ -15,7 +15,7 @@ initTheme()
     const plan = params.get('pfcc_plan')
     if (plan) storePlanDays(plan)
 
-    storePaymentReturn(paymentId)
+    storePaymentReturn(paymentId, plan ? Number(plan) : undefined)
     sessionStorage.setItem(MOYASAR_STORAGE.openPackages, '1')
     window.history.replaceState({}, '', window.location.pathname)
   } catch {

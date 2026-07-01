@@ -10,11 +10,19 @@
   box-shadow: 0 0 0 3px rgba(37, 111, 168, 0.1);
 }
 
-.inp-code-play {
-  font-size: 17px;
-  letter-spacing: 0.02em;
+.inp-code-sub {
+  display: block;
+  width: 100%;
+  font-size: 22px;
+  text-align: center;
+  letter-spacing: 0.12em;
   font-family: ui-monospace, 'Cairo', monospace;
   font-weight: 800;
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--border-faint);
+  background: var(--card2);
+  color: var(--text);
 }
 
 .code-act-notes__single {

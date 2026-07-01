@@ -8,16 +8,24 @@ import PackagesLegalNotice from '../components/codes/PackagesLegalNotice';
 import PackagePaymentSupport from '../components/codes/PackagePaymentSupport';
 import LegalModal from '../components/layout/LegalModal';
 import { SUBSCRIPTION_FEATURES } from '../core/subscriptionPackages';
-import { persistActiveCodeLocal } from '../core/firebaseHelpers';
+import { persistActiveCodeLocal, activateCode, formatCodeForDisplay } from '../core/firebaseHelpers';
+import { buildDeviceInfo } from '../components/auth/playerAccessHelpers';
 import {
-  MOYASAR_STORAGE,
   buildMoyasarCallbackUrl,
   clearMoyasarPaymentStorage,
+  clearPaymentError,
+  clearPaymentSuccess,
+  clearReturnFailed,
   getPendingReturnId,
-  markReturnFailed,
+  readPaymentError,
+  readPaymentSuccess,
+  readPendingPayment,
   readStoredPlanDays,
-  storePlanDays,
+  storePaymentError,
   storePaymentReturn,
+  storePaymentSuccess,
+  storePendingPayment,
+  storePlanDays,
 } from '../core/moyasarPayment';
 
 const MOYASAR_JS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
@@ -99,6 +107,46 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function resolveInitialPhase() {
+  if (readPaymentSuccess()) return 'success';
+  if (getPendingReturnId() || readPendingPayment()) return 'processing';
+  return 'browse';
+}
+
+function resolveInitialSuccess() {
+  const saved = readPaymentSuccess();
+  if (!saved) return null;
+  return { code: saved.code, expiresAt: saved.expiresAt };
+}
+
+function resolveInitialError() {
+  const saved = readPaymentError();
+  if (!saved) return null;
+  return { message: saved.message, paymentId: saved.paymentId };
+}
+
+async function waitForAuth(maxMs = 6000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    if (auth.currentUser) return auth.currentUser;
+    await wait(250);
+  }
+  return auth.currentUser;
+}
+
+async function bindPurchasedCode(code) {
+  const user = await waitForAuth();
+  if (!user || !code) return;
+  try {
+    await activateCode(code, user.uid, buildDeviceInfo());
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (!msg.includes('مُفعّل') && !msg.includes('الكود غير')) {
+      console.warn('bindPurchasedCode:', e);
+    }
+  }
+}
+
 export default function Packages({
   onBack,
   onSubscriptionActivated,
@@ -111,16 +159,14 @@ export default function Packages({
   const [highlightId, setHighlightId] = useState(null);
   const [payError, setPayError] = useState('');
   const [loadingPay, setLoadingPay] = useState(false);
-  const [phase, setPhase] = useState(() => (
-    getPendingReturnId() ? 'processing' : 'browse'
-  ));
-  const [successData, setSuccessData] = useState(null);
+  const [phase, setPhase] = useState(resolveInitialPhase);
+  const [successData, setSuccessData] = useState(resolveInitialSuccess);
   const [pendingMsg, setPendingMsg] = useState(() => (
-    getPendingReturnId()
+    resolveInitialPhase() === 'processing'
       ? 'جاري التحقق من الدفع وتجهيز كودك...'
       : ''
   ));
-  const [globalError, setGlobalError] = useState(null);
+  const [globalError, setGlobalError] = useState(resolveInitialError);
   const [refundOpen, setRefundOpen] = useState(false);
 
   const openCodes = () => window.dispatchEvent(new CustomEvent('pfcc-open-code-activation'));
@@ -165,13 +211,45 @@ export default function Packages({
     return data;
   }, []);
 
-  const handlePaymentSuccess = useCallback(async (paymentId, planDays) => {
-    if (activatingRef.current) return;
+  const finishWithSuccess = useCallback(async (data, paymentId, planDays) => {
+    const codeData = {
+      codeId: data.code,
+      id: data.code,
+      code: formatCodeForDisplay(data.code),
+      expiresAt: data.expiresAt,
+      activatedAt: data.activatedAt || Date.now(),
+      duration: data.duration || planDays,
+      paymentId: data.paymentId || paymentId,
+      source: 'moyasar',
+    };
+    persistActiveCodeLocal(codeData);
+    await bindPurchasedCode(data.code);
+    onSubscriptionActivated?.(codeData);
+    storePaymentSuccess({
+      code: formatCodeForDisplay(data.code),
+      expiresAt: data.expiresAt,
+      paymentId: data.paymentId || paymentId,
+      duration: codeData.duration,
+    });
+    clearMoyasarPaymentStorage();
+    clearReturnFailed(paymentId);
+    setSuccessData({ code: formatCodeForDisplay(data.code), expiresAt: data.expiresAt });
+    setGlobalError(null);
+    setPhase('success');
+    activatingRef.current = false;
+    scrollToTop();
+  }, [onSubscriptionActivated]);
+
+  const handlePaymentSuccess = useCallback(async (paymentId, planDays, { force = false } = {}) => {
+    if (activatingRef.current && !force) return;
     activatingRef.current = true;
 
+    storePendingPayment(paymentId, planDays || readStoredPlanDays());
+    clearReturnFailed(paymentId);
     setPhase('processing');
     setPayError('');
     setGlobalError(null);
+    clearPaymentError();
     setPendingMsg('جاري التحقق من الدفع وتجهيز كودك...');
     scrollToTop();
 
@@ -184,23 +262,7 @@ export default function Packages({
         }
 
         const data = await activateOnServer(paymentId, planDays);
-        const codeData = {
-          codeId: data.code,
-          id: data.code,
-          code: data.code,
-          expiresAt: data.expiresAt,
-          activatedAt: data.activatedAt || Date.now(),
-          duration: data.duration || planDays,
-          paymentId: data.paymentId || paymentId,
-          source: 'moyasar',
-        };
-        persistActiveCodeLocal(codeData);
-        onSubscriptionActivated?.(codeData);
-        clearMoyasarPaymentStorage();
-        setSuccessData({ code: data.code, expiresAt: data.expiresAt });
-        setPhase('success');
-        activatingRef.current = false;
-        scrollToTop();
+        await finishWithSuccess(data, paymentId, planDays);
         return;
       } catch (err) {
         lastErr = err;
@@ -211,16 +273,16 @@ export default function Packages({
     }
 
     activatingRef.current = false;
-    markReturnFailed(paymentId);
-    clearMoyasarPaymentStorage();
-    setPendingMsg('');
     const hint = mapActivateError(lastErr);
-    setGlobalError({
-      message: hint || 'تم الدفع — لكن تعذّر تجهيز الكود تلقائياً. تواصل معنا فوراً.',
+    const errorPayload = {
+      message: hint || 'تم الدفع — لكن تعذّر تجهيز الكود تلقائياً. اضغط «إعادة تفعيل الكود» أو تواصل معنا.',
       paymentId,
-    });
+    };
+    storePaymentError(errorPayload.message, paymentId);
+    setPendingMsg('');
+    setGlobalError(errorPayload);
     setPhase('browse');
-  }, [activateOnServer, onSubscriptionActivated]);
+  }, [activateOnServer, finishWithSuccess]);
 
   const mountMoyasarForm = useCallback(async (plan) => {
     const publishableKey = import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY;
@@ -247,7 +309,7 @@ export default function Packages({
           if (payment?.status === 'paid' && payment?.id) {
             await handlePaymentSuccess(payment.id, plan.planDays);
           } else if (payment?.id) {
-            storePaymentReturn(payment.id);
+            storePaymentReturn(payment.id, plan.planDays);
           }
         },
         on_failure: () => setPayError('فشل الدفع — تحقق من بيانات البطاقة أو جرّب بطاقة أخرى.'),
@@ -280,12 +342,36 @@ export default function Packages({
   }, []);
 
   useEffect(() => {
-    const returnId = getPendingReturnId();
-    if (!returnId) return;
+    if (readPaymentSuccess()) return;
 
-    const planDays = readStoredPlanDays();
-    handlePaymentSuccess(returnId, planDays || undefined);
+    const pending = readPendingPayment();
+    const returnId = getPendingReturnId();
+    const paymentId = pending?.paymentId || returnId;
+    if (!paymentId) return;
+
+    const planDays = pending?.planDays || readStoredPlanDays();
+    handlePaymentSuccess(paymentId, planDays || undefined);
   }, [handlePaymentSuccess]);
+
+  const handleRetryActivation = useCallback(() => {
+    const pending = readPendingPayment();
+    const paymentId = pending?.paymentId || globalError?.paymentId || getPendingReturnId();
+    if (!paymentId) return;
+    const planDays = pending?.planDays || readStoredPlanDays();
+    handlePaymentSuccess(paymentId, planDays || undefined, { force: true });
+  }, [globalError?.paymentId, handlePaymentSuccess]);
+
+  const handleDismissSuccess = useCallback(() => {
+    clearPaymentSuccess();
+    setSuccessData(null);
+    setPhase('browse');
+    onBack?.();
+  }, [onBack]);
+
+  const handleGoAccountFromSuccess = useCallback(() => {
+    clearPaymentSuccess();
+    onGoAccount?.();
+  }, [onGoAccount]);
 
   const copyCode = () => {
     if (!successData?.code) return;
@@ -299,8 +385,8 @@ export default function Packages({
         expiresAt={successData.expiresAt}
         isGuest={isGuest}
         onCopy={copyCode}
-        onPlay={onBack}
-        onGoAccount={onGoAccount}
+        onPlay={handleDismissSuccess}
+        onGoAccount={isGuest ? handleGoAccountFromSuccess : onGoAccount}
       />
     );
   }
@@ -358,6 +444,7 @@ export default function Packages({
         <PackagePaymentSupport
           message={globalError.message}
           paymentId={globalError.paymentId}
+          onRetry={handleRetryActivation}
           onOpenRefund={() => setRefundOpen(true)}
         />
       ) : null}
