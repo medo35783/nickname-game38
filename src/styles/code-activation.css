@@ -10,6 +10,13 @@
   box-shadow: 0 0 0 3px rgba(37, 111, 168, 0.1);
 }
 
+.inp-code-play {
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  font-family: ui-monospace, 'Cairo', monospace;
+  font-weight: 800;
+}
+
 .code-act-notes__single {
   margin: 0;
   font-size: 12px;

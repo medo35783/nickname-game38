@@ -44,7 +44,10 @@ function mapActivateError(err) {
   if (code === 'not_paid_yet' || err?.status === 402 || code === 'invalid_payment') {
     return 'تعذّر تأكيد الدفع من ميسر — انتظر 30 ثانية ثم أعد فتح الباقات.';
   }
-  if (err?.status === 500 || code === 'server_error' || code === 'missing_firebase_config') {
+  if (err?.status === 500 || code === 'server_error' || code === 'missing_firebase_config' || code === 'invalid_firebase_config') {
+    if (code === 'invalid_firebase_config') {
+      return 'FIREBASE_SERVICE_ACCOUNT_JSON على Vercel غير صالح (JSON مكسور) — أعد لصقه سطراً واحداً ثم Redeploy.';
+    }
     return 'خطأ إعداد السيرver (Firebase) — تحقق من FIREBASE_SERVICE_ACCOUNT_JSON على Vercel ثم Redeploy.';
   }
   return null;

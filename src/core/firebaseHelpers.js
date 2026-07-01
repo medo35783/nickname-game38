@@ -73,6 +73,36 @@ export function normalizeSubscriptionCode(raw) {
 
 const PLAY_CODE_RE = /^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
+export const PLAY_CODE_INPUT_MAX = 14;
+
+/** تنسيق الإدخال: KYEFA8 أو PLAY-XXXX-XXXX */
+export function sanitizeSubscriptionCodeInput(raw) {
+  let t = String(raw || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  const compact = t.replace(/-/g, '');
+
+  if (compact.startsWith('PLAY') && compact.length > 4) {
+    const rest = compact.slice(4);
+    if (rest.length <= 4) return `PLAY-${rest}`;
+    return `PLAY-${rest.slice(0, 4)}-${rest.slice(4, 8)}`;
+  }
+
+  if (t.includes('-') || t.startsWith('PLAY')) {
+    return t.slice(0, PLAY_CODE_INPUT_MAX);
+  }
+
+  return compact.slice(0, 6);
+}
+
+export function isPlayCodeInput(raw) {
+  const t = String(raw || '').trim().toUpperCase();
+  return t.startsWith('PLAY') || t.includes('-') || t.length > 6;
+}
+
+export function isValidSubscriptionCodeInput(raw) {
+  const normalized = normalizeSubscriptionCode(raw);
+  return /^CODE-[A-Z0-9]{6}$/.test(normalized) || PLAY_CODE_RE.test(normalized);
+}
+
 export function isPlaySubscriptionCode(code) {
   return PLAY_CODE_RE.test(String(code || '').trim().toUpperCase());
 }

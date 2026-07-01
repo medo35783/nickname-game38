@@ -15,12 +15,22 @@ function cleanSecret(raw) {
   return String(raw).trim().replace(/^["']|["']$/g, '');
 }
 
+function parseServiceAccountJson(raw) {
+  if (!raw) return null;
+  const trimmed = String(raw).trim().replace(/^["']|["']$/g, '');
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    throw new Error('invalid_firebase_config');
+  }
+}
+
 function getAdminApp() {
   if (!getApps().length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('missing_firebase_config');
     initializeApp({
-      credential: cert(JSON.parse(String(raw).trim())),
+      credential: cert(parseServiceAccountJson(raw)),
       databaseURL: process.env.FIREBASE_DATABASE_URL || DEFAULT_DB_URL,
     });
   }
@@ -288,6 +298,11 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('activateCode:', err);
+    const msg = err?.message || '';
+    if (msg === 'missing_firebase_config' || msg === 'invalid_firebase_config') {
+      res.status(500).json({ error: msg });
+      return;
+    }
     res.status(500).json({ error: 'server_error' });
   }
 }

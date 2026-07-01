@@ -12,10 +12,12 @@ import { auth } from '../../firebase';
 import {
   activateCode,
   ensurePlayerProfile,
-  formatCodeForDisplay,
   normalizeSubscriptionCode,
   normalizeWhatsappPhone,
   saveCodePhone,
+  sanitizeSubscriptionCodeInput,
+  isValidSubscriptionCodeInput,
+  isPlayCodeInput,
 } from '../../firebaseHelpers';
 import { ARENA_WELCOME_BONUS } from '../../core/arena.constants';
 import {
@@ -131,8 +133,8 @@ export default function PlayerAccessPanel({
     if (codeLoading) return;
     setCodeError('');
 
-    if (!normalizedCode || !/^[A-Z0-9]{6}$/.test(formatCodeForDisplay(normalizedCode))) {
-      setCodeError('أدخل 6 أحرف أو أرقام');
+    if (!isValidSubscriptionCodeInput(codeInput)) {
+      setCodeError('أدخل كوداً صالحاً: 6 أحرف أو PLAY-XXXX-XXXX');
       return;
     }
 
@@ -360,20 +362,19 @@ export default function PlayerAccessPanel({
             <>
               <div className="ig">
                 <label className="lbl" htmlFor="pap-code-inp">
-                  كود الاشتراك (6 أحرف)
+                  كود الاشتراك
                 </label>
                 <input
                   id="pap-code-inp"
-                  className={`inp big${codeError ? ' err-b' : ''}`}
-                  placeholder="مثال: KYEFA8"
+                  className={`inp big${isPlayCodeInput(codeInput) ? ' inp-code-play' : ''}${codeError ? ' err-b' : ''}`}
+                  placeholder="KYEFA8 أو PLAY-XXXX-XXXX"
                   autoComplete="off"
                   autoCapitalize="characters"
                   spellCheck={false}
-                  maxLength={6}
+                  maxLength={isPlayCodeInput(codeInput) ? 14 : 6}
                   value={codeInput}
                   onChange={(e) => {
-                    const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                    setCodeInput(v);
+                    setCodeInput(sanitizeSubscriptionCodeInput(e.target.value));
                     if (codeError) setCodeError('');
                   }}
                   onKeyDown={(e) => {
