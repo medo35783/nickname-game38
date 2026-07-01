@@ -28,6 +28,7 @@ import { useTheme } from './hooks/useTheme';
 import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
 import { refreshAdminClaim } from './core/adminAuth';
 import { getEffectivePrice } from './core/subscriptionPackages';
+import { MOYASAR_STORAGE } from './core/moyasarPayment';
 import { ensureArenaProfile } from './core/arenaProfile';
 import { arenaPointsForRank } from './core/arena.constants';
 import { rewardCurrentPlayerIfRegistered } from './core/arenaRewards';
@@ -62,7 +63,17 @@ export default function App() {
   const [authFailed, setAuthFailed] = useState(false);
 
   /* ── NAV ── */
-  const [tab, setTab]           = useState('game');
+  const [tab, setTab]           = useState(() => {
+    try {
+      if (
+        sessionStorage.getItem(MOYASAR_STORAGE.returnId)
+        || sessionStorage.getItem(MOYASAR_STORAGE.openPackages)
+      ) {
+        return 'pricing';
+      }
+    } catch { /* ignore */ }
+    return 'game';
+  });
   const [selectedGame, setSelectedGame] = useState(null);
   const [gameScreen, setGameScreen] = useState('home');
 
@@ -213,6 +224,15 @@ export default function App() {
     document.addEventListener('click', handleDocClick);
     return () => document.removeEventListener('click', handleDocClick);
   }, [accountMenuOpen]);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(MOYASAR_STORAGE.openPackages)) {
+        sessionStorage.removeItem(MOYASAR_STORAGE.openPackages);
+        setTab('pricing');
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     const handleOpenPackages = () => setTab('pricing');

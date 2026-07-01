@@ -626,6 +626,125 @@
   margin-bottom: 4px;
 }
 
+/* ── Moyasar + نجاح الدفع ── */
+.pkg-moyasar-wrap {
+  margin: 12px 0 16px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 111, 168, 0.28);
+  background: linear-gradient(180deg, rgba(37, 111, 168, 0.06), var(--card));
+}
+
+.pkg-moyasar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pkg-moyasar-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pkg-moyasar-head span {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--brand-blue);
+}
+
+.pkg-moyasar-form {
+  min-height: 120px;
+  margin-bottom: 8px;
+}
+
+.pkg-moyasar-loading {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pkg-moyasar-error {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #fff;
+  background: rgba(184, 37, 56, 0.92);
+  text-align: center;
+}
+
+.pkg-moyasar-cancel {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.pkg-pay-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.pkg-pay-success__icon {
+  margin: 0 0 8px;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.pkg-pay-success__title {
+  margin: 0 0 12px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--brand-green);
+}
+
+.pkg-pay-success__label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.pkg-pay-success__code {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 0 10px;
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 2px dashed rgba(36, 143, 85, 0.45);
+  background: rgba(36, 143, 85, 0.08);
+  font-family: 'Cairo', monospace;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--brand-green);
+  cursor: pointer;
+}
+
+.pkg-pay-success__exp {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pkg-pay-success__cta {
+  max-width: 280px;
+}
+
 @media (max-width: 360px) {
   .pkg-includes {
     flex-direction: column;
