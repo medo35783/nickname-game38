@@ -1,4 +1,4 @@
-import { SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_URL } from '../../core/constants';
+import { SUPPORT_WHATSAPP_URL } from '../../core/constants';
 
 function IconWhatsApp() {
   return (
@@ -37,13 +37,6 @@ export default function PackagePaymentSupport({ message, paymentId, onOpenRefund
           </button>
         </p>
       ) : null}
-      <p className="pkg-pay-support__phone">
-        📱 جوال الدعم:
-        {' '}
-        <a href={`tel:+966${SUPPORT_WHATSAPP.replace(/^0/, '')}`} dir="ltr">
-          {SUPPORT_WHATSAPP}
-        </a>
-      </p>
       <div className="pkg-pay-support__actions">
         <a
           className="pkg-pay-support__wa btn bg"
@@ -52,7 +45,7 @@ export default function PackagePaymentSupport({ message, paymentId, onOpenRefund
           rel="noopener noreferrer"
         >
           <IconWhatsApp />
-          <span>تواصل واتساب — مساعدة فورية</span>
+          <span>مساعدة فورية</span>
         </a>
         {typeof onOpenRefund === 'function' ? (
           <button type="button" className="btn bo bsm pkg-pay-support__refund" onClick={onOpenRefund}>

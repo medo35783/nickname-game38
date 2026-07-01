@@ -10,12 +10,17 @@ const DEFAULT_DB_URL = 'https://nickname-game-default-rtdb.firebaseio.com';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function cleanSecret(raw) {
+  if (!raw) return '';
+  return String(raw).trim().replace(/^["']|["']$/g, '');
+}
+
 function getAdminApp() {
   if (!getApps().length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('missing_firebase_config');
     initializeApp({
-      credential: cert(JSON.parse(raw)),
+      credential: cert(JSON.parse(String(raw).trim())),
       databaseURL: process.env.FIREBASE_DATABASE_URL || DEFAULT_DB_URL,
     });
   }
@@ -48,33 +53,52 @@ async function verifyUserToken(idToken) {
 }
 
 async function fetchMoyasarPayment(paymentId) {
-  const secret = process.env.MOYASAR_SECRET_KEY;
-  if (!secret) throw new Error('missing_moyasar_secret');
+  const secret = cleanSecret(process.env.MOYASAR_SECRET_KEY);
+  if (!secret) return { ok: false, reason: 'missing_moyasar_secret' };
 
   const authHeader = Buffer.from(`${secret}:`).toString('base64');
   const res = await fetch(`https://api.moyasar.com/v1/payments/${paymentId}`, {
     headers: { Authorization: `Basic ${authHeader}` },
   });
 
-  if (!res.ok) return null;
-  return res.json();
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, reason: 'moyasar_auth_failed', status: res.status };
+  }
+  if (!res.ok) {
+    return { ok: false, reason: 'moyasar_fetch_failed', status: res.status };
+  }
+
+  return { ok: true, payment: await res.json() };
 }
 
-async function verifyMoyasarPayment(paymentId, expectedAmount = null) {
-  const delays = [0, 1200, 2400, 4000, 6000, 8000];
+/** تأكيد paid — محاولات قصيرة لأن 3DS قد يتأخر قليلاً */
+async function verifyMoyasarPayment(paymentId) {
+  const delays = [0, 500, 1000, 2000, 3500];
+  let lastStatus = null;
 
   for (let i = 0; i < delays.length; i += 1) {
     if (delays[i] > 0) await sleep(delays[i]);
 
-    const payment = await fetchMoyasarPayment(paymentId);
-    if (!payment) continue;
-    if (payment.status !== 'paid') continue;
-    if (payment.currency !== 'SAR') return null;
-    if (expectedAmount != null && Number(payment.amount) !== expectedAmount) return null;
-    return payment;
+    const result = await fetchMoyasarPayment(paymentId);
+    if (result.reason === 'missing_moyasar_secret') {
+      return { ok: false, reason: 'missing_moyasar_secret' };
+    }
+    if (result.reason === 'moyasar_auth_failed') {
+      return { ok: false, reason: 'moyasar_auth_failed' };
+    }
+    if (!result.ok) continue;
+
+    const payment = result.payment;
+    lastStatus = payment?.status || null;
+    if (payment?.status !== 'paid') continue;
+    if (payment?.currency !== 'SAR') return { ok: false, reason: 'invalid_currency' };
+    return { ok: true, payment };
   }
 
-  return null;
+  if (lastStatus === 'failed') {
+    return { ok: false, reason: 'payment_failed', status: lastStatus };
+  }
+  return { ok: false, reason: 'not_paid_yet', status: lastStatus };
 }
 
 function resolvePlanDays(clientPlanDays, paymentAmount) {
@@ -102,6 +126,7 @@ function buildCodeRecord(codeId, days, now, expiresAt, paymentId, userId) {
     code: codeId,
     planDays: days,
     duration: days,
+    price: PLAN_AMOUNTS[days] ? PLAN_AMOUNTS[days] / 100 : 0,
     createdAt: now,
     activatedAt: now,
     expiresAt,
@@ -127,7 +152,7 @@ function buildActiveSummary(codeId, days, now, expiresAt, paymentId) {
 
 function buildHistoryEntry(codeId, days, now, expiresAt, paymentId, amountHalalas) {
   return {
-    code: codeId,
+    code: codeId.length <= 16 ? codeId : codeId.slice(0, 16),
     codeId,
     duration: days,
     planName: PLAN_NAMES[days] || `${days} يوم`,
@@ -212,12 +237,18 @@ export default async function handler(req, res) {
     }
 
     const verified = await verifyMoyasarPayment(paymentId);
-    if (!verified) {
-      res.status(402).json({ error: 'invalid_payment' });
+    if (!verified.ok) {
+      const status = verified.reason === 'moyasar_auth_failed' ? 401
+        : verified.reason === 'missing_moyasar_secret' ? 500
+          : 402;
+      res.status(status).json({
+        error: verified.reason || 'invalid_payment',
+        moyasarStatus: verified.status || null,
+      });
       return;
     }
 
-    const days = resolvePlanDays(clientPlanDays, verified.amount);
+    const days = resolvePlanDays(clientPlanDays, verified.payment.amount);
     if (!days) {
       res.status(400).json({ error: 'invalid_plan' });
       return;
@@ -227,7 +258,14 @@ export default async function handler(req, res) {
     const now = Date.now();
     const expiresAt = now + days * 24 * 60 * 60 * 1000;
     const codeRecord = buildCodeRecord(codeId, days, now, expiresAt, paymentId, userId);
-    const historyEntry = buildHistoryEntry(codeId, days, now, expiresAt, paymentId, Number(verified.amount));
+    const historyEntry = buildHistoryEntry(
+      codeId,
+      days,
+      now,
+      expiresAt,
+      paymentId,
+      Number(verified.payment.amount),
+    );
 
     const updates = {
       [`payments/${paymentId}`]: { used: true, codeId, createdAt: now, planDays: days, userId: userId || null },

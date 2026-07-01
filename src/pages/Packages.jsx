@@ -22,8 +22,8 @@ import {
 
 const MOYASAR_JS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
 const MOYASAR_CSS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.css';
-const ACTIVATE_RETRIES = 8;
-const ACTIVATE_RETRY_MS = 2000;
+const ACTIVATE_RETRIES = 4;
+const ACTIVATE_RETRY_MS = 1200;
 
 function mapActivateError(err) {
   const code = err?.code || err?.message || '';
@@ -32,13 +32,31 @@ function mapActivateError(err) {
       ? 'الدفع نجح — لكن السيرفر المحلي لا يولّد الأكواد. شغّل: npx vercel dev — أو جرّب على رابط Vercel.'
       : 'تعذّر الاتصال بسيرفر التفعيل — حدّث الصفحة أو جرّب لاحقاً.';
   }
-  if (err?.status === 402 || code === 'invalid_payment') {
-    return 'تعذّر تأكيد الدفع من ميسر — انتظر دقيقة وأعد فتح الباقات (نفس العملية).';
+  if (code === 'moyasar_auth_failed') {
+    return 'إعداد ميسر على السيرver غير صحيح: MOYASAR_SECRET_KEY لازم يكون sk_test ويطابق pk_test — حدّث Vercel ثم Redeploy.';
+  }
+  if (code === 'missing_moyasar_secret') {
+    return 'MOYASAR_SECRET_KEY غير موجود على Vercel — أضفه ثم Redeploy.';
+  }
+  if (code === 'payment_failed' || err?.moyasarStatus === 'failed') {
+    return 'لم يكتمل الدفع — البطاقة مرفوضة أو غير مقبولة في وضع الاختبار. جرّب بطاقة 4111 1111 1111 1111 أو بطاقة أخرى.';
+  }
+  if (code === 'not_paid_yet' || err?.status === 402 || code === 'invalid_payment') {
+    return 'تعذّر تأكيد الدفع من ميسر — انتظر 30 ثانية ثم أعد فتح الباقات.';
   }
   if (err?.status === 500 || code === 'server_error' || code === 'missing_firebase_config') {
-    return 'خطأ إعداد السيرفر (Firebase) — تحقق من FIREBASE_SERVICE_ACCOUNT_JSON على Vercel ثم Redeploy.';
+    return 'خطأ إعداد السيرver (Firebase) — تحقق من FIREBASE_SERVICE_ACCOUNT_JSON على Vercel ثم Redeploy.';
   }
   return null;
+}
+
+function shouldRetryActivate(err) {
+  const code = err?.code || '';
+  if (code === 'moyasar_auth_failed' || code === 'missing_moyasar_secret') return false;
+  if (code === 'payment_failed' || err?.moyasarStatus === 'failed') return false;
+  if (code === 'api_unavailable') return false;
+  if (err?.status === 401 || err?.status === 500) return false;
+  return true;
 }
 
 export const PAYMENT_PLANS = [
@@ -96,7 +114,7 @@ export default function Packages({
   const [successData, setSuccessData] = useState(null);
   const [pendingMsg, setPendingMsg] = useState(() => (
     getPendingReturnId()
-      ? 'تم الدفع بنجاح — جاري تجهيز كودك...'
+      ? 'جاري التحقق من الدفع وتجهيز كودك...'
       : ''
   ));
   const [globalError, setGlobalError] = useState(null);
@@ -138,6 +156,7 @@ export default function Packages({
       const err = new Error(data.error || 'activate_failed');
       err.status = res.status;
       err.code = data.error;
+      err.moyasarStatus = data.moyasarStatus;
       throw err;
     }
     return data;
@@ -150,7 +169,7 @@ export default function Packages({
     setPhase('processing');
     setPayError('');
     setGlobalError(null);
-    setPendingMsg('تم الدفع بنجاح — جاري تجهيز كودك...');
+    setPendingMsg('جاري التحقق من الدفع وتجهيز كودك...');
     scrollToTop();
 
     let lastErr = null;
@@ -183,6 +202,7 @@ export default function Packages({
       } catch (err) {
         lastErr = err;
         if (err?.status === 409) continue;
+        if (!shouldRetryActivate(err)) break;
         if (attempt === ACTIVATE_RETRIES - 1) break;
       }
     }
