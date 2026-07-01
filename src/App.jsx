@@ -25,9 +25,8 @@ import SiteFooter from './components/layout/SiteFooter';
 import ThemeToggle from './components/layout/ThemeToggle';
 import PwaInstallBanner from './components/layout/PwaInstallBanner';
 import { useTheme } from './hooks/useTheme';
-import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal } from './firebaseHelpers';
+import { getActiveUserCode, isCodeValid, adminProfileExistsForUid, ensurePlayerProfile, persistActiveCodeLocal, readLocalSubscription } from './firebaseHelpers';
 import { refreshAdminClaim } from './core/adminAuth';
-import { getEffectivePrice } from './core/subscriptionPackages';
 import { MOYASAR_STORAGE } from './core/moyasarPayment';
 import { ensureArenaProfile } from './core/arenaProfile';
 import { arenaPointsForRank } from './core/arena.constants';
@@ -179,7 +178,11 @@ export default function App() {
         }
 
         const code = await getActiveUserCode(user.uid);
-        const validCode = code && isCodeValid(code) ? code : null;
+        const localCode = readLocalSubscription();
+        let validCode = code && isCodeValid(code) ? code : null;
+        if (!validCode && localCode && isCodeValid(localCode)) {
+          validCode = localCode;
+        }
         setActiveCode(validCode);
         persistActiveCodeLocal(validCode);
 
@@ -727,8 +730,18 @@ export default function App() {
         {!showCodeActivation && !contributeOpen && tab==='pricing'&&(
           <Packages
             onBack={() => goToTab('game')}
-            onSubscribe={(pkg) => {
-              notify(`قريباً: الدفع لباقة ${pkg.durationLabel} (${getEffectivePrice(pkg)} ريال)`, 'info');
+            isGuest={isGuest}
+            onGoAccount={() => {
+              setAccountAuthMode('register');
+              setTab('account');
+              notify('سجّل لحفظ اشتراكك على كل أجهزتك', 'info');
+            }}
+            onSubscriptionActivated={(codeData) => {
+              if (codeData) {
+                setActiveCode(codeData);
+                persistActiveCodeLocal(codeData);
+                notify('تم تفعيل اشتراكك — استمتع باللعب!', 'success');
+              }
             }}
           />
         )}

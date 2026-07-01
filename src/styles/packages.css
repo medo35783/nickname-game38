@@ -745,6 +745,141 @@
   max-width: 280px;
 }
 
+.pkg-pay-success__secondary {
+  max-width: 280px;
+  margin-top: 10px;
+}
+
+.pkg-pay-success__hint {
+  margin: 0 0 14px;
+  max-width: 300px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* ── Checkout مركّز ── */
+.pkg-checkout-scr {
+  animation: pkgCheckoutIn 0.32s ease-out;
+}
+
+@keyframes pkgCheckoutIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pkg-checkout {
+  margin: 8px 0 16px;
+}
+
+.pkg-checkout__back {
+  margin-bottom: 12px;
+}
+
+.pkg-checkout__summary {
+  margin-bottom: 14px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(37, 111, 168, 0.28);
+  background: linear-gradient(165deg, rgba(37, 111, 168, 0.08), var(--card));
+}
+
+.pkg-checkout__summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pkg-checkout__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.pkg-checkout__name {
+  margin: 0;
+  font-family: 'Cairo', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.pkg-checkout__duration {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pkg-checkout__price {
+  margin-right: auto;
+  text-align: left;
+}
+
+.pkg-checkout__price-num {
+  font-family: 'Cairo', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--brand-blue);
+}
+
+.pkg-checkout__price-unit {
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.pkg-checkout__features {
+  margin: 0;
+  padding: 0 18px 0 0;
+  list-style: none;
+}
+
+.pkg-checkout__features li {
+  position: relative;
+  margin-bottom: 4px;
+  padding-right: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pkg-checkout__features li::before {
+  content: '✓';
+  position: absolute;
+  right: 0;
+  color: var(--brand-green);
+  font-weight: 900;
+}
+
+.pkg-checkout__pay {
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 111, 168, 0.28);
+  background: var(--card);
+}
+
+.pkg-checkout__pay-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pkg-tier--selected {
+  outline: 3px solid rgba(37, 111, 168, 0.55);
+  outline-offset: 2px;
+  transform: scale(1.01);
+  transition: transform 0.2s ease, outline 0.2s ease;
+}
+
 @media (max-width: 360px) {
   .pkg-includes {
     flex-direction: column;

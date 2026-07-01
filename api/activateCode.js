@@ -1,14 +1,16 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 
 const PLAN_AMOUNTS = { 1: 900, 3: 1800, 7: 3500 };
 const AMOUNT_TO_DAYS = { 900: 1, 1800: 3, 3500: 7 };
+const PLAN_NAMES = { 1: 'لمسة سريعة', 3: 'جمعة اللمة', 7: 'أسبوع البطولة' };
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const DEFAULT_DB_URL = 'https://nickname-game-default-rtdb.firebaseio.com';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function getAdminDb() {
+function getAdminApp() {
   if (!getApps().length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('missing_firebase_config');
@@ -17,7 +19,16 @@ function getAdminDb() {
       databaseURL: process.env.FIREBASE_DATABASE_URL || DEFAULT_DB_URL,
     });
   }
+}
+
+function getAdminDb() {
+  getAdminApp();
   return getDatabase();
+}
+
+function getAdminAuth() {
+  getAdminApp();
+  return getAuth();
 }
 
 function generateCodeId() {
@@ -26,20 +37,29 @@ function generateCodeId() {
   return `PLAY-${block(4)}-${block(4)}`;
 }
 
+async function verifyUserToken(idToken) {
+  if (!idToken || typeof idToken !== 'string') return null;
+  try {
+    const decoded = await getAdminAuth().verifyIdToken(idToken);
+    return decoded.uid;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchMoyasarPayment(paymentId) {
   const secret = process.env.MOYASAR_SECRET_KEY;
   if (!secret) throw new Error('missing_moyasar_secret');
 
-  const auth = Buffer.from(`${secret}:`).toString('base64');
+  const authHeader = Buffer.from(`${secret}:`).toString('base64');
   const res = await fetch(`https://api.moyasar.com/v1/payments/${paymentId}`, {
-    headers: { Authorization: `Basic ${auth}` },
+    headers: { Authorization: `Basic ${authHeader}` },
   });
 
   if (!res.ok) return null;
   return res.json();
 }
 
-/** يعيد الدفع بعد تأكيد الحالة paid — مع إعادة محاولة لأن ميسر قد يتأخر بعد 3DS */
 async function verifyMoyasarPayment(paymentId, expectedAmount = null) {
   const delays = [0, 1200, 2400, 4000, 6000, 8000];
 
@@ -77,6 +97,64 @@ async function createUniqueCodeId(db) {
   throw new Error('code_generation_failed');
 }
 
+function buildCodeRecord(codeId, days, now, expiresAt, paymentId, userId) {
+  return {
+    code: codeId,
+    planDays: days,
+    duration: days,
+    createdAt: now,
+    activatedAt: now,
+    expiresAt,
+    paymentId,
+    status: 'active',
+    source: 'moyasar',
+    userId: userId || null,
+    sessions: 0,
+  };
+}
+
+function buildActiveSummary(codeId, days, now, expiresAt, paymentId) {
+  return {
+    codeId,
+    code: codeId,
+    activatedAt: now,
+    expiresAt,
+    duration: days,
+    paymentId,
+    source: 'moyasar',
+  };
+}
+
+function buildHistoryEntry(codeId, days, now, expiresAt, paymentId, amountHalalas) {
+  return {
+    code: codeId,
+    codeId,
+    duration: days,
+    planName: PLAN_NAMES[days] || `${days} يوم`,
+    amountSar: amountHalalas / 100,
+    paymentId,
+    source: 'moyasar',
+    activatedAt: now,
+    expiresAt,
+    recordedAt: now,
+  };
+}
+
+function buildUserBindUpdates(db, uid, codeId, codeRecord, historyEntry) {
+  const histKey = db.ref(`users/${uid}/subscriptionHistory`).push().key;
+  return {
+    [`users/${uid}/activeCode`]: buildActiveSummary(
+      codeId,
+      codeRecord.duration,
+      codeRecord.activatedAt,
+      codeRecord.expiresAt,
+      codeRecord.paymentId,
+    ),
+    [`users/${uid}/subscriptionHistory/${histKey}`]: historyEntry,
+    [`codes/${codeId}/userId`]: uid,
+  };
+}
+
 async function returnExistingCode(res, db, paymentId) {
   const paymentSnap = await db.ref(`payments/${paymentId}`).get();
   if (!paymentSnap.exists()) {
@@ -101,6 +179,9 @@ async function returnExistingCode(res, db, paymentId) {
     success: true,
     code: paymentData.codeId,
     expiresAt: code.expiresAt,
+    activatedAt: code.activatedAt || paymentData.createdAt,
+    duration: code.duration || code.planDays || paymentData.planDays,
+    paymentId,
     recovered: true,
   });
   return true;
@@ -113,16 +194,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { paymentId, planDays: clientPlanDays } = req.body || {};
+    const { paymentId, planDays: clientPlanDays, idToken } = req.body || {};
 
     if (!paymentId || typeof paymentId !== 'string') {
       res.status(400).json({ error: 'invalid_payment' });
       return;
     }
 
+    const userId = await verifyUserToken(idToken);
     const db = getAdminDb();
     const paymentRef = db.ref(`payments/${paymentId}`);
     const existing = await paymentRef.get();
+
     if (existing.exists()) {
       await returnExistingCode(res, db, paymentId);
       return;
@@ -143,22 +226,28 @@ export default async function handler(req, res) {
     const codeId = await createUniqueCodeId(db);
     const now = Date.now();
     const expiresAt = now + days * 24 * 60 * 60 * 1000;
+    const codeRecord = buildCodeRecord(codeId, days, now, expiresAt, paymentId, userId);
+    const historyEntry = buildHistoryEntry(codeId, days, now, expiresAt, paymentId, Number(verified.amount));
 
-    await db.ref().update({
-      [`payments/${paymentId}`]: { used: true, codeId, createdAt: now, planDays: days },
-      [`codes/${codeId}`]: {
-        code: codeId,
-        planDays: days,
-        createdAt: now,
-        expiresAt,
-        paymentId,
-        active: true,
-        sessions: 0,
-        source: 'moyasar',
-      },
+    const updates = {
+      [`payments/${paymentId}`]: { used: true, codeId, createdAt: now, planDays: days, userId: userId || null },
+      [`codes/${codeId}`]: codeRecord,
+    };
+
+    if (userId) {
+      Object.assign(updates, buildUserBindUpdates(db, userId, codeId, codeRecord, historyEntry));
+    }
+
+    await db.ref().update(updates);
+
+    res.status(200).json({
+      success: true,
+      code: codeId,
+      expiresAt,
+      activatedAt: now,
+      duration: days,
+      paymentId,
     });
-
-    res.status(200).json({ success: true, code: codeId, expiresAt });
   } catch (err) {
     console.error('activateCode:', err);
     res.status(500).json({ error: 'server_error' });

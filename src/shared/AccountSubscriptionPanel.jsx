@@ -1,4 +1,5 @@
 import { formatCodeForDisplay, formatSubscriptionDuration } from '../core/firebaseHelpers';
+import PaymentHistoryRow from '../components/codes/PaymentHistoryRow';
 import {
   fmt,
   formatAccountDate,
@@ -26,6 +27,18 @@ export default function AccountSubscriptionPanel({
 }) {
   const totalActivations = historyList.length;
   const pastDays = historyList.reduce((sum, row) => sum + (Number(row.duration) || 0), 0);
+  const moyasarPayments = historyList.filter((row) => row.source === 'moyasar');
+
+  const paymentHistoryBlock = moyasarPayments.length > 0 ? (
+    <div className="acct-pay-history">
+      <h4 className="acct-pay-history__title">آخر عمليات الشراء</h4>
+      <div className="acct-pay-history__list">
+        {moyasarPayments.slice(0, 5).map((row) => (
+          <PaymentHistoryRow key={row.id || row.paymentId || row.recordedAt} row={row} />
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   if (isActive && activeCode) {
     const codeStr = formatCodeForDisplay(activeCode.code) || '—';
@@ -116,11 +129,14 @@ export default function AccountSubscriptionPanel({
             </button>
           ) : null}
         </div>
+
+        {paymentHistoryBlock}
       </section>
     );
   }
 
   return (
+    <>
     <section className="acct-sub acct-sub--empty">
       <div className="acct-sub__glow acct-sub__glow--muted" aria-hidden />
       <div className="acct-sub__empty-icon">💎</div>
@@ -146,6 +162,8 @@ export default function AccountSubscriptionPanel({
         </button>
       </div>
     </section>
+    {paymentHistoryBlock}
+    </>
   );
 }
 

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { auth } from '../firebase';
 import GameTopNav from '../shared/GameTopNav';
 import PackagePlanCard from '../components/codes/PackagePlanCard';
+import PackageCheckout from '../components/codes/PackageCheckout';
+import PackagePaySuccess from '../components/codes/PackagePaySuccess';
 import PackagesLegalNotice from '../components/codes/PackagesLegalNotice';
 import { SUBSCRIPTION_FEATURES } from '../core/subscriptionPackages';
+import { persistActiveCodeLocal } from '../core/firebaseHelpers';
 import {
   MOYASAR_STORAGE,
   buildMoyasarCallbackUrl,
@@ -17,7 +21,7 @@ const SUPPORT_EMAIL = 'play@la3ibz.com';
 const ACTIVATE_RETRIES = 8;
 const ACTIVATE_RETRY_MS = 2000;
 
-const PAYMENT_PLANS = [
+export const PAYMENT_PLANS = [
   { id: '1d', icon: '⚡', name: 'لمسة سريعة', durationSub: '1 يوم', days: 1, planDays: 1, price: 9, amountHalalas: 900, planClass: 'plan-burgundy', badge: 'تجربة سريعة', badgeSide: true },
   { id: '3d', icon: '🎪', name: 'جمعة اللمة', durationSub: '3 أيام', days: 3, planDays: 3, price: 18, amountHalalas: 1800, planClass: 'plan-green', popular: true, badge: 'مثالي لعطلة نهاية الأسبوع', badgeSide: true },
   { id: '7d', icon: '💎', name: 'أسبوع البطولة', durationSub: '7 أيام', days: 7, planDays: 7, price: 35, amountHalalas: 3500, planClass: 'plan-blue', best: true, badges: ['الأفضل', 'الأوفر'] },
@@ -46,18 +50,24 @@ function loadMoyasarAssets() {
   return moyasarLoadPromise;
 }
 
-function formatArabicDate(ts) {
-  return new Intl.DateTimeFormat('ar-SA', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(ts));
-}
-
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export default function Packages({ onBack }) {
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+export default function Packages({
+  onBack,
+  onSubscriptionActivated,
+  onGoAccount,
+  isGuest = false,
+}) {
   const formRef = useRef(null);
   const activatingRef = useRef(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [highlightId, setHighlightId] = useState(null);
   const [payError, setPayError] = useState('');
   const [loadingPay, setLoadingPay] = useState(false);
   const [phase, setPhase] = useState(() => (
@@ -74,10 +84,15 @@ export default function Packages({ onBack }) {
   const openCodes = () => window.dispatchEvent(new CustomEvent('pfcc-open-code-activation'));
 
   const activateOnServer = useCallback(async (paymentId, planDays) => {
+    let idToken = null;
+    try {
+      idToken = await auth.currentUser?.getIdToken();
+    } catch { /* ignore */ }
+
     const res = await fetch('/api/activateCode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentId, planDays: planDays || undefined }),
+      body: JSON.stringify({ paymentId, planDays: planDays || undefined, idToken }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
@@ -96,6 +111,7 @@ export default function Packages({ onBack }) {
     setPayError('');
     setGlobalError('');
     setPendingMsg('تم الدفع بنجاح — جاري تجهيز كودك...');
+    scrollToTop();
 
     for (let attempt = 0; attempt < ACTIVATE_RETRIES; attempt += 1) {
       try {
@@ -105,17 +121,23 @@ export default function Packages({ onBack }) {
         }
 
         const data = await activateOnServer(paymentId, planDays);
-        localStorage.setItem('code_active_pfcc', JSON.stringify({
+        const codeData = {
           codeId: data.code,
           id: data.code,
           code: data.code,
           expiresAt: data.expiresAt,
-          activatedAt: Date.now(),
-        }));
+          activatedAt: data.activatedAt || Date.now(),
+          duration: data.duration || planDays,
+          paymentId: data.paymentId || paymentId,
+          source: 'moyasar',
+        };
+        persistActiveCodeLocal(codeData);
+        onSubscriptionActivated?.(codeData);
         clearMoyasarPaymentStorage();
         setSuccessData({ code: data.code, expiresAt: data.expiresAt });
         setPhase('success');
         activatingRef.current = false;
+        scrollToTop();
         return;
       } catch (err) {
         if (err?.status === 409) continue;
@@ -127,7 +149,7 @@ export default function Packages({ onBack }) {
     setPendingMsg('');
     setGlobalError(`تواصل معنا على ${SUPPORT_EMAIL} مع رقم العملية: ${paymentId}`);
     setPhase('browse');
-  }, [activateOnServer]);
+  }, [activateOnServer, onSubscriptionActivated]);
 
   const mountMoyasarForm = useCallback(async (plan) => {
     const publishableKey = import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY;
@@ -167,11 +189,24 @@ export default function Packages({ onBack }) {
   }, [handlePaymentSuccess]);
 
   const handleSubscribe = useCallback(async (plan) => {
-    setSelectedPlan(plan);
-    setPhase('pay');
+    setHighlightId(plan.id);
     setGlobalError('');
-    await mountMoyasarForm(plan);
+    setTimeout(async () => {
+      setSelectedPlan(plan);
+      setPhase('checkout');
+      scrollToTop();
+      await mountMoyasarForm(plan);
+      setHighlightId(null);
+    }, 280);
   }, [mountMoyasarForm]);
+
+  const handleCheckoutBack = useCallback(() => {
+    if (formRef.current) formRef.current.innerHTML = '';
+    setSelectedPlan(null);
+    setPhase('browse');
+    setPayError('');
+    scrollToTop();
+  }, []);
 
   useEffect(() => {
     const returnId = sessionStorage.getItem(MOYASAR_STORAGE.returnId);
@@ -188,20 +223,14 @@ export default function Packages({ onBack }) {
 
   if (phase === 'success' && successData) {
     return (
-      <div className="scr packages-scr">
-        <div className="pkg-pay-success">
-          <p className="pkg-pay-success__icon">✅</p>
-          <h2 className="pkg-pay-success__title">تم الاشتراك بنجاح!</h2>
-          <p className="pkg-pay-success__label">كودك:</p>
-          <button type="button" className="pkg-pay-success__code" onClick={copyCode}>
-            {successData.code}
-          </button>
-          <p className="pkg-pay-success__exp">صالح حتى: {formatArabicDate(successData.expiresAt)}</p>
-          <button type="button" className="btn bg pkg-pay-success__cta" onClick={onBack}>
-            ابدأ اللعب الآن
-          </button>
-        </div>
-      </div>
+      <PackagePaySuccess
+        code={successData.code}
+        expiresAt={successData.expiresAt}
+        isGuest={isGuest}
+        onCopy={copyCode}
+        onPlay={onBack}
+        onGoAccount={onGoAccount}
+      />
     );
   }
 
@@ -213,6 +242,22 @@ export default function Packages({ onBack }) {
           <p className="pkg-pay-success__title">{pendingMsg || 'جاري تفعيل اشتراكك...'}</p>
           <p className="pkg-pay-success__exp">لا تغلق الصفحة — سيظهر كودك خلال ثوانٍ</p>
         </div>
+      </div>
+    );
+  }
+
+  if (phase === 'checkout' && selectedPlan) {
+    return (
+      <div className="scr packages-scr pkg-checkout-scr">
+        {onBack ? <GameTopNav onBack={handleCheckoutBack} variant="arena" /> : null}
+        <PackageCheckout
+          plan={selectedPlan}
+          formRef={formRef}
+          loadingPay={loadingPay}
+          payError={payError}
+          onBack={handleCheckoutBack}
+        />
+        <PackagesLegalNotice />
       </div>
     );
   }
@@ -244,24 +289,15 @@ export default function Packages({ onBack }) {
 
       <div className="pkg-tiers">
         {PAYMENT_PLANS.map((pkg) => (
-          <PackagePlanCard key={pkg.id} pkg={pkg} onSubscribe={handleSubscribe} ctaLabel="اشترك" />
+          <PackagePlanCard
+            key={pkg.id}
+            pkg={pkg}
+            onSubscribe={handleSubscribe}
+            ctaLabel="اشترك"
+            highlighted={highlightId === pkg.id}
+          />
         ))}
       </div>
-
-      {phase === 'pay' && selectedPlan ? (
-        <section className="pkg-moyasar-wrap">
-          <div className="pkg-moyasar-head">
-            <h3>الدفع — {selectedPlan.name}</h3>
-            <span>{selectedPlan.price} ر.س</span>
-          </div>
-          {loadingPay ? <p className="pkg-moyasar-loading">جاري تحميل نموذج الدفع...</p> : null}
-          <div ref={formRef} className="pkg-moyasar-form" />
-          {payError ? <p className="pkg-moyasar-error" role="alert">{payError}</p> : null}
-          <button type="button" className="btn bo bsm pkg-moyasar-cancel" onClick={() => { setPhase('browse'); setPayError(''); }}>
-            إلغاء
-          </button>
-        </section>
-      ) : null}
 
       <PackagesLegalNotice />
 

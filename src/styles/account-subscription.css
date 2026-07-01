@@ -1238,3 +1238,70 @@
   }
 }
 
+/* ── سجل عمليات Moyasar ── */
+.acct-pay-history {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 111, 168, 0.22);
+  background: rgba(37, 111, 168, 0.04);
+}
+
+.acct-pay-history__title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.acct-pay-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acct-pay-row {
+  padding: 10px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+}
+
+.acct-pay-row__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.acct-pay-row__plan {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.acct-pay-row__amount {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--brand-blue);
+}
+
+.acct-pay-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.acct-pay-row__status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(36, 143, 85, 0.12);
+  color: var(--brand-green);
+  font-weight: 900;
+}
+

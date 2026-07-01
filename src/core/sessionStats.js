@@ -97,6 +97,29 @@ export function resolveCodeId() {
   }
 }
 
+/** يقرأ الاشتراك المحلي مع expiresAt — للاسترجاع بعد الدفع */
+export function readLocalSubscription() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = JSON.parse(localStorage.getItem('code_active_pfcc') || '{}');
+    const codeId = raw.codeId || raw.id;
+    const expiresAt = Number(raw.expiresAt);
+    if (!codeId || !expiresAt) return null;
+    return {
+      codeId,
+      id: codeId,
+      code: raw.code || codeId,
+      expiresAt,
+      activatedAt: Number(raw.activatedAt) || null,
+      duration: Number(raw.duration) || null,
+      paymentId: raw.paymentId || null,
+      source: raw.source || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** يحفظ/يمسح الكود النشط في localStorage لاستخدام sessionStats */
 export function persistActiveCodeLocal(codeData) {
   if (typeof localStorage === 'undefined') return;
@@ -111,12 +134,17 @@ export function persistActiveCodeLocal(codeData) {
     JSON.stringify({
       codeId,
       id: codeId,
-      code: codeData.code || null,
+      code: codeData.code || codeId,
+      expiresAt: codeData.expiresAt ?? null,
+      activatedAt: codeData.activatedAt ?? null,
+      duration: codeData.duration ?? null,
+      paymentId: codeData.paymentId ?? null,
+      source: codeData.source ?? null,
       sponsorId: codeData.sponsorId || null,
       sponsorName: codeData.sponsorName || null,
       sponsorLogoUrl: codeData.sponsorLogoUrl || null,
       sponsorTagline: codeData.sponsorTagline || null,
-    })
+    }),
   );
 }
 

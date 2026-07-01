@@ -29,6 +29,7 @@ export {
   resolveCodeId,
   buildGameSessionTracking,
   persistActiveCodeLocal,
+  readLocalSubscription,
 } from './sessionStats';
 
 // ═══════════════════════════════════════════
@@ -66,7 +67,14 @@ export function normalizeSubscriptionCode(raw) {
   const t = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
   if (/^[A-Z0-9]{6}$/.test(t)) return formatStoredCode(t);
   if (/^CODE-[A-Z0-9]{6}$/.test(t)) return t;
+  if (/^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(t)) return t;
   return t;
+}
+
+const PLAY_CODE_RE = /^PLAY-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+export function isPlaySubscriptionCode(code) {
+  return PLAY_CODE_RE.test(String(code || '').trim().toUpperCase());
 }
 
 /** يُحوّل رقم واتساب محلي (05…) إلى صيغة wa.me (966…) */
@@ -257,7 +265,8 @@ async function activateCodeViaCloud(code, userId, deviceInfo, options = {}) {
 async function activateCodeClient(code, userId, deviceInfo, options = {}) {
   assertCodeActivationAllowed(userId);
   const storedCode = normalizeSubscriptionCode(code);
-  if (!/^CODE-[A-Z0-9]{6}$/.test(storedCode)) {
+  const isPlayCode = isPlaySubscriptionCode(storedCode);
+  if (!/^CODE-[A-Z0-9]{6}$/.test(storedCode) && !isPlayCode) {
     throw new Error('الكود غير صحيح');
   }
   if (!userId) {
@@ -268,116 +277,130 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
   }
 
   try {
-    const indexSnap = await get(ref(db, `codeIndex/${storedCode}`));
     let foundCodeId = null;
     let foundCodeData = null;
 
-    if (indexSnap.exists()) {
-      const idx = indexSnap.val();
-      foundCodeId = idx.codeId;
-      foundCodeData = { ...idx, id: foundCodeId };
-    } else {
-      const codesSnap = await get(ref(db, 'codes'));
-      if (!codesSnap.exists()) {
-        throw new Error('الكود غير موجود');
+    if (isPlayCode) {
+      const playSnap = await get(ref(db, `codes/${storedCode}`));
+      if (playSnap.exists()) {
+        foundCodeId = storedCode;
+        foundCodeData = { ...playSnap.val(), id: storedCode };
       }
-      codesSnap.forEach((child) => {
-        if (child.val()?.code === storedCode) {
-          foundCodeId = child.key;
-          foundCodeData = { ...child.val(), id: child.key };
+    } else {
+      const indexSnap = await get(ref(db, `codeIndex/${storedCode}`));
+      if (indexSnap.exists()) {
+        const idx = indexSnap.val();
+        foundCodeId = idx.codeId;
+        foundCodeData = { ...idx, id: foundCodeId };
+      } else {
+        const codesSnap = await get(ref(db, 'codes'));
+        if (codesSnap.exists()) {
+          codesSnap.forEach((child) => {
+            if (child.val()?.code === storedCode) {
+              foundCodeId = child.key;
+              foundCodeData = { ...child.val(), id: child.key };
+            }
+          });
         }
-      });
+      }
     }
 
     if (!foundCodeId || !foundCodeData) {
       throw new Error('الكود غير صحيح');
     }
 
-    if (foundCodeData.status === 'expired') {
+    if (foundCodeData.expiresAt && foundCodeData.expiresAt <= Date.now()) {
       throw new Error('الكود منتهي الصلاحية');
     }
 
-    if (foundCodeData.status === 'active') {
+    const codeStatus = foundCodeData.status || (foundCodeData.active ? 'active' : 'unused');
+    const isMoyasarPurchase = foundCodeData.source === 'moyasar' || isPlayCode;
+
+    if (codeStatus === 'expired') {
+      throw new Error('الكود منتهي الصلاحية');
+    }
+
+    if (codeStatus === 'active' || isMoyasarPurchase) {
       if (foundCodeData.userId && foundCodeData.userId !== userId) {
         throw new Error('الكود مُفعّل على حساب آخر');
       }
-      if (foundCodeData.expiresAt && foundCodeData.expiresAt <= Date.now()) {
-        throw new Error('الكود منتهي الصلاحية');
-      }
-    } else if (foundCodeData.status !== 'unused') {
+    } else if (codeStatus !== 'unused') {
       throw new Error('الكود غير متاح للتفعيل');
     }
 
     const devices = { ...(foundCodeData.devices || {}) };
     const deviceCount = Object.keys(devices).length;
-    if (deviceCount >= 2 && !devices[deviceInfo.fingerprint]) {
+    if (!isMoyasarPurchase && deviceCount >= 2 && !devices[deviceInfo.fingerprint]) {
       throw new Error('تم تجاوز الحد الأقصى للأجهزة (2)');
     }
 
     const now = Date.now();
-    const isFirstActivation = foundCodeData.status === 'unused';
+    const isFirstActivation = codeStatus === 'unused' && !isMoyasarPurchase;
     const expiresAt = isFirstActivation
       ? computeCodeExpiresAt(foundCodeData, now)
       : foundCodeData.expiresAt;
 
-    devices[deviceInfo.fingerprint] = {
-      ...deviceInfo,
-      activatedAt: now,
-    };
+    if (!isMoyasarPurchase) {
+      devices[deviceInfo.fingerprint] = {
+        ...deviceInfo,
+        activatedAt: now,
+      };
+    }
 
     const activationMeta = buildActivationMetaFields(foundCodeData);
+    const displayCode = isPlayCode ? foundCodeId : storedCode;
 
     const activeSummary = {
       codeId: foundCodeId,
-      code: storedCode,
+      code: displayCode,
       activatedAt: isFirstActivation ? now : foundCodeData.activatedAt ?? now,
       expiresAt,
-      duration: foundCodeData.duration,
+      duration: foundCodeData.duration || foundCodeData.planDays,
       price: foundCodeData.price,
+      paymentId: foundCodeData.paymentId || null,
+      source: foundCodeData.source || null,
       ...activationMeta,
       ...buildActiveCodeSponsorPayload(foundCodeData),
     };
 
-    const indexUpdate = {
-      codeId: foundCodeId,
-      code: storedCode,
-      duration: foundCodeData.duration,
-      price: foundCodeData.price,
-      status: 'active',
-      createdAt: foundCodeData.createdAt,
-      activatedAt: activeSummary.activatedAt,
-      expiresAt,
-      userId,
-      devices,
-      ...activationMeta,
-    };
-
-    const phone = normalizeWhatsappPhone(options.phone);
-
     const updates = {
-      [`codeIndex/${storedCode}`]: indexUpdate,
       [`users/${userId}/activeCode`]: activeSummary,
-      [`codes/${foundCodeId}/status`]: 'active',
-      [`codes/${foundCodeId}/activatedAt`]: activeSummary.activatedAt,
-      [`codes/${foundCodeId}/expiresAt`]: expiresAt,
       [`codes/${foundCodeId}/userId`]: userId,
-      [`codes/${foundCodeId}/devices`]: devices,
     };
 
-    if (phone && isFirstActivation) {
-      updates[`codes/${foundCodeId}/phone`] = phone;
+    if (!isMoyasarPurchase) {
+      const indexUpdate = {
+        codeId: foundCodeId,
+        code: storedCode,
+        duration: foundCodeData.duration,
+        price: foundCodeData.price,
+        status: 'active',
+        createdAt: foundCodeData.createdAt,
+        activatedAt: activeSummary.activatedAt,
+        expiresAt,
+        userId,
+        devices,
+        ...activationMeta,
+      };
+      updates[`codeIndex/${storedCode}`] = indexUpdate;
+      updates[`codes/${foundCodeId}/status`] = 'active';
+      updates[`codes/${foundCodeId}/activatedAt`] = activeSummary.activatedAt;
+      updates[`codes/${foundCodeId}/expiresAt`] = expiresAt;
+      updates[`codes/${foundCodeId}/devices`] = devices;
     }
 
     if (isFirstActivation) {
       const histKey = push(ref(db, `users/${userId}/subscriptionHistory`)).key;
       updates[`users/${userId}/subscriptionHistory/${histKey}`] = {
-        code: formatCodeForDisplay(storedCode),
+        code: formatCodeForDisplay(displayCode),
         codeId: foundCodeId,
-        duration: Number(foundCodeData.duration) || 0,
+        duration: Number(foundCodeData.duration || foundCodeData.planDays) || 0,
         ...activationMeta,
         activatedAt: activeSummary.activatedAt,
         expiresAt,
         recordedAt: now,
+        source: foundCodeData.source || null,
+        paymentId: foundCodeData.paymentId || null,
       };
     }
 
@@ -388,13 +411,13 @@ async function activateCodeClient(code, userId, deviceInfo, options = {}) {
     return {
       ...foundCodeData,
       id: foundCodeId,
-      code: storedCode,
+      code: displayCode,
       status: 'active',
       activatedAt: activeSummary.activatedAt,
       expiresAt,
       userId,
       devices,
-      phone: phone || foundCodeData.phone || null,
+      phone: foundCodeData.phone || null,
       ...buildActiveCodeSponsorPayload(foundCodeData),
     };
   } catch (error) {

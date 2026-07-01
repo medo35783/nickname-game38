@@ -12,7 +12,7 @@ import PackagePlanBadges, { badgesForPackage } from './PackagePlanBadges';
  * @param {(pkg: import('../../core/subscriptionPackages').SubscriptionPackage) => void} props.onSubscribe
  * @param {string} [props.ctaLabel]
  */
-export default function PackagePlanCard({ pkg, onSubscribe, ctaLabel }) {
+export default function PackagePlanCard({ pkg, onSubscribe, ctaLabel, highlighted = false }) {
   const promo = hasActivePromo(pkg);
   const effective = getEffectivePrice(pkg);
   const save = savingsPercent(pkg.days, effective);
@@ -23,7 +23,7 @@ export default function PackagePlanCard({ pkg, onSubscribe, ctaLabel }) {
 
   return (
     <article
-      className={`pkg-tier plan-card ${pkg.planClass}${pkg.best ? ' pkg-tier--featured' : ''}${pkg.popular ? ' pkg-tier--popular' : ''}`}
+      className={`pkg-tier plan-card ${pkg.planClass}${pkg.best ? ' pkg-tier--featured' : ''}${pkg.popular ? ' pkg-tier--popular' : ''}${highlighted ? ' pkg-tier--selected' : ''}`}
       style={pkg.cardStyle}
     >
       <PackagePlanBadges badges={badgesForPackage(pkg)} />
