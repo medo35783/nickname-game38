@@ -224,7 +224,6 @@ function buildUserBindUpdates(db, uid, codeId, codeRecord, historyEntry) {
       codeRecord.paymentId,
     ),
     [`users/${uid}/subscriptionHistory/${histKey}`]: historyEntry,
-    [`codes/${codeId}/userId`]: uid,
   };
 }
 
