@@ -106,9 +106,9 @@ async function fetchMoyasarPayment(paymentId) {
   return { ok: true, payment: await res.json() };
 }
 
-/** تأكيد paid — محاولات قصيرة لأن 3DS قد يتأخر قليلاً */
+/** تأكيد paid — محاولات سريعة على السيرver؛ الباقي يعيده العميل */
 async function verifyMoyasarPayment(paymentId) {
-  const delays = [0, 500, 1000, 2000, 3500];
+  const delays = [0, 1000, 2500];
   let lastStatus = null;
 
   for (let i = 0; i < delays.length; i += 1) {
@@ -134,6 +134,19 @@ async function verifyMoyasarPayment(paymentId) {
     return { ok: false, reason: 'payment_failed', status: lastStatus };
   }
   return { ok: false, reason: 'not_paid_yet', status: lastStatus };
+}
+
+async function withDbRetry(fn, retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries - 1) await sleep(400 * (i + 1));
+    }
+  }
+  throw lastErr;
 }
 
 function resolvePlanDays(clientPlanDays, paymentAmount) {
@@ -247,6 +260,10 @@ async function returnExistingCode(res, db, paymentId) {
   return true;
 }
 
+export const config = {
+  maxDuration: 60,
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'method_not_allowed' });
@@ -264,7 +281,7 @@ export default async function handler(req, res) {
     const userId = await verifyUserToken(idToken);
     const db = await getAdminDb();
     const paymentRef = db.ref(`payments/${paymentId}`);
-    const existing = await paymentRef.get();
+    const existing = await withDbRetry(() => paymentRef.get());
 
     if (existing.exists()) {
       await returnExistingCode(res, db, paymentId);
@@ -311,7 +328,7 @@ export default async function handler(req, res) {
       Object.assign(updates, buildUserBindUpdates(db, userId, codeId, codeRecord, historyEntry));
     }
 
-    await db.ref().update(updates);
+    await withDbRetry(() => db.ref().update(updates));
 
     res.status(200).json({
       success: true,

@@ -31,8 +31,20 @@ import {
 
 const MOYASAR_JS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
 const MOYASAR_CSS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.css';
-const ACTIVATE_RETRIES = 8;
-const ACTIVATE_RETRY_MS = 1500;
+const ACTIVATE_RETRIES = 20;
+const ACTIVATE_RETRY_MIN_MS = 2500;
+const ACTIVATE_RETRY_MAX_MS = 7000;
+
+/** انتظار متزايد بين المحاولات — حتى ~90 ثانية إجمالاً */
+function getActivateRetryDelay(attempt) {
+  return Math.min(ACTIVATE_RETRY_MIN_MS + attempt * 700, ACTIVATE_RETRY_MAX_MS);
+}
+
+function processingSubtext(attempt) {
+  if (attempt <= 2) return 'لا تغلق الصفحة — سيظهر كودك خلال ثوانٍ';
+  if (attempt <= 10) return 'قد يستغرق حتى دقيقة — خاصةً عند أول دفع بعد النشر';
+  return 'ما زلنا نحاول — لا تغلق الصفحة ولا تحدّثها';
+}
 
 function mapActivateError(err) {
   const code = err?.code || err?.message || '';
@@ -68,6 +80,7 @@ function shouldRetryActivate(err) {
   if (code === 'payment_failed' || err?.moyasarStatus === 'failed') return false;
   if (code === 'api_unavailable') return false;
   if (err?.status === 401) return false;
+  if (code === 'not_paid_yet' || err?.status === 402 || code === 'invalid_payment') return true;
   if (code === 'invalid_firebase_config' || code === 'missing_firebase_config') return true;
   if (err?.status === 500 || code === 'server_error') return true;
   return true;
@@ -172,6 +185,9 @@ export default function Packages({
       ? 'جاري التحقق من الدفع وتجهيز كودك...'
       : ''
   ));
+  const [processingHint, setProcessingHint] = useState(() => (
+    resolveInitialPhase() === 'processing' ? processingSubtext(0) : ''
+  ));
   const [globalError, setGlobalError] = useState(resolveInitialError);
   const [refundOpen, setRefundOpen] = useState(false);
 
@@ -263,6 +279,7 @@ export default function Packages({
     clearPaymentError();
     setSuccessData(null);
     setPendingMsg('جاري التحقق من الدفع وتجهيز كودك...');
+    setProcessingHint(processingSubtext(0));
     scrollToTop();
 
     await waitForAuth();
@@ -272,7 +289,8 @@ export default function Packages({
       try {
         if (attempt > 0) {
           setPendingMsg(`جاري تجهيز كودك... (محاولة ${attempt + 1}/${ACTIVATE_RETRIES})`);
-          await wait(ACTIVATE_RETRY_MS);
+          setProcessingHint(processingSubtext(attempt));
+          await wait(getActivateRetryDelay(attempt - 1));
         }
 
         const data = await activateOnServer(paymentId, planDays);
@@ -280,7 +298,10 @@ export default function Packages({
         return;
       } catch (err) {
         lastErr = err;
-        if (err?.status === 409) continue;
+        if (err?.status === 409) {
+          await wait(800);
+          continue;
+        }
         if (!shouldRetryActivate(err)) break;
         if (attempt === ACTIVATE_RETRIES - 1) break;
       }
@@ -294,6 +315,7 @@ export default function Packages({
     };
     storePaymentError(errorPayload.message, paymentId);
     setPendingMsg('');
+    setProcessingHint('');
     setGlobalError(errorPayload);
     setPhase('browse');
   }, [activateOnServer, finishWithSuccess]);
@@ -411,7 +433,7 @@ export default function Packages({
         <div className="pkg-pay-success">
           <p className="pkg-pay-success__icon" aria-hidden="true">⏳</p>
           <p className="pkg-pay-success__title">{pendingMsg || 'جاري تفعيل اشتراكك...'}</p>
-          <p className="pkg-pay-success__exp">لا تغلق الصفحة — سيظهر كودك خلال ثوانٍ</p>
+          <p className="pkg-pay-success__exp">{processingHint || 'لا تغلق الصفحة — قد يستغرق حتى دقيقة'}</p>
         </div>
       </div>
     );
