@@ -3,6 +3,8 @@
  */
 import useWinnerPrize from '../../hooks/useWinnerPrize';
 import WinnerPrizeCertificate from '../../shared/WinnerPrizeCertificate';
+import GameCancelledScreen from '../../shared/GameCancelledScreen';
+import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
 
 export default function TitlesGameSummary({
   role,
@@ -18,6 +20,20 @@ export default function TitlesGameSummary({
   myId,
   notify,
 }) {
+  if (isGameCancelled(gameState) || !hasTitlesCompetitionStarted(gameState, allRoundsData)) {
+    return (
+      <GameCancelledScreen
+        gameLabel="مسابقة الألقاب"
+        roomCode={roomCode}
+        onHome={() => {
+          localStorage.removeItem('ng_session');
+          localStorage.removeItem('ng_admin_session');
+          setSelectedGame(null);
+        }}
+      />
+    );
+  }
+
   const playersList = Object.entries(players || {}).map(([id, p]) => ({ ...p, id }));
   const activePlayers = playersList.filter((p) => p.status === 'active');
   const primaryWinner = activePlayers[0];

@@ -17,6 +17,7 @@ import {
   clearPaymentSuccess,
   clearReturnFailed,
   getPendingReturnId,
+  isStoredSuccessForPending,
   readPaymentError,
   readPaymentSuccess,
   readPendingPayment,
@@ -30,8 +31,8 @@ import {
 
 const MOYASAR_JS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.js';
 const MOYASAR_CSS = 'https://cdn.moyasar.com/mpf/1.14.0/moyasar.css';
-const ACTIVATE_RETRIES = 4;
-const ACTIVATE_RETRY_MS = 1200;
+const ACTIVATE_RETRIES = 8;
+const ACTIVATE_RETRY_MS = 1500;
 
 function mapActivateError(err) {
   const code = err?.code || err?.message || '';
@@ -66,7 +67,9 @@ function shouldRetryActivate(err) {
   if (code === 'moyasar_auth_failed' || code === 'missing_moyasar_secret') return false;
   if (code === 'payment_failed' || err?.moyasarStatus === 'failed') return false;
   if (code === 'api_unavailable') return false;
-  if (err?.status === 401 || err?.status === 500) return false;
+  if (err?.status === 401) return false;
+  if (code === 'invalid_firebase_config' || code === 'missing_firebase_config') return true;
+  if (err?.status === 500 || code === 'server_error') return true;
   return true;
 }
 
@@ -108,12 +111,15 @@ function scrollToTop() {
 }
 
 function resolveInitialPhase() {
-  if (readPaymentSuccess()) return 'success';
-  if (getPendingReturnId() || readPendingPayment()) return 'processing';
+  const pending = readPendingPayment() || getPendingReturnId();
+  if (pending && !isStoredSuccessForPending()) return 'processing';
+  if (isStoredSuccessForPending()) return 'success';
+  if (readPaymentError()) return 'browse';
   return 'browse';
 }
 
 function resolveInitialSuccess() {
+  if (!isStoredSuccessForPending()) return null;
   const saved = readPaymentSuccess();
   if (!saved) return null;
   return { code: saved.code, expiresAt: saved.expiresAt };
@@ -244,14 +250,22 @@ export default function Packages({
     if (activatingRef.current && !force) return;
     activatingRef.current = true;
 
+    const saved = readPaymentSuccess();
+    if (saved?.paymentId && saved.paymentId !== paymentId) {
+      clearPaymentSuccess();
+    }
+
     storePendingPayment(paymentId, planDays || readStoredPlanDays());
     clearReturnFailed(paymentId);
     setPhase('processing');
     setPayError('');
     setGlobalError(null);
     clearPaymentError();
+    setSuccessData(null);
     setPendingMsg('جاري التحقق من الدفع وتجهيز كودك...');
     scrollToTop();
+
+    await waitForAuth();
 
     let lastErr = null;
     for (let attempt = 0; attempt < ACTIVATE_RETRIES; attempt += 1) {
@@ -342,12 +356,12 @@ export default function Packages({
   }, []);
 
   useEffect(() => {
-    if (readPaymentSuccess()) return;
-
     const pending = readPendingPayment();
     const returnId = getPendingReturnId();
     const paymentId = pending?.paymentId || returnId;
     if (!paymentId) return;
+
+    if (isStoredSuccessForPending()) return;
 
     const planDays = pending?.planDays || readStoredPlanDays();
     handlePaymentSuccess(paymentId, planDays || undefined);

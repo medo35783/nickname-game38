@@ -57,7 +57,9 @@ import FameeriPlayerLeaderNotice from './FameeriPlayerLeaderNotice';
 import GameExitSheet from '../../shared/GameExitSheet';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasFameeriCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import { hasMeaningfulFameeriParticipation } from '../../core/arenaParticipation';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
+import { useSessionGateTimeout } from '../../shared/useSessionGateTimeout';
 import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
 import GameSeatPinField from '../../shared/GameSeatPinField';
 import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
@@ -114,6 +116,9 @@ const FameeriGame = forwardRef(function FameeriGame(
   void onGoAccount;
   const [qSaved] = useState(readSavedFameeri);
   const [sessionGate, setSessionGate] = useState(() => (readSavedFameeri().qRoom ? 'checking' : 'ready'));
+  useSessionGateTimeout(sessionGate, setSessionGate);
+  const [qCreating, setQCreating] = useState(false);
+  const fameeriClosingRef = useRef(false);
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [showGuide, setShowGuide] = useState(false);
@@ -198,6 +203,7 @@ const FameeriGame = forwardRef(function FameeriGame(
   };
 
   const createQumairiRoom = async () => {
+    if (qCreating) return;
     if (!canCreateRoom) {
       notify(
         'لا يمكن إنشاء غرفة جديدة بدون اشتراك نشط. غرفك الحالية تبقى مفتوحة — فعّل كودك من «الباقات» للغرف الجديدة.',
@@ -211,42 +217,54 @@ const FameeriGame = forwardRef(function FameeriGame(
       onRequestActivation();
       return;
     }
+    setQCreating(true);
     try {
       if (typeof auth.authStateReady === 'function') await auth.authStateReady();
-    } catch {
-      /* ignore */
+      const hostUid = auth.currentUser?.uid;
+      if (!hostUid) {
+        notify('لم يكتمل اتصال الحساب — انتظر ثانية وحاول مجدداً', 'error');
+        return;
+      }
+      const existingHost = await resolveActiveHostRoom('fameeri', auth.currentUser);
+      if (existingHost) {
+        enterAsFameeriAdmin(existingHost.roomCode, existingHost.data?.game?.phase);
+        notify(`✅ لديك غرفة قميري نشطة: ${existingHost.roomCode}`, 'gold');
+        return;
+      }
+      const code = await allocateFreeRoomCode('qrooms');
+      if (!code) {
+        notify('لم يتاح رمز غرفة فاضٍ — حاول بعد قليل', 'error');
+        return;
+      }
+      await set(dbRef(db, `qrooms/${code}`), {
+        adminId: hostUid,
+        game: {
+          phase: 'lobby',
+          createdAt: Date.now(),
+          ...buildGameSessionTracking('fameeri'),
+        },
+        groups: {},
+        members: {},
+        attacks: {},
+      });
+      setQRoom(code);
+      setQRole('admin');
+      localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
+      setGameScreen('qumairi_lobby');
+      if (isArenaRegisteredUser(auth.currentUser)) {
+        void setHostActiveRoom(hostUid, 'fameeri', code);
+      }
+      notify(`✅ الغرفة: ${code}`, 'gold');
+    } catch (err) {
+      const msg = String(err?.message || err || '');
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('permission_denied')) {
+        notify('تعذّر إنشاء الغرفة — تحقق من قواعد Firebase أو سجّل الدخول', 'error');
+      } else {
+        notify('تعذّر إنشاء الغرفة — حاول مجدداً', 'error');
+      }
+    } finally {
+      setQCreating(false);
     }
-    const hostUid = auth.currentUser?.uid;
-    const existingHost = await resolveActiveHostRoom('fameeri', auth.currentUser);
-    if (existingHost) {
-      enterAsFameeriAdmin(existingHost.roomCode, existingHost.data?.game?.phase);
-      notify('✅ لديك غرفة نشطة — عدت إليها', 'gold');
-      return;
-    }
-    const code = await allocateFreeRoomCode('qrooms');
-    if (!code) {
-      notify('لم يتاح رمز غرفة فاضٍ — حاول بعد قليل', 'error');
-      return;
-    }
-    setQRoom(code);
-    setQRole('admin');
-    await set(dbRef(db, `qrooms/${code}`), {
-      ...(auth.currentUser?.uid ? { adminId: auth.currentUser.uid } : {}),
-      game: {
-        phase: 'lobby',
-        createdAt: Date.now(),
-        ...buildGameSessionTracking('fameeri'),
-      },
-      groups: {},
-      members: {},
-      attacks: {},
-    });
-    localStorage.setItem('ng_qumairi', JSON.stringify({ qRoom: code, qRole: 'admin' }));
-    setGameScreen('qumairi_lobby');
-    if (hostUid && isArenaRegisteredUser(auth.currentUser)) {
-      void setHostActiveRoom(hostUid, 'fameeri', code);
-    }
-    notify(`✅ الغرفة: ${code}`, 'gold');
   };
 
   /* ── QUMAIRI GAME STATE ── */
@@ -313,11 +331,11 @@ const FameeriGame = forwardRef(function FameeriGame(
     const qaRef = dbRef(db, `qrooms/${qRoom}/attacks`);
     const qmRef = dbRef(db, `qrooms/${qRoom}/members`);
     const qprRef = dbRef(db, `qrooms/${qRoom}/presence`);
-    onValue(qgRef, snap=>setQGameState(snap.val()));
-    onValue(qpRef, snap=>setQGroups(snap.val()||{}));
-    onValue(qaRef, snap=>setQAttacks(snap.val()||{}));
-    onValue(qmRef, snap=>setQMembers(snap.val()||{}));
-    onValue(qprRef, snap=>setQPresence(snap.val()||{}));
+    onValue(qgRef, snap=>{ if (fameeriClosingRef.current) return; setQGameState(snap.val()); });
+    onValue(qpRef, snap=>{ if (fameeriClosingRef.current) return; setQGroups(snap.val()||{}); });
+    onValue(qaRef, snap=>{ if (fameeriClosingRef.current) return; setQAttacks(snap.val()||{}); });
+    onValue(qmRef, snap=>{ if (fameeriClosingRef.current) return; setQMembers(snap.val()||{}); });
+    onValue(qprRef, snap=>{ if (fameeriClosingRef.current) return; setQPresence(snap.val()||{}); });
     return ()=>{ off(qgRef); off(qpRef); off(qaRef); off(qmRef); off(qprRef); };
   }, [qRoom]);
 
@@ -896,42 +914,60 @@ const FameeriGame = forwardRef(function FameeriGame(
     notify('عدت لساحة الألعاب', 'info');
   };
 
-  const cancelFameeriCompetition = async () => {
-    if (!qRoom) return;
-    await recordSessionEnd('fameeri', qRoom, true).catch(() => {});
-    await update(dbRef(db, `qrooms/${qRoom}/game`), {
+  const cancelFameeriCompetition = async (codeOverride) => {
+    const code = codeOverride || qRoom;
+    if (!code) return;
+    void recordSessionEnd('fameeri', code, false).catch(() => {});
+    await update(dbRef(db, `qrooms/${code}/game`), {
       phase: 'ended',
       cancelled: true,
+      closedFromLobby: true,
       endedAt: Date.now(),
     });
     localStorage.removeItem('ng_qumairi');
-    notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+    if (auth.currentUser?.uid) {
+      void clearHostActiveRoom(auth.currentUser.uid, 'fameeri');
+    }
+    resetFameeriRoomState();
+    notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
   };
 
   const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
     const code = qRoom;
-    const started = hasFameeriCompetitionStarted(qGameState, qAttacks);
-    resetFameeriRoomState();
     if (!code) return;
+    const started = hasFameeriCompetitionStarted(qGameState, qAttacks);
+
+    fameeriClosingRef.current = true;
+    localStorage.removeItem('ng_qumairi');
+    if (auth.currentUser?.uid) {
+      void clearHostActiveRoom(auth.currentUser.uid, 'fameeri');
+    }
+    resetFameeriRoomState();
+
     try {
-      await recordSessionEnd('fameeri', code, true).catch(() => {});
+      if (!started) {
+        void recordSessionEnd('fameeri', code, false).catch(() => {});
+        await update(dbRef(db, `qrooms/${code}/game`), {
+          phase: 'ended',
+          cancelled: true,
+          closedFromLobby: true,
+          endedAt: Date.now(),
+        });
+        notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
+        return;
+      }
+      void recordSessionEnd('fameeri', code, true).catch(() => {});
       await update(dbRef(db, `qrooms/${code}/game`), {
         phase: 'ended',
         endedAt: Date.now(),
         endedByHost: true,
-        ...(started ? {} : { closedFromLobby: true }),
       });
-      localStorage.removeItem('ng_qumairi');
-      if (auth.currentUser?.uid) {
-        void clearHostActiveRoom(auth.currentUser.uid, 'fameeri');
-      }
-      notify(
-        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
-        'info'
-      );
+      notify('تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت', 'info');
     } catch {
       notify('تعذّر إنهاء المسابقة — حاول مجدداً', 'error');
+    } finally {
+      fameeriClosingRef.current = false;
     }
   };
 
@@ -956,7 +992,7 @@ const FameeriGame = forwardRef(function FameeriGame(
       await cancelFameeriCompetition();
       return;
     }
-    await recordSessionEnd('fameeri', qRoom, true).catch(() => {});
+    void recordSessionEnd('fameeri', qRoom, true).catch(() => {});
     await update(dbRef(db, `qrooms/${qRoom}/game`), { phase: 'ended', endedAt: Date.now() });
     playSound('applause');
     notify('🏆 تم إنهاء المسابقة — المتسابقون يرون النتائج', 'gold');
@@ -1573,7 +1609,9 @@ const FameeriGame = forwardRef(function FameeriGame(
       const accuracy = myOff.length ? Math.round((good / myOff.length) * 100) : 0;
       const t0 = qGameState?.createdAt;
       const timeSec = t0 ? Math.round((Date.now() - t0) / 1000) : undefined;
-      playerStats = { rank, hits, accuracy, time: timeSec };
+      if (hasMeaningfulFameeriParticipation({ attacks: myOff.length, hits }) && rank > 0) {
+        playerStats = { rank, hits, accuracy, time: timeSec };
+      }
     }
 
     onGameEnd({ game: 'fameeri', roomCode: qRoom, winner: winnerName, playerStats });
@@ -1620,7 +1658,9 @@ const FameeriGame = forwardRef(function FameeriGame(
             </div>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button type="button" className="btn bg" onClick={() => void handleAdminEntry()}>👑 إنشاء غرفة كمسؤول</button>
+            <button type="button" className="btn bg" disabled={qCreating} onClick={() => void handleAdminEntry()}>
+              {qCreating ? '⏳ جاري إنشاء الغرفة…' : '👑 إنشاء غرفة كمسؤول'}
+            </button>
             <button type="button" className="btn bo" onClick={() => void handlePlayerEntry()}>🎮 انضمام كمجموعة برمز الغرفة</button>
             <button type="button" className="btn bgh" onClick={() => { setQJoinInput(''); setQJoinErr(''); setGameScreen('qumairi_spectator_join'); }}>📺 شاشة عرض (بروجكتر)</button>
           </div>

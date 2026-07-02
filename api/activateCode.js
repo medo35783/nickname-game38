@@ -17,32 +17,55 @@ function cleanSecret(raw) {
 
 function parseServiceAccountJson(raw) {
   if (!raw) return null;
-  const trimmed = String(raw).trim().replace(/^["']|["']$/g, '');
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    throw new Error('invalid_firebase_config');
+  let trimmed = String(raw).trim().replace(/^\uFEFF/, '');
+  trimmed = trimmed.replace(/^["']|["']$/g, '');
+
+  const attempts = [trimmed];
+  if (trimmed.includes('\\n')) {
+    attempts.push(trimmed.replace(/\\n/g, '\n'));
   }
+
+  for (const candidate of attempts) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed?.private_key && typeof parsed.private_key === 'string') {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+      }
+      if (parsed?.client_email && parsed?.project_id) return parsed;
+    } catch {
+      /* try next */
+    }
+  }
+
+  throw new Error('invalid_firebase_config');
 }
+
+let adminInitPromise = null;
 
 function getAdminApp() {
-  if (!getApps().length) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!raw) throw new Error('missing_firebase_config');
-    initializeApp({
-      credential: cert(parseServiceAccountJson(raw)),
-      databaseURL: process.env.FIREBASE_DATABASE_URL || DEFAULT_DB_URL,
-    });
+  if (getApps().length) return;
+
+  if (!adminInitPromise) {
+    adminInitPromise = (async () => {
+      const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      if (!raw) throw new Error('missing_firebase_config');
+      initializeApp({
+        credential: cert(parseServiceAccountJson(raw)),
+        databaseURL: process.env.FIREBASE_DATABASE_URL || DEFAULT_DB_URL,
+      });
+    })();
   }
+
+  return adminInitPromise;
 }
 
-function getAdminDb() {
-  getAdminApp();
+async function getAdminDb() {
+  await getAdminApp();
   return getDatabase();
 }
 
-function getAdminAuth() {
-  getAdminApp();
+async function getAdminAuth() {
+  await getAdminApp();
   return getAuth();
 }
 
@@ -56,7 +79,8 @@ function generateCodeId() {
 async function verifyUserToken(idToken) {
   if (!idToken || typeof idToken !== 'string') return null;
   try {
-    const decoded = await getAdminAuth().verifyIdToken(idToken);
+    const authAdmin = await getAdminAuth();
+    const decoded = await authAdmin.verifyIdToken(idToken);
     return decoded.uid;
   } catch {
     return null;
@@ -238,7 +262,7 @@ export default async function handler(req, res) {
     }
 
     const userId = await verifyUserToken(idToken);
-    const db = getAdminDb();
+    const db = await getAdminDb();
     const paymentRef = db.ref(`payments/${paymentId}`);
     const existing = await paymentRef.get();
 

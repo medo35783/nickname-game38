@@ -52,7 +52,9 @@ import StatsRemainingPanel from './stats/StatsRemainingPanel';
 import GameExitSheet from '../../shared/GameExitSheet';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasTitlesCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import { hasMeaningfulTitlesParticipation } from '../../core/arenaParticipation';
 import GameTopNav, { GameSessionChecking } from '../../shared/GameTopNav';
+import { useSessionGateTimeout } from '../../shared/useSessionGateTimeout';
 import SponsorRoundBadge from '../../shared/SponsorRoundBadge';
 import { formatOtherSessionsHint, getOtherActiveSessions, getSavedRoomForGame } from '../../shared/gameSessionRegistry';
 import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
@@ -78,6 +80,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const [gameScreen, setGameScreen] = useState('home');
   /** يمنع عرض أزرار «الرئيسية» قبل انتهاء التحقق من جلسة localStorage + Firebase */
   const [sessionGate, setSessionGate] = useState('checking');
+  const titlesClosingRef = useRef(false);
+  useSessionGateTimeout(sessionGate, setSessionGate);
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(null);
@@ -108,7 +112,8 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     writeGuestDeviceLock('titles', code, seatId);
   };
 
-  const applyTitlesPlayerRejoin = (code, seatId, seatData, gamePhase) => {
+  const applyTitlesPlayerRejoin = (code, seatId, seatData, gameSnap) => {
+    const gamePhase = gameSnap?.phase || 'lobby';
     setMyId(seatId);
     setMyNickLocal(seatData.nick);
     setRoomCode(code);
@@ -116,7 +121,9 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (gamePhase === 'lobby') setGameScreen('lobby');
     else if (gamePhase === 'attacking') setGameScreen('attack');
     else if (gamePhase === 'revealing') setGameScreen('results');
-    else if (gamePhase === 'ended') setGameScreen('summary');
+    else if (gamePhase === 'ended') {
+      setGameScreen(isGameCancelled(gameSnap) ? 'cancelled' : 'summary');
+    }
   };
 
   const finalizeTitlesPlayerRejoin = async (code, seatId, seatData, gamePhase) => {
@@ -132,7 +139,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
       /* قد يمنعها قواعد Firebase — لا تعطل العودة */
     }
     persistTitlesPlayerSession(code, seatId, seatData.name, seatData.nick, seatData.sessionToken);
-    applyTitlesPlayerRejoin(code, seatId, seatData, gamePhase);
+    applyTitlesPlayerRejoin(code, seatId, seatData, { phase: gamePhase });
     notify('✅ تم الرجوع للعبة!', 'success');
   };
 
@@ -489,32 +496,44 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
     const code = roomCode;
+    if (!code) return;
     const started = hasTitlesCompetitionStarted(gameState, allRoundsData);
     const livePhase = gameState?.phase;
+
+    titlesClosingRef.current = true;
+    localStorage.removeItem('ng_session');
+    localStorage.removeItem('ng_admin_session');
+    if (auth.currentUser?.uid) {
+      void clearHostActiveRoom(auth.currentUser.uid, 'titles');
+    }
     resetTitlesRoomState();
-    if (!code) return;
+
     try {
-      if (started && (livePhase === 'attacking' || livePhase === 'revealing')) {
-        await recordRoundCompleted('titles', code).catch(() => {});
+      if (!started) {
+        void recordSessionEnd('titles', code, false).catch(() => {});
+        await update(gameRef(code), {
+          phase: 'ended',
+          cancelled: true,
+          closedFromLobby: true,
+          endedAt: Date.now(),
+        });
+        notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
+        return;
       }
-      await recordSessionEnd('titles', code, true).catch(() => {});
+      if (livePhase === 'attacking' || livePhase === 'revealing') {
+        void recordRoundCompleted('titles', code).catch(() => {});
+      }
+      void recordSessionEnd('titles', code, true).catch(() => {});
       await update(gameRef(code), {
         phase: 'ended',
         endedAt: Date.now(),
         endedByHost: true,
-        ...(started ? {} : { closedFromLobby: true }),
       });
-      localStorage.removeItem('ng_session');
-      localStorage.removeItem('ng_admin_session');
-      if (auth.currentUser?.uid) {
-        void clearHostActiveRoom(auth.currentUser.uid, 'titles');
-      }
-      notify(
-        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
-        'info'
-      );
+      notify('تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت', 'info');
     } catch {
       notify('تعذّر إنهاء المسابقة — حاول مجدداً', 'error');
+    } finally {
+      titlesClosingRef.current = false;
     }
   };
 
@@ -562,7 +581,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         setRoomCode(saved.roomCode);
         setRole('admin');
         setMyId(null);
-        applyTitlesAdminScreens(roomData?.game?.phase || 'lobby');
+        applyTitlesAdminScreens(roomData?.game || { phase: 'lobby' });
         notify('✅ عدت للغرفة كمشرف', 'gold');
         return;
       }
@@ -732,11 +751,20 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
   };
 
   /* ══ PLAYER: JOIN ROOM ══ */
-  const applyTitlesAdminScreens = (gamePhase) => {
+  const normalizeGameSnap = (gameSnap) => {
+    if (!gameSnap) return { phase: 'lobby' };
+    if (typeof gameSnap === 'string') return { phase: gameSnap };
+    return gameSnap;
+  };
+
+  const applyTitlesAdminScreens = (gameSnap) => {
+    const snap = normalizeGameSnap(gameSnap);
+    const gamePhase = snap.phase || 'lobby';
     if (gamePhase === 'lobby' || gamePhase === 'attacking') setGameScreen('host');
     else if (gamePhase === 'revealing') setGameScreen('results');
-    else if (gamePhase === 'ended') setGameScreen('summary');
-    else setGameScreen('host');
+    else if (gamePhase === 'ended') {
+      setGameScreen(isGameCancelled(snap) ? 'cancelled' : 'summary');
+    } else setGameScreen('host');
   };
 
   const rejoinAsHost = async () => {
@@ -1457,16 +1485,19 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     await update(gameRef(roomCode),{deadline:(deadline||Date.now())+ms});
     notify(`⏱️ تمديد ${fmtMs(ms)}`,'gold');
   };
-  const cancelCompetition = async () => {
-    if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
-    await update(gameRef(roomCode), {
+  const cancelCompetition = async (codeOverride) => {
+    const code = codeOverride || roomCode;
+    if (!code) return;
+    void recordSessionEnd('titles', code, false).catch(() => {});
+    await update(gameRef(code), {
       phase: 'ended',
       cancelled: true,
+      closedFromLobby: true,
       endedAt: Date.now(),
     });
     localStorage.removeItem('ng_session');
     localStorage.removeItem('ng_admin_session');
-    notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+    notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
   };
 
   const endGame = async () => {
@@ -1477,7 +1508,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if (gameState?.phase === 'attacking' || gameState?.phase === 'revealing') {
       await recordRoundCompleted('titles', roomCode).catch(() => {});
     }
-    if (roomCode) recordSessionEnd('titles', roomCode, true).catch(() => {});
+    if (roomCode) void recordSessionEnd('titles', roomCode, true).catch(() => {});
     await update(gameRef(roomCode), { phase: 'ended', endedAt: Date.now() });
     // Clear ALL sessions so no one auto-rejoins a finished game
     localStorage.removeItem('ng_session');
@@ -1674,12 +1705,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           await auth.authStateReady();
         }
 
-        const applyAdminFromRoom = (roomCode, ph) => {
+        const applyAdminFromRoom = (roomCode, gameSnap) => {
           setRoomCode(roomCode);
           setRole('admin');
           setMyId(null);
           setMyNickLocal('');
-          applyTitlesAdminScreens(ph || 'lobby');
+          applyTitlesAdminScreens(gameSnap);
         };
 
         const clearLsForRoom = (roomCode) => {
@@ -1715,12 +1746,12 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           if (uid && roomData?.adminId === uid) {
             localStorage.removeItem('ng_session');
             localStorage.setItem('ng_admin_session', JSON.stringify({ roomCode }));
-            applyAdminFromRoom(roomCode, phase);
+            applyAdminFromRoom(roomCode, roomData?.game || { phase: phase || 'lobby' });
             return true;
           }
 
           if (mode === 'admin') {
-            applyAdminFromRoom(roomCode, phase);
+            applyAdminFromRoom(roomCode, roomData?.game || { phase: phase || 'lobby' });
             return true;
           }
 
@@ -1739,7 +1770,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
             if (aRaw) {
               try {
                 if (JSON.parse(aRaw)?.roomCode === roomCode) {
-                  applyAdminFromRoom(roomCode, phase);
+                  applyAdminFromRoom(roomCode, roomData?.game || { phase: phase || 'lobby' });
                   return true;
                 }
               } catch {
@@ -1855,7 +1886,7 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
         setRole('admin');
         setMyId(null);
         setMyNickLocal('');
-        applyTitlesAdminScreens(ph || 'lobby');
+        applyTitlesAdminScreens(pdata?.game || { phase: ph || 'lobby' });
 
         if (hadMislinkedPlayerSession) {
           notify('✅ تم التعرف على صلاحياتك كمشرف الغرفة', 'gold');
@@ -1935,16 +1966,16 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
     if(!roomCode) return;
     // game state
     const gRef = gameRef(roomCode);
-    const unsub1 = onValue(gRef, snap=>{ setGameState(snap.val()); });
+    const unsub1 = onValue(gRef, snap=>{ if (titlesClosingRef.current) return; setGameState(snap.val()); });
     // players
     const pRef = playersRef(roomCode);
-    const unsub2 = onValue(pRef, snap=>{ setPlayers(snap.val()||{}); });
+    const unsub2 = onValue(pRef, snap=>{ if (titlesClosingRef.current) return; setPlayers(snap.val()||{}); });
     // attacks
     const aRef = attacksRef(roomCode);
-    const unsub3 = onValue(aRef, snap=>{ setAttacks(snap.val()||{}); });
+    const unsub3 = onValue(aRef, snap=>{ if (titlesClosingRef.current) return; setAttacks(snap.val()||{}); });
     // all rounds
     const rRef = ref(db, `rooms/${roomCode}/rounds`);
-    const unsub4 = onValue(rRef, snap=>{ setAllRoundsData(snap.val()||{}); });
+    const unsub4 = onValue(rRef, snap=>{ if (titlesClosingRef.current) return; setAllRoundsData(snap.val()||{}); });
 
     return ()=>{ off(gRef); off(pRef); off(aRef); off(rRef); };
   }, [roomCode]);
@@ -2026,19 +2057,22 @@ const TitlesGameInner = forwardRef(function TitlesGameInner(
           })
           .sort((a, b) => b.hits - a.hits || b.count - a.count);
         const rankIdx = myId ? rankRows.findIndex((r) => r.id === myId) : -1;
-        const rank = rankIdx >= 0 ? rankIdx + 1 : playersList.length ? playersList.length : null;
+        const rank = rankIdx >= 0 ? rankIdx + 1 : null;
         const started = gameState?.createdAt;
         const timeSec = started ? Math.round((Date.now() - started) / 1000) : undefined;
+        const meaningful = hasMeaningfulTitlesParticipation({ hits, attacks: myAtks.length });
         onGameEnd({
           game: 'titles',
           roomCode: joinInput || roomCode,
           winner: winnerName,
-          playerStats: {
-            rank,
-            hits,
-            accuracy,
-            time: timeSec,
-          },
+          playerStats: meaningful && rank != null
+            ? {
+                rank,
+                hits,
+                accuracy,
+                time: timeSec,
+              }
+            : null,
         });
       }
       return;

@@ -43,6 +43,8 @@ import { HESBAH_QUICK_RULES } from '../../shared/quickRulesContent';
 import { GameSessionChecking } from '../../shared/GameTopNav';
 import GameCancelledScreen from '../../shared/GameCancelledScreen';
 import { hasHesbahCompetitionStarted, isGameCancelled } from '../../shared/gameCompetition';
+import { hasMeaningfulHesbahParticipation } from '../../core/arenaParticipation';
+import { useSessionGateTimeout } from '../../shared/useSessionGateTimeout';
 import { formatOtherSessionsHint, getOtherActiveSessions } from '../../shared/gameSessionRegistry';
 import GameSeatPinField from '../../shared/GameSeatPinField';
 import GameSeatWelcomeOverlay from '../../shared/GameSeatWelcomeOverlay';
@@ -133,6 +135,7 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [authUid, setAuthUid] = useState(auth.currentUser?.uid || null);
   const [savedSession, setSavedSession] = useState(() => readSavedHesbah());
   const [sessionGate, setSessionGate] = useState(() => (readSavedHesbah().roomCode ? 'checking' : 'ready'));
+  useSessionGateTimeout(sessionGate, setSessionGate);
   const [gameScreen, setGameScreen] = useState('home');
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [showGuide, setShowGuide] = useState(false);
@@ -176,6 +179,7 @@ const HesbahGame = forwardRef(function HesbahGame(
   const [exitSheetOpen, setExitSheetOpen] = useState(false);
   const endPromptRef = useRef(false);
   const hesbahPlayerEndRef = useRef(false);
+  const hesbahClosingRef = useRef(false);
   const pendingOnboardingRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -322,11 +326,11 @@ const HesbahGame = forwardRef(function HesbahGame(
     const hRef = dbRef(db, `srooms/${roomCode}/hostAnswer`);
     const vRef = dbRef(db, `srooms/${roomCode}/votes`);
 
-    const onG = (snap) => setGame(snap.val());
-    const onP = (snap) => setPlayers(snap.val() || {});
-    const onA = (snap) => setAnswers(snap.val() || {});
-    const onH = (snap) => setHostAnswer(snap.val());
-    const onV = (snap) => setVotes(snap.val() || {});
+    const onG = (snap) => { if (hesbahClosingRef.current) return; setGame(snap.val()); };
+    const onP = (snap) => { if (hesbahClosingRef.current) return; setPlayers(snap.val() || {}); };
+    const onA = (snap) => { if (hesbahClosingRef.current) return; setAnswers(snap.val() || {}); };
+    const onH = (snap) => { if (hesbahClosingRef.current) return; setHostAnswer(snap.val()); };
+    const onV = (snap) => { if (hesbahClosingRef.current) return; setVotes(snap.val() || {}); };
 
     onValue(gRef, onG);
     onValue(pRef, onP);
@@ -930,6 +934,13 @@ const HesbahGame = forwardRef(function HesbahGame(
         notify(subGuard.message, subGuard.expired ? 'error' : 'info');
         return;
       }
+      const gamePhase = data.game?.phase;
+      if (gamePhase === 'ended' || isGameCancelled(data.game)) {
+        clearHesbahSession();
+        setSavedSession({});
+        notify('انتهت هذه المسابقة', 'info');
+        return;
+      }
       const player = data.players?.[pid];
       const uid = auth.currentUser?.uid;
       const tokenOk =
@@ -1455,7 +1466,7 @@ const HesbahGame = forwardRef(function HesbahGame(
 
   const endGame = async () => {
     if (endPromptRef.current && phase === 'final') return;
-    await recordSessionEnd('hesbah', roomCode, true);
+    void recordSessionEnd('hesbah', roomCode, true).catch(() => {});
     if (!endPromptRef.current) {
       endPromptRef.current = true;
       onGameEnd?.({ game: 'hesbah', roomCode });
@@ -1463,45 +1474,63 @@ const HesbahGame = forwardRef(function HesbahGame(
     playSound('victory');
   };
 
-  const cancelCompetition = async () => {
+  const cancelCompetition = async (codeOverride) => {
+    const code = codeOverride || roomCode;
+    if (!code) return;
     try {
-      await recordSessionEnd('hesbah', roomCode, true);
-      await update(dbRef(db, `srooms/${roomCode}/game`), {
+      void recordSessionEnd('hesbah', code, false).catch(() => {});
+      await update(dbRef(db, `srooms/${code}/game`), {
         phase: 'ended',
         cancelled: true,
+        closedFromLobby: true,
         endedAt: Date.now(),
       });
       clearHesbahSession();
-      notify('تم إلغاء المسابقة — المتسابقون سيُخرجون', 'info');
+      setSavedSession({});
+      resetHesbahRoomState();
+      notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
     } catch {
-      notify('تعذّر إلغاء المسابقة', 'error');
+      notify('تعذّر إغلاق الغرفة', 'error');
     }
   };
 
   const endCompetitionFromExit = async () => {
     setExitSheetOpen(false);
     const code = roomCode;
-    const started = hasHesbahCompetitionStarted(game);
-    resetHesbahRoomState();
     if (!code) return;
+    const started = hasHesbahCompetitionStarted(game);
+
+    hesbahClosingRef.current = true;
+    clearHesbahSession();
+    setSavedSession({});
+    if (auth.currentUser?.uid) {
+      void clearHostActiveRoom(auth.currentUser.uid, 'hesbah');
+    }
+    resetHesbahRoomState();
+
     try {
-      await recordSessionEnd('hesbah', code, true);
+      if (!started) {
+        void recordSessionEnd('hesbah', code, false).catch(() => {});
+        await update(dbRef(db, `srooms/${code}/game`), {
+          phase: 'ended',
+          cancelled: true,
+          closedFromLobby: true,
+          endedAt: Date.now(),
+        });
+        notify('تم إغلاق الغرفة — لم تبدأ المسابقة', 'info');
+        return;
+      }
+      void recordSessionEnd('hesbah', code, true).catch(() => {});
       await update(dbRef(db, `srooms/${code}/game`), {
         phase: 'ended',
         endedAt: Date.now(),
         endedByHost: true,
-        ...(started ? {} : { closedFromLobby: true }),
       });
-      clearHesbahSession();
-      if (auth.currentUser?.uid) {
-        void clearHostActiveRoom(auth.currentUser.uid, 'hesbah');
-      }
-      notify(
-        started ? 'تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت' : 'تم إغلاق الغرفة',
-        'info'
-      );
+      notify('تم إنهاء المسابقة — المتسابقون يرون أن اللعبة انتهت', 'info');
     } catch {
       notify('تعذّر إنهاء المسابقة', 'error');
+    } finally {
+      hesbahClosingRef.current = false;
     }
   };
 
@@ -1637,14 +1666,16 @@ const HesbahGame = forwardRef(function HesbahGame(
 
     const ranked = sortedHesbahPlayers(players);
     const rankIdx = ranked.findIndex((p) => p.id === myId);
-    const rank = rankIdx >= 0 ? rankIdx + 1 : ranked.length || null;
+    const rank = rankIdx >= 0 ? rankIdx + 1 : null;
     const winnerName = ranked[0]?.name || '—';
+    const myPlayer = myId ? players[myId] : null;
 
     onGameEnd({
       game: 'hesbah',
       roomCode,
       winner: winnerName,
-      playerStats: rank != null ? { rank } : null,
+      playerStats:
+        rank != null && hasMeaningfulHesbahParticipation(myPlayer) ? { rank } : null,
     });
   }, [phase, role, onGameEnd, roomCode, players, myId, game]);
 

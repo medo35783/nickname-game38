@@ -1,8 +1,21 @@
-import { get, ref } from 'firebase/database';
+import { get, ref, set } from 'firebase/database';
 import { arenaPointsForRank, ARENA_HOST_BASE, ARENA_HOST_PER_PLAYER } from './arena.constants';
 import { awardArenaPoints, isArenaRegisteredUser } from './arenaProfile';
 import { updateWeeklyLeaderboard } from './arenaLeaderboard';
 import { auth, db } from '../firebase';
+
+async function claimArenaRewardDedupe(uid, dedupeKey) {
+  if (!uid || !dedupeKey) return true;
+  try {
+    const dedupeRef = ref(db, `users/${uid}/arenaRewards/${dedupeKey}`);
+    const snap = await get(dedupeRef);
+    if (snap.exists()) return false;
+    await set(dedupeRef, { at: Date.now() });
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 /**
  * مكافأة متسابق عند نهاية اللعبة
@@ -11,6 +24,10 @@ export async function rewardArenaPlayerEnd({ uid, gameType, rank, roomCode }) {
   if (!uid || rank == null) return 0;
   const pts = arenaPointsForRank(rank);
   if (pts <= 0) return 0;
+
+  const dedupeKey = `player_${gameType}_${roomCode || 'na'}_${rank}`;
+  const ok = await claimArenaRewardDedupe(uid, dedupeKey);
+  if (!ok) return 0;
 
   const result = await awardArenaPoints(uid, pts, {
     type: 'player_rank',
@@ -39,6 +56,10 @@ export async function rewardArenaHostSession({
   let pts = ARENA_HOST_BASE;
   pts += Math.min(Math.max(0, Number(playerCount) || 0), 20) * ARENA_HOST_PER_PLAYER;
   if (pts <= 0) return 0;
+
+  const dedupeKey = `host_${gameType}_${roomCode || 'na'}`;
+  const ok = await claimArenaRewardDedupe(uid, dedupeKey);
+  if (!ok) return 0;
 
   const result = await awardArenaPoints(uid, pts, {
     type: 'host_complete',

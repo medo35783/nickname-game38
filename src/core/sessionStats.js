@@ -192,6 +192,45 @@ function playersPath(gameType, roomCode) {
   return `qrooms/${roomCode}/members`;
 }
 
+/** لاعبون نشطون فقط — بدون مشرف/منسحب/مغادر */
+export function countActiveParticipants(gameType, players = {}) {
+  const type = normalizeGameType(gameType);
+  let count = 0;
+  Object.values(players).forEach((p) => {
+    if (!p || typeof p !== 'object') return;
+    if (type === 'hesbah') {
+      if (p.isHost) return;
+      if (p.left) return;
+      if (String(p.name || '').trim()) count += 1;
+      return;
+    }
+    if (type === 'titles') {
+      if (p.role === 'admin' || p.isAdmin) return;
+      if (p.status === 'withdrawn') return;
+      if (String(p.name || '').trim()) count += 1;
+      return;
+    }
+    if (p.status === 'withdrawn') return;
+    if (String(p.name || '').trim()) count += 1;
+  });
+  return count;
+}
+
+function sessionQualifiesForHostReward(gameType, game = {}) {
+  const type = normalizeGameType(gameType);
+  const totalRounds = Number(game.totalRounds) || 0;
+  if (type === 'hesbah') {
+    return (Number(game.currentQ) || 0) >= 1 || totalRounds >= 1;
+  }
+  if (type === 'titles') {
+    return totalRounds >= 1 || (Number(game.roundNum) || 0) >= 1;
+  }
+  if (type === 'fameeri') {
+    return totalRounds >= 1;
+  }
+  return totalRounds >= 1;
+}
+
 export function computeNextStats(prev = {}, sessionData) {
   const {
     gameType,
@@ -377,7 +416,7 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
     const roomData = roomSnap.val() || {};
     const playersSnap = await get(ref(db, playersPath(type, roomCode)));
     const players = playersSnap.val() || {};
-    const playerCount = Object.keys(players).length;
+    const playerCount = countActiveParticipants(type, players);
     const sessionEnd = Date.now();
 
     await update(ref(db, `${base}/game`), {
@@ -413,12 +452,14 @@ export async function recordSessionEnd(gameType, roomCode, completed = true) {
     };
     await updateCodeStats(adminId, game.adminCode || resolveCodeId(), sessionData);
 
-    if (completed && adminId) {
+    const qualifiesForHostReward =
+      completed && adminId && sessionQualifiesForHostReward(type, game);
+    if (qualifiesForHostReward) {
       const hostResult = await rewardHostIfRegistered({
         uid: adminId,
         gameType: type,
         playerCount,
-        completed,
+        completed: true,
         roomCode,
         totalRounds: Number(game.totalRounds) || 0,
         durationMinutes,

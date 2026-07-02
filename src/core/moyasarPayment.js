@@ -36,6 +36,10 @@ function writeJson(key, value) {
 /** عملية دفع معلّقة — تبقى حتى ينجح التفعيل */
 export function storePendingPayment(paymentId, planDays) {
   if (!paymentId) return;
+  const oldSuccess = readPaymentSuccess();
+  if (oldSuccess?.paymentId && oldSuccess.paymentId !== paymentId) {
+    clearPaymentSuccess();
+  }
   writeJson(MOYASAR_STORAGE.pendingPayment, {
     paymentId,
     planDays: Number(planDays) || null,
@@ -83,6 +87,16 @@ export function readPaymentSuccess() {
     return null;
   }
   return row;
+}
+
+/** هل النجاح المحفوظ يخص نفس عملية الدفع المعلّقة؟ */
+export function isStoredSuccessForPending() {
+  const pending = readPendingPayment();
+  const success = readPaymentSuccess();
+  const pendingId = pending?.paymentId || null;
+  if (!pendingId) return Boolean(success);
+  if (!success?.paymentId) return false;
+  return success.paymentId === pendingId;
 }
 
 export function clearPaymentSuccess() {
